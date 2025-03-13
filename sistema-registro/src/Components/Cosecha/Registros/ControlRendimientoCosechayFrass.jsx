@@ -57,16 +57,16 @@ function ControlRendimientoCosechayFrass() {
   const navigate = useNavigate();
 
   //Errores de validación
-      const [observacionesObligatorio, setObservacionesObligatorio] =
-        useState(false);
-      const [erroresValidacion, setErroresValidacion] = useState({
-        cant_cajas_cosechadas: false, 
-      kg_larva_fresca: false,
-      cant_cajas_desechadas: false, //Si es mayor a 0
-      kg_total_frass: false,
-      kg_material_grueso: false,
-      });
-
+  const [observacionesObligatorio, setObservacionesObligatorio] =
+    useState(false);
+  const [erroresValidacion, setErroresValidacion] = useState({
+    cant_cajas_cosechadas: false,
+    kg_larva_fresca: false,
+    cant_cajas_desechadas: false, //Si es mayor a 0
+    kg_total_frass: false,
+    kg_material_grueso: false,
+  });
+  const [lotes, setLotes] = useState([]);
   const convertirFecha = (fecha) =>
     fecha ? fecha.split("-").reverse().join("/") : "";
 
@@ -85,9 +85,22 @@ function ControlRendimientoCosechayFrass() {
       console.log("Error en la conexión a la base de datos");
     }
   };
+  const fetchLotes = async () => {
+    try {
+      const { data, error } = await supabase
+        .from("Lotes")
+        .select() // Si solo necesitas el campo base_numero_lote, podrías especificarlo: .select("base_numero_lote")
+        .in("etapa_actual", ["Dieta", "Cosecha", "HornoMul", "HornoMic"]); // Filtra registros con etapa_actual igual a 'hatchery' o 'dieta'
+      if (error) throw error;
+      setLotes(data || []); // Actualiza el estado con los datos obtenidos
+    } catch (err) {
+      console.log("Error en la conexión a la base de datos Lotes", err);
+    }
+  };
 
   useEffect(() => {
     fetchRegistros();
+    fetchLotes();
   }, []);
 
   const formatDateTime = (date, format = "DD-MM-YYYY hh:mm A") => {
@@ -111,14 +124,13 @@ function ControlRendimientoCosechayFrass() {
       .replace("A", fmt.dayPeriod || "AM");
   };
 
- 
-
   const saveRegistro = async () => {
     setSubmitted(true);
-  
+
     // Validar los campos
     const isCantCajasCosechadasInvalido =
-      registro.cant_cajas_cosechadas < 500 || registro.cant_cajas_cosechadas > 2000;
+      registro.cant_cajas_cosechadas < 500 ||
+      registro.cant_cajas_cosechadas > 2000;
     const isKgLarvaFrescaInvalido =
       registro.kg_larva_fresca < 0 || registro.kg_larva_fresca > 12000;
     const isCantCajasDesechadasInvalido = registro.cant_cajas_desechadas === 0;
@@ -126,7 +138,7 @@ function ControlRendimientoCosechayFrass() {
       registro.kg_total_frass < 0 || registro.kg_total_frass > 6000;
     const isKgMaterialGruesoInvalido =
       registro.kg_material_grueso < 0 || registro.kg_material_grueso > 6000;
-  
+
     // Actualizar el estado de errores
     const erroresValidacion = {
       cant_cajas_cosechadas: isCantCajasCosechadasInvalido,
@@ -135,12 +147,12 @@ function ControlRendimientoCosechayFrass() {
       kg_total_frass: isKgTotalFrassInvalido,
       kg_material_grueso: isKgMaterialGruesoInvalido,
     };
-  
+
     // Verificar si algún valor está fuera de rango
     const valoresFueraDeRango = Object.values(erroresValidacion).some(
       (error) => error
     );
-  
+
     // Validación principal
     if (
       !registro.fec_siembra ||
@@ -163,7 +175,7 @@ function ControlRendimientoCosechayFrass() {
       });
       return;
     }
-  
+
     // Si algún valor está fuera de rango y no hay observaciones, mostrar error
     if (valoresFueraDeRango && !registro.observaciones) {
       const camposInvalidos = Object.keys(erroresValidacion)
@@ -185,7 +197,7 @@ function ControlRendimientoCosechayFrass() {
           }
         })
         .join(", ");
-  
+
       toast.current.show({
         severity: "error",
         summary: "Error",
@@ -194,15 +206,32 @@ function ControlRendimientoCosechayFrass() {
       });
       return;
     }
-  
+
     try {
-      const currentDate = formatDateTime(new Date(), "DD/MM/YYYY"); // Solo fecha
-      const currentTime = formatDateTime(new Date(), "hh:mm A"); // Fecha en formato ISO 8601
-  
+      const currentDate = formatDateTime(new Date(), "DD/MM/YYYY");
+      const currentTime = formatDateTime(new Date(), "hh:mm A");
+
+      // Verificar si el lote seleccionado existe
+      const { data: loteExistente, error: loteError } = await supabase
+        .from("Lotes")
+        .select("base_numero_lote")
+        .eq("base_numero_lote", registro.base_numero_lote)
+        .single();
+
+      if (loteError || !loteExistente) {
+        toast.current.show({
+          severity: "error",
+          summary: "Error",
+          detail: `El lote ${registro.base_numero_lote} no existe.`,
+          life: 3000,
+        });
+        return;
+      }
       const { data, error } = await supabase
         .from("Control_Rendimiento_CosechayFrass")
         .insert([
           {
+            base_numero_lote: registro.base_numero_lote, // Lote seleccionado
             fec_siembra: registro.fec_siembra,
             fec_cosecha: registro.fec_cosecha,
             cant_cajas_cosechadas: registro.cant_cajas_cosechadas,
@@ -219,21 +248,33 @@ function ControlRendimientoCosechayFrass() {
             tipo_control: registro.tipo_control,
           },
         ]);
-  
+
       if (error) {
         console.error("Error en Supabase:", error);
         throw new Error(
           error.message || "Error desconocido al guardar en Supabase"
         );
       }
-  
+      // Actualizar la tabla Lotes con la nueva etapa_actual
+      const { error: updateError } = await supabase
+        .from("Lotes")
+        .update({ etapa_actual: "Cosecha" }) // Cambia "Control de Rendimiento" por la etapa que corresponda
+        .eq("base_numero_lote", registro.base_numero_lote);
+
+      if (updateError) {
+        console.error("Error al actualizar Lotes:", updateError);
+        throw new Error(
+          updateError.message || "Error desconocido al actualizar Lotes"
+        );
+      }
+
       toast.current.show({
         severity: "success",
         summary: "Exitoso",
         detail: "Registro guardado exitosamente",
         life: 3000,
       });
-  
+
       // Limpia el estado
       setRegistro(emptyRegister);
       setRegistroDialog(false);
@@ -393,10 +434,7 @@ function ControlRendimientoCosechayFrass() {
         outlined
         onClick={hideDialog}
       />
-      <Button 
-      label="Guardar" 
-      icon="pi pi-check" 
-      onClick={saveRegistro} />
+      <Button label="Guardar" icon="pi pi-check" onClick={saveRegistro} />
     </React.Fragment>
   );
 
@@ -436,10 +474,12 @@ function ControlRendimientoCosechayFrass() {
     doc.setFontSize(18);
     doc.text("Registros de Control Rendimiento Cosecha y Frass", 14, 22);
 
-    const exportData = selectedRegistros.map(({ fec_registro, hor_registro, ...row }) => ({
-      ...row,
-      registrado: `${fec_registro || ""} ${hor_registro || ""}`,
-    }));
+    const exportData = selectedRegistros.map(
+      ({ fec_registro, hor_registro, ...row }) => ({
+        ...row,
+        registrado: `${fec_registro || ""} ${hor_registro || ""}`,
+      })
+    );
 
     const columnsPerPage = 5;
     const maxHeightPerColumn = 10;
@@ -461,11 +501,21 @@ function ControlRendimientoCosechayFrass() {
       exportColumns.forEach(({ title, dataKey }, index) => {
         const value = row[dataKey];
         doc.setFillColor(...headerColor);
-        doc.rect(startX, currentY + (index * maxHeightPerColumn), 180, maxHeightPerColumn, 'F');
+        doc.rect(
+          startX,
+          currentY + index * maxHeightPerColumn,
+          180,
+          maxHeightPerColumn,
+          "F"
+        );
         doc.setTextColor(255);
-        doc.text(title, startX + 2, currentY + (index * maxHeightPerColumn) + 7);
+        doc.text(title, startX + 2, currentY + index * maxHeightPerColumn + 7);
         doc.setTextColor(...textColor);
-        doc.text(`${value}`, startX + 90, currentY + (index * maxHeightPerColumn) + 7);
+        doc.text(
+          `${value}`,
+          startX + 90,
+          currentY + index * maxHeightPerColumn + 7
+        );
       });
 
       currentY += rowHeight;
@@ -485,18 +535,24 @@ function ControlRendimientoCosechayFrass() {
       return;
     }
 
-    const headers = cols.map(col => col.header);
-    const exportData = selectedRegistros.map(({ fec_registro, hor_registro, ...registro }) => ({
-      ...registro,
-      registrado: `${fec_registro || ""} ${hor_registro || ""}`,
-    }));
+    const headers = cols.map((col) => col.header);
+    const exportData = selectedRegistros.map(
+      ({ fec_registro, hor_registro, ...registro }) => ({
+        ...registro,
+        registrado: `${fec_registro || ""} ${hor_registro || ""}`,
+      })
+    );
 
-    const rows = exportData.map(registro => cols.map(col => registro[col.field]));
+    const rows = exportData.map((registro) =>
+      cols.map((col) => registro[col.field])
+    );
 
     const dataToExport = [headers, ...rows];
     const ws = XLSX.utils.aoa_to_sheet(dataToExport);
 
-    ws["!cols"] = cols.map(col => ({ width: Math.max(col.header.length, 10) }));
+    ws["!cols"] = cols.map((col) => ({
+      width: Math.max(col.header.length, 10),
+    }));
 
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, "Registros");
@@ -550,12 +606,39 @@ function ControlRendimientoCosechayFrass() {
             currentPageReportTemplate="Mostrando del {first} al {last} de {totalRecords} Registros"
           >
             <Column selectionMode="multiple" exportable={false}></Column>
+            <Column
+              field="numero_lote"
+              header="Número Lote"
+              // editor={(options) => textEditor(options)}
+              sortable
+              style={{ minWidth: "10rem" }}
+            ></Column>
             <Column field="fec_registro" header="Fecha Registro" sortable />
             <Column field="hor_registro" header="Hora Registro" sortable />
-            <Column field="tipo_produccion" header="Tipo Producción" editor={(options) => textEditor(options)} sortable />
-            <Column field="tipo_control" header="Tipo Control" editor={(options) => textEditor(options)} sortable />
-            <Column field="fec_siembra" header="Fecha Siembra" editor={(options) => dateEditor(options)} sortable />
-            <Column field="fec_cosecha" header="Fecha Cosecha" editor={(options) => dateEditor(options)} sortable />
+            <Column
+              field="tipo_produccion"
+              header="Tipo Producción"
+              editor={(options) => textEditor(options)}
+              sortable
+            />
+            <Column
+              field="tipo_control"
+              header="Tipo Control"
+              editor={(options) => textEditor(options)}
+              sortable
+            />
+            <Column
+              field="fec_siembra"
+              header="Fecha Siembra"
+              editor={(options) => dateEditor(options)}
+              sortable
+            />
+            <Column
+              field="fec_cosecha"
+              header="Fecha Cosecha"
+              editor={(options) => dateEditor(options)}
+              sortable
+            />
             <Column
               field="cant_cajas_cosechadas"
               header="Cajas Cosechadas"
@@ -574,7 +657,12 @@ function ControlRendimientoCosechayFrass() {
               sortable
               editor={(options) => numberEditor(options)}
             />
-            <Column field="kg_total_frass" header="Total Frass (KG)" editor={(options) => floatEditor(options)} sortable />
+            <Column
+              field="kg_total_frass"
+              header="Total Frass (KG)"
+              editor={(options) => floatEditor(options)}
+              sortable
+            />
             <Column
               field="kg_material_grueso"
               header="Material Grueso (KG)"
@@ -588,7 +676,12 @@ function ControlRendimientoCosechayFrass() {
               sortable
               editor={(options) => dateEditor(options)}
             />
-            <Column field="observaciones" header="Observaciones" sortable editor={(options) => textEditor(options)} />
+            <Column
+              field="observaciones"
+              header="Observaciones"
+              sortable
+              editor={(options) => textEditor(options)}
+            />
             <Column
               header="Herramientas"
               rowEditor={allowEdit}
@@ -609,6 +702,25 @@ function ControlRendimientoCosechayFrass() {
         onHide={hideDialog}
       >
         <div className="field">
+          <label htmlFor="base_numero_lote" className="font-bold">
+            Número de lote{" "}
+            {submitted && !registro.base_numero_lote && (
+              <small className="p-error">Requerido.</small>
+            )}
+          </label>
+
+          <Dropdown
+            value={registro.base_numero_lote}
+            onChange={(e) => {
+              setRegistro({ ...registro, base_numero_lote: e.value });
+            }}
+            options={[...(lotes || [])]}
+            optionLabel="base_numero_lote" // Mostrar el campo "label" en el dropdown
+            optionValue="base_numero_lote" // Guardar el valor de "base_numero_lote"
+            placeholder="Selecciona un Número de lote"
+            className="w-full md:w-14rem"
+          />
+          <br />
           <label htmlFor="fec_siembra" className="font-bold">
             Fecha Siembra{" "}
             {submitted && !registro.fec_siembra && (

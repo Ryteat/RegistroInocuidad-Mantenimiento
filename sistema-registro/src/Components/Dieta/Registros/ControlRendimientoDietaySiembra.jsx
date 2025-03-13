@@ -72,6 +72,7 @@ function ControLRendimientoDietaySiembra() {
     cajas_dieta_no_sembradas_pro: false,
     g_neonatos_sembrados_caja_pro: false,
   });
+   const [lotes, setLotes] = useState([]); 
 
   const convertirFecha = (fecha) =>
     fecha ? fecha.split("-").reverse().join("/") : "";
@@ -88,9 +89,22 @@ function ControLRendimientoDietaySiembra() {
       console.log("Error en la conexión a la base de datos");
     }
   };
+  const fetchLotes = async () => {
+      try {
+        const { data, error } = await supabase
+          .from("Lotes")
+          .select() // Si solo necesitas el campo base_numero_lote, podrías especificarlo: .select("base_numero_lote")
+          .in("etapa_actual", ["Hatchery", "Dieta", "Cosecha"]); // Filtra registros con etapa_actual igual a 'hatchery' o 'dieta'
+        if (error) throw error;
+        setLotes(data || []); // Actualiza el estado con los datos obtenidos
+      } catch (err) {
+        console.log("Error en la conexión a la base de datos Lotes", err);
+      }
+    };
 
   useEffect(() => {
     fetchRegistros();
+    fetchLotes();
   }, []);
 
   const formatDateTime = (date, format = "DD-MM-YYYY hh:mm A") => {
@@ -218,13 +232,31 @@ function ControLRendimientoDietaySiembra() {
     });
 
     try {
-      const currentDate = formatDateTime(new Date(), "DD/MM/YYYY"); // Fecha actual
-      const currentTime = formatDateTime(new Date(), "hh:mm A"); // Hora actual
+      const currentDate = formatDateTime(new Date(), "DD/MM/YYYY");
+      const currentTime = formatDateTime(new Date(), "hh:mm A");
+
+      // Verificar si el lote seleccionado existe
+      const { data: loteExistente, error: loteError } = await supabase
+          .from("Lotes")
+          .select("base_numero_lote")
+          .eq("base_numero_lote", registro.base_numero_lote)
+          .single();
+
+      if (loteError || !loteExistente) {
+          toast.current.show({
+              severity: "error",
+              summary: "Error",
+              detail: `El lote ${registro.base_numero_lote} no existe.`,
+              life: 3000,
+          });
+          return;
+      }
 
       const { data, error } = await supabase
         .from("Control_Rendimiento_DietaySiembra")
         .insert([
           {
+            base_numero_lote: registro.base_numero_lote, // Lote seleccionado
             cantidad_tandas: registro.cantidad_tandas,
             kg_dieta_caja: registro.kg_dieta_caja,
             kg_residuo_organico: registro.kg_residuo_organico,
@@ -258,6 +290,18 @@ function ControLRendimientoDietaySiembra() {
           error.message || "Error desconocido al guardar en Supabase"
         );
       }
+       // Actualizar la tabla Lotes con la nueva etapa_actual
+       const { error: updateError } = await supabase
+       .from("Lotes")
+       .update({ etapa_actual: "Dieta" }) // Cambia "Control de Rendimiento" por la etapa que corresponda
+       .eq("base_numero_lote", registro.base_numero_lote);
+
+   if (updateError) {
+       console.error("Error al actualizar Lotes:", updateError);
+       throw new Error(
+           updateError.message || "Error desconocido al actualizar Lotes"
+       );
+   }
       toast.current.show({
         severity: "success",
         summary: "Exitoso",
@@ -626,6 +670,13 @@ function ControLRendimientoDietaySiembra() {
           >
             <Column selectionMode="multiple" exportable={false}></Column>
             <Column
+                          field="numero_lote"
+                          header="Número Lote"
+                          // editor={(options) => textEditor(options)}
+                          sortable
+                          style={{ minWidth: "10rem" }}
+                        ></Column>
+            <Column
               field="cantidad_tandas"
               header="Cantidad Tandas"
               editor={(options) => numberEditor(options)}
@@ -774,6 +825,29 @@ function ControLRendimientoDietaySiembra() {
         onHide={hideDialog}
       >
         <div className="field">
+          <label htmlFor="base_numero_lote" className="font-bold">
+                      Número de lote{" "}
+                      {submitted && !registro.base_numero_lote && (
+                        <small className="p-error">Requerido.</small>
+                      )}
+                    </label>
+          
+          
+                    
+                    <Dropdown
+              value={registro.base_numero_lote}
+              onChange={(e) => {
+                  setRegistro({ ...registro, base_numero_lote: e.value });
+              }}
+              options={[
+                  ...(lotes || []),
+              ]}
+              optionLabel="base_numero_lote" // Mostrar el campo "label" en el dropdown
+              optionValue="base_numero_lote" // Guardar el valor de "base_numero_lote"
+              placeholder="Selecciona un Número de lote"
+              className="w-full md:w-14rem"
+          />
+          <br />
           <label htmlFor="cantidad_tandas" className="font-bold">
             Cantidad Tandas{" "}
             {submitted && !registro.cantidad_tandas && (
