@@ -1,19 +1,43 @@
 import React from 'react';
-
 import { useLocation, useNavigate } from 'react-router-dom';
 import './MenuPrincipal.css';
 import logo from '../../assets/Pronuvo_logos_sin_fondo_6.png green.png';
 import logo2 from '../../assets/mosca.png';
 
-
 function MenuPrincipal() {
   const navigate = useNavigate();
   const location = useLocation();
-  const { departamento } = location.state || {}; // Obtener el nombre de usuario desde el estado
+  const { departamento } = location.state || {};
 
-  // Función para manejar el cierre de sesión
+  // Depuración: Mostrar en consola el valor recibido
+  console.log('Departamentos recibidos:', departamento);
+
+  // Función mejorada para verificar departamentos
+  const hasDepartment = (requiredDepartments) => {
+    try {
+      if (!departamento) return false;
+      
+      // Asegurar que sea array (convertir si es string)
+      const userDepartments = Array.isArray(departamento) 
+        ? departamento 
+        : typeof departamento === 'string'
+          ? departamento.split(',')
+          : [];
+
+      // Normalizar nombres (trim + minúsculas)
+      const normalizedUserDepartments = userDepartments.map(d => d.trim().toLowerCase());
+      
+      return requiredDepartments.some(rd => 
+        normalizedUserDepartments.includes(rd.trim().toLowerCase())
+      );
+    } catch (error) {
+      console.error('Error verificando departamentos:', error);
+      return false;
+    }
+  };
+
   const handleLogout = () => {
-    navigate('/'); // Redirigir a la pantalla de Login
+    navigate('/');
   };
 
   return (
@@ -21,38 +45,47 @@ function MenuPrincipal() {
       <h1>
         <img src={logo2} alt="mosca" className="logo2" /> Menú Principal
       </h1>
+
       <div className="botones">
-        {/* Solo mostrar "Opción 1" si el usuario pertenece al departamento de Calidad" */}
-        
-        {departamento === 'Hatchery' && (
-          <button onClick={() => navigate('/Hatchery')}>Registros Hatchery </button>
+        {hasDepartment(['Hatchery']) && (
+          <button onClick={() => navigate('/Hatchery')}>Registros Hatchery</button>
         )}
-        {departamento === 'Dieta'&& (
-          <button onClick={() => navigate('/Dieta')}>Registros Dieta </button>
+
+        {hasDepartment(['Dieta']) && (
+          <button onClick={() => navigate('/Dieta')}>Registros Dieta</button>
         )}
-        {departamento === 'Horno' && (
-          <button onClick={() => navigate('/Horno')}>Registros Horno </button>
+
+        {hasDepartment(['Horno']) && (
+          <button onClick={() => navigate('/Horno')}>Registros Horno</button>
         )}
-        {departamento === 'Calidad' && (
+
+        {hasDepartment(['Calidad']) && (
           <button onClick={() => navigate('/Calidad')}>Registros Calidad</button>
         )}
-        {departamento === 'Cosecha'&& (
-          <button onClick={() => navigate('/Cosecha')}>Registros Cosecha </button>
+
+        {hasDepartment(['Cosecha']) && (
+          <button onClick={() => navigate('/Cosecha')}>Registros Cosecha</button>
         )}
-        {departamento === 'Mantenimiento'  && (
-          <button onClick={() => navigate('/Mantenimiento')}>Registros Mantenimiento </button>
+
+        {hasDepartment(['Mantenimiento']) && (
+          <button onClick={() => navigate('/Mantenimiento')}>Registros Mantenimiento</button>
         )}
-        {departamento === 'Gerencia' && (
-          <button onClick={() => navigate('/Gerencia')}>Información Gerencia </button>
+
+        {hasDepartment(['Gerencia']) && (
+          <button onClick={() => navigate('/Gerencia')}>Información Gerencia</button>
         )}
+
+        {hasDepartment(['Visualizar']) && (
+          <button onClick={() => navigate('/Visualizar')}>Visualizar información</button>
+        )}
+
         <button onClick={handleLogout} className="logout-button">
           Cerrar Sesión
         </button>
       </div>
-         {/* Logo en la esquina inferior derecha */}
-        <img src={logo} alt="Logo de mi aplicación" className="logo" />
-    </div>
 
+      <img src={logo} alt="Logo" className="logo" />
+    </div>
   );
 }
 
