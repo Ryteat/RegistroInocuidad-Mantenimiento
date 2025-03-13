@@ -17,7 +17,6 @@ import jsPDF from "jspdf";
 import "jspdf-autotable";
 import logo2 from "../../../assets/mosca.png";
 
-
 function ControlRendimientoSecadoHornoMultilevel() {
   let emptyRegister = {
     fecha_registro: "",
@@ -41,24 +40,24 @@ function ControlRendimientoSecadoHornoMultilevel() {
   const [submitted, setSubmitted] = useState(false);
   const [registroDialog, setRegistroDialog] = useState(false);
   const navigate = useNavigate();
-
+  const [lotes, setLotes] = useState([]);
 
   // Función para formatear la fecha en formato día/mes/año
-const formatearFecha = (fecha) => {
-  if (!fecha) return "";
-  const date = new Date(fecha);
-  const dia = String(date.getDate()).padStart(2, "0");
-  const mes = String(date.getMonth() + 1).padStart(2, "0"); // Los meses comienzan en 0
-  const año = date.getFullYear();
-  return `${dia}/${mes}/${año}`;
+  const formatearFecha = (fecha) => {
+    if (!fecha) return "";
+    const date = new Date(fecha);
+    const dia = String(date.getDate()).padStart(2, "0");
+    const mes = String(date.getMonth() + 1).padStart(2, "0"); // Los meses comienzan en 0
+    const año = date.getFullYear();
+    return `${dia}/${mes}/${año}`;
   };
 
   // Función para convertir la fecha de día/mes/año a formato ISO (año-mes-día)
   const convertirFechaISO = (fecha) => {
-  if (!fecha) return "";
-  const [dia, mes, año] = fecha.split("/");
-  return `${año}-${mes}-${dia}`;
-};
+    if (!fecha) return "";
+    const [dia, mes, año] = fecha.split("/");
+    return `${año}-${mes}-${dia}`;
+  };
 
   // Opciones para el campo "tipo_control"
   const tiposControl = ["Prueba", "Control"];
@@ -82,9 +81,27 @@ const formatearFecha = (fecha) => {
       console.log("Error en la conexión a la base de datos");
     }
   };
+  const fetchLotes = async () => {
+    try {
+      const { data, error } = await supabase
+        .from("Lotes")
+        .select() // Si solo necesitas el campo base_numero_lote, podrías especificarlo: .select("base_numero_lote")
+        .in("etapa_actual", [
+          "Cosecha",
+          "HornoMul",
+          "HornoMic",
+          "ProductoTerminado",
+        ]); // Filtra registros con etapa_actual igual a 'hatchery' o 'dieta'
+      if (error) throw error;
+      setLotes(data || []); // Actualiza el estado con los datos obtenidos
+    } catch (err) {
+      console.log("Error en la conexión a la base de datos Lotes", err);
+    }
+  };
 
   useEffect(() => {
     fetchRegistros();
+    fetchLotes();
   }, []);
 
   const obtenerHoraActual = () => {
@@ -114,7 +131,7 @@ const formatearFecha = (fecha) => {
       });
       return;
     }
-  
+
     const horaActual = obtenerHoraActual();
     const registroConHora = {
       ...registro,
@@ -123,8 +140,27 @@ const formatearFecha = (fecha) => {
       fecha_produccion: convertirFechaISO(registro.fecha_produccion),
       hora_registro: horaActual,
     };
-  
+
     try {
+      const currentDate = formatDateTime(new Date(), "DD/MM/YYYY");
+      const currentTime = formatDateTime(new Date(), "hh:mm A");
+
+      // Verificar si el lote seleccionado existe
+      const { data: loteExistente, error: loteError } = await supabase
+        .from("Lotes")
+        .select("base_numero_lote")
+        .eq("base_numero_lote", registro.base_numero_lote)
+        .single();
+
+      if (loteError || !loteExistente) {
+        toast.current.show({
+          severity: "error",
+          summary: "Error",
+          detail: `El lote ${registro.base_numero_lote} no existe.`,
+          life: 3000,
+        });
+        return;
+      }
       const { id, ...registroSinId } = registroConHora;
       const { data, error } = await supabase
         .from("Control_Rendimiento_Secado_Horno_Multilevel")
@@ -133,6 +169,18 @@ const formatearFecha = (fecha) => {
         console.error("Error en Supabase:", error);
         throw new Error(
           error.message || "Error desconocido al guardar en Supabase"
+        );
+      }
+      // Actualizar la tabla Lotes con la nueva etapa_actual
+      const { error: updateError } = await supabase
+        .from("Lotes")
+        .update({ etapa_actual: "HornoMul" }) // Cambia "Control de Rendimiento" por la etapa que corresponda
+        .eq("base_numero_lote", registro.base_numero_lote);
+
+      if (updateError) {
+        console.error("Error al actualizar Lotes:", updateError);
+        throw new Error(
+          updateError.message || "Error desconocido al actualizar Lotes"
         );
       }
       toast.current.show({
@@ -237,11 +285,11 @@ const formatearFecha = (fecha) => {
       });
       return;
     }
-  
+
     const doc = new jsPDF();
     doc.setFontSize(18);
     doc.text("Registros de Control de Rendimiento y Secado", 14, 22);
-  
+
     doc.autoTable({
       head: [
         [
@@ -273,10 +321,10 @@ const formatearFecha = (fecha) => {
       styles: { fontSize: 10 },
       headStyles: { fillColor: [41, 128, 185], textColor: 255 },
     });
-  
+
     doc.save("Control_Rendimiento_Secado_Horno_Multilevel.pdf");
   };
-  
+
   const exportXlsx = () => {
     if (selectedRegistros.length === 0) {
       toast.current.show({
@@ -287,7 +335,7 @@ const formatearFecha = (fecha) => {
       });
       return;
     }
-  
+
     const headers = [
       "Fecha Registro",
       "Hora Registro",
@@ -312,7 +360,7 @@ const formatearFecha = (fecha) => {
       registro.desecho_kg,
       registro.observaciones,
     ]);
-  
+
     const dataToExport = [headers, ...rows];
     const ws = XLSX.utils.aoa_to_sheet(dataToExport);
     const wb = XLSX.utils.book_new();
@@ -330,8 +378,8 @@ const formatearFecha = (fecha) => {
         </h1>
         <div className="welcome-message">
           <p>
-            Bienvenido al sistema de control de rendimiento y secado. Aquí puedes
-            gestionar los registros de producción.
+            Bienvenido al sistema de control de rendimiento y secado. Aquí
+            puedes gestionar los registros de producción.
           </p>
         </div>
         <div className="buttons-container">
@@ -339,7 +387,7 @@ const formatearFecha = (fecha) => {
             Volver
           </button>
           <br />
-        <br />
+          <br />
           <button onClick={() => navigate(-2)} className="menu-button">
             Menú principal
           </button>
@@ -365,13 +413,28 @@ const formatearFecha = (fecha) => {
             currentPageReportTemplate="Mostrando del {first} al {last} de {totalRecords} Registros"
           >
             <Column selectionMode="multiple" exportable={false}></Column>
+            <Column
+              field="numero_lote"
+              header="Número Lote"
+              // editor={(options) => textEditor(options)}
+              sortable
+              style={{ minWidth: "10rem" }}
+            ></Column>
             <Column field="fecha_registro" header="Fecha Registro" sortable />
             <Column field="hora_registro" header="Hora Registro" sortable />
             <Column field="tipo_control" header="Tipo Control" sortable />
             <Column field="fecha_siembra" header="Fecha Siembra" sortable />
-            <Column field="fecha_produccion" header="Fecha Producción" sortable />
+            <Column
+              field="fecha_produccion"
+              header="Fecha Producción"
+              sortable
+            />
             <Column field="hora_proceso" header="Hora Proceso" sortable />
-            <Column field="larva_fresca_kg" header="Larva Fresca (kg)" sortable />
+            <Column
+              field="larva_fresca_kg"
+              header="Larva Fresca (kg)"
+              sortable
+            />
             <Column field="cajas_totales" header="Cajas Totales" sortable />
             <Column field="desecho_kg" header="Desecho (kg)" sortable />
             <Column field="observaciones" header="Observaciones" sortable />
@@ -389,6 +452,25 @@ const formatearFecha = (fecha) => {
         onHide={hideDialog}
       >
         <div className="field">
+          <label htmlFor="base_numero_lote" className="font-bold">
+            Número de lote{" "}
+            {submitted && !registro.base_numero_lote && (
+              <small className="p-error">Requerido.</small>
+            )}
+          </label>
+
+          <Dropdown
+            value={registro.base_numero_lote}
+            onChange={(e) => {
+              setRegistro({ ...registro, base_numero_lote: e.value });
+            }}
+            options={[...(lotes || [])]}
+            optionLabel="base_numero_lote" // Mostrar el campo "label" en el dropdown
+            optionValue="base_numero_lote" // Guardar el valor de "base_numero_lote"
+            placeholder="Selecciona un Número de lote"
+            className="w-full md:w-14rem"
+          />
+          <br />
           <label htmlFor="fecha_registro" className="font-bold">
             Fecha Registro{" "}
             {submitted && !registro.fecha_registro && (
