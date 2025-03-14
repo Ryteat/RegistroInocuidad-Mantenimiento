@@ -61,9 +61,9 @@ import ControlRendimientoCosechayFrass from './pages/Cosecha/Registros/PagesCont
 
 //imports de páginas visualizar
 // En main.js
-import PagesVisualizar from './pages/Visualizar/PagesVisualizar';
-import PagesVisualizarKPIs from './pages/Visualizar/Registros/PagesVisualizarKPIs';
-
+import Visualizar from './pages/Visualizar/PagesVisualizar';
+import VisualizarKPIs from './pages/Visualizar/Registros/PagesVisualizarKPIs';
+import VisualizarLotes from './pages/Visualizar/Registros/PagesVisualizarLotes';
 
 
 const Layout = () => {
@@ -152,6 +152,10 @@ const router = createBrowserRouter([{
         {
           path: `VisualizarKPIs`,
           element: <VisualizarKPIs />, // Componente hijo
+        },
+        {
+          path: `VisualizarLotes`,
+          element: <VisualizarLotes />, // Componente hijo
         },
       ],
     },
