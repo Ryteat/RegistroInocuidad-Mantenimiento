@@ -26,6 +26,7 @@ import ControlMovimientosCajasProceso from './pages/Dieta/Registros/PagesControl
 import Gerencia from './pages/Gerencia/PagesGerencia.jsx';
 import GestionUsuarios from './pages/Gerencia/Registros/PagesGestionUsuarios.jsx';
 
+
 //control de tiempos imports
 import ControlTiempos from './pages/ControlTiempos/PagesControlTiempos.jsx';
 
@@ -57,6 +58,11 @@ import PreoperacionalTeletruk from './pages/Mantenimiento/Registros/PagesPreoper
 //imports de paginas de Cosecha
 import Cosecha from './pages/Cosecha/PagesCosecha.jsx';
 import ControlRendimientoCosechayFrass from './pages/Cosecha/Registros/PagesControlRendimientoCosechayFrass.jsx'
+
+//imports de páginas visualizar
+// En main.js
+import PagesVisualizar from './pages/Visualizar/PagesVisualizar';
+import PagesVisualizarKPIs from './pages/Visualizar/Registros/PagesVisualizarKPIs';
 
 
 
@@ -133,8 +139,20 @@ const router = createBrowserRouter([{
         {
           path: `GestionUsuarios`,
           element: <GestionUsuarios />,
-        },
+        }
         
+      ],
+    },
+
+    // Grupo de rutas de Visualizar
+    {
+      path: `/Visualizar`,
+      element: <Visualizar />, // Componente padre
+      children: [
+        {
+          path: `VisualizarKPIs`,
+          element: <VisualizarKPIs />, // Componente hijo
+        },
       ],
     },
 
@@ -261,27 +279,5 @@ root.render(
   <PrimeReactProvider>
     <RouterProvider router={router}/>
     </PrimeReactProvider>
-  // <React.StrictMode>
-  //   <BrowserRouter>
-  //     <Routes>
-  //       <Route path="/" element={<Login />} />
-  //       <Route path="/MenuPrincipal" element={<MenuPrincipal />} />
-  //       <Route path="/Calidad" element={<Calidad />} />
-
-  //       <Route path="/Hatchery" element={<Hatchery />} />
-  //       <Route path="/IngresoPPInvernadero" element={<IngresoPPInvernadero />} />
-  //       <Route path="/ColectaInvernadero" element={<ColectaInvernadero />} />
-  //       <Route path="/NIB" element={<NIB />} />
-
-
-  //       <Route path="/Horno" element={<Horno />} />
-  //       <Route path="/Dieta" element={<Dieta />} />
-  //       <Route path="/Cosecha" element={<Cosecha />} />
-  //       <Route path="/Mantenimiento" element={<Mantenimiento />} /> 
-        
-
-
-  //     </Routes>
-  //   </BrowserRouter>
-  // </React.StrictMode>
+  
 );

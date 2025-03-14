@@ -1,0 +1,19 @@
+h2 {
+    font-size: 1.2rem;  /* Tamaño más pequeño (ajusta este valor) */
+    color: #2c3e50;     /* Color igual al de "Gráfico" - ajusta el código de color */
+  }
+
+  h2 {
+    font-size: 1.2rem;
+    color: inherit; /* Hereda el color del padre */
+  }
+  
+  /* O si el color está definido en una clase */
+  .etiqueta-grafico {
+    color: #2c3e50; /* Mismo color que usan los cuadros */
+  }
+  
+  h2 {
+    font-size: 1.2rem;
+    color: var(--color-grafico); /* Usando variables CSS si están definidas */
+  }

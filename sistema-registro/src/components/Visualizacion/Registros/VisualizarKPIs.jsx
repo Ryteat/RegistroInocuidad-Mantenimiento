@@ -1,0 +1,548 @@
+
+import supabase from "../../../supabaseClient";
+import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { Scatter } from 'react-chartjs-2';
+import logo2 from "../../../assets/mosca.png";
+import "./VisualizarKPIs.css";
+//import { BrowserRouter, Routes, Route } from 'react-router-dom';
+
+
+import { 
+  Chart as ChartJS, 
+  LinearScale, 
+  PointElement, 
+  LineElement, 
+  Tooltip, 
+  Title,
+  TimeScale 
+} from 'chart.js';
+import 'chartjs-adapter-date-fns';
+
+ChartJS.register(
+  LinearScale,
+  PointElement,
+  LineElement,
+  Tooltip,
+  Title,
+  TimeScale
+);
+
+const VisualizarKPIs = () => {
+  const [kpiData, setKpiData] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+  const [selectedChart, setSelectedChart] = useState(null);
+  const [currentWeekOffset, setCurrentWeekOffset] = useState(0);
+  const [weekRange, setWeekRange] = useState({ start: null, end: null });
+  const navigate = useNavigate();
+
+  const formatDate = (dateInput) => {
+    try {
+      if (typeof dateInput === 'string' && dateInput.includes('/')) {
+        const [day, month, year] = dateInput.split('/');
+        return `${day.padStart(2, '0')}/${month.padStart(2, '0')}/${year}`;
+      }
+      
+      const date = new Date(dateInput);
+      return date.toLocaleDateString('es-CR', {
+        day: '2-digit',
+        month: '2-digit',
+        year: 'numeric',
+        timeZone: 'America/Costa_Rica'
+      });
+    } catch {
+      return 'Fecha inválida';
+    }
+  };
+
+  useEffect(() => {
+    const calculateWeekRange = () => {
+      const now = new Date();
+      const tzOffset = -6 * 60 * 60 * 1000;
+      
+      const baseDate = new Date(now.getTime() + (currentWeekOffset * 7 * 24 * 60 * 60 * 1000));
+      const costaRicaDate = new Date(baseDate.getTime() + tzOffset);
+      
+      const startOfWeek = new Date(costaRicaDate);
+      startOfWeek.setDate(costaRicaDate.getDate() - costaRicaDate.getDay());
+      startOfWeek.setHours(0, 0, 0, 0);
+
+      const endOfWeek = new Date(startOfWeek);
+      endOfWeek.setDate(startOfWeek.getDate() + 6);
+      endOfWeek.setHours(23, 59, 59, 999);
+
+      return {
+        start: new Date(startOfWeek.getTime() - tzOffset),
+        end: new Date(endOfWeek.getTime() - tzOffset)
+      };
+    };
+
+    setWeekRange(calculateWeekRange());
+  }, [currentWeekOffset]);
+
+  useEffect(() => {
+    const fetchData = async () => {
+      try {
+        const { data, error } = await supabase
+          .from('visualizar_kpis')
+          .select('*')
+          .order('fecha', { ascending: true });
+
+        if (error) throw error;
+
+        const parsedData = data.map(item => {
+          if (typeof item.fecha === 'string' && item.fecha.includes('/')) {
+            const [day, month, year] = item.fecha.split('/');
+            const dateString = `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}T12:00:00-06:00`;
+            return {
+              ...item,
+              fecha: new Date(dateString)
+            };
+          }
+          return {
+            ...item,
+            fecha: new Date(item.fecha)
+          };
+        });
+
+        setKpiData(parsedData);
+      } catch (err) {
+        setError(err.message);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchData();
+  }, []);
+
+  const kpiNames = {
+    fecha: 'Fecha',
+    kg_pp_modulo: 'Ingreso PP al módulo (kg)',
+    cantidad_eggies: 'Cantidad de Eggies Recolectados',
+    total_gm: 'Total de gramos (nave/procedencia)',
+    gm_colectados: 'Peso en gramos colectados',
+    cajas_inoculadas_destino: 'Cantidad cajas Inoculadas Destino',
+    cajas_procesadas_neonatos: 'Cajas Procesadas de Neonatos',
+    cajas_sembradas_rep: 'Cajas Sembradas Reproducción',
+    cajas_dieta_no_sembradas_rep: 'Cajas Dieta no Sembradas Reproducción',
+    g_neonatos_sembrados_caja_rep: 'Gramos Neonatos Sembrados Caja Reproducción',
+    cajas_sembradas_pro: 'Cajas Sembradas Producción',
+    cajas_dieta_no_sembradas_pro: 'Cajas Dieta no Sembradas Producción',
+    g_neonatos_sembrados_caja_pro: 'Gramos Neonatos Sembrados Caja Producción',
+    kg_larva_fresca: 'Larva Fresca (kg)',
+    cant_cajas_cosechadas: 'Cajas Cosechadas',
+    cant_cajas_desechadas: 'Cajas Desechadas',
+    larva_fresca_kg: 'Larva Fresca Total (kg)',
+    cajas_totales: 'Total de Cajas',
+    cant_bolsas: 'Cantidad de Bolsas'
+  };
+
+  const calcularVariacion = (current, previous) => {
+    if (previous === 0 || !previous) return null;
+    return ((current - previous) / previous) * 100;
+  };
+
+  const formatValue = (columnName, value) => {
+    const floatColumns = [
+      'kg_pp_modulo', 'total_gm', 'gm_colectados',
+      'g_neonatos_sembrados_caja_rep', 'g_neonatos_sembrados_caja_pro',
+      'kg_larva_fresca'
+    ];
+    
+    const integerColumns = [
+      'cantidad_eggies', 'cajas_inoculadas_destino',
+      'cajas_procesadas_neonatos', 'cajas_sembradas_rep',
+      'cajas_dieta_no_sembradas_rep', 'cajas_sembradas_pro',
+      'cajas_dieta_no_sembradas_pro', 'cant_cajas_cosechadas',
+      'cant_cajas_desechadas', 'larva_fresca_kg', 'cajas_totales',
+      'cant_bolsas'
+    ];
+
+    if (floatColumns.includes(columnName)) {
+      return parseFloat(value).toFixed(2) + ' kg';
+    }
+    if (integerColumns.includes(columnName)) {
+      return parseInt(value).toLocaleString('es-CR');
+    }
+    return value;
+  };
+
+  const getLatestValues = () => {
+    if (kpiData.length < 1) return {};
+    
+    const latest = kpiData[kpiData.length - 1];
+    const previous = kpiData[kpiData.length - 2] || {};
+    
+    return Object.keys(latest).reduce((acc, key) => {
+      if (key !== 'fecha') {
+        acc[key] = {
+          current: latest[key],
+          previous: previous[key] || 0
+        };
+      }
+      return acc;
+    }, {});
+  };
+
+  const handleShowChart = (columnName) => {
+    setSelectedChart(columnName);
+  };
+
+  const getChartData = () => {
+    if (!selectedChart || !weekRange.start || !weekRange.end) return {};
+    
+    const chartData = kpiData
+      .filter(entry => {
+        const entryDate = entry.fecha.getTime();
+        return entryDate >= weekRange.start.getTime() && entryDate <= weekRange.end.getTime();
+      })
+      .map(entry => ({
+        x: entry.fecha,
+        y: entry[selectedChart]
+      }));
+
+    return {
+      datasets: [{
+        label: kpiNames[selectedChart],
+        data: chartData,
+        backgroundColor: '#6366f1',
+        borderColor: '#4f46e5',
+        pointRadius: 5,
+        pointHoverRadius: 7
+      }]
+    };
+  };
+
+  const formatWeekRange = (start, end) => {
+    if (!start || !end) return '';
+    return `Del domingo ${formatDate(start)} al sábado ${formatDate(end)}`;
+  };
+
+  const KpiCard = ({ columnName, values }) => {
+    const variacion = calcularVariacion(values.current, values.previous);
+    const formattedValue = formatValue(columnName, values.current);
+    const displayName = kpiNames[columnName] || columnName;
+
+    return (
+      <div style={styles.card}>
+        <div style={styles.cardHeader}>
+          <h3 style={styles.title}>{displayName}</h3>
+          <button 
+            onClick={() => handleShowChart(columnName)}
+            style={styles.chartButton}
+          >
+            Gráfico
+          </button>
+        </div>
+        
+        <div style={styles.valueContainer}>
+          <span style={styles.value}>{formattedValue}</span>
+          
+          {variacion !== null && (
+            <div style={styles.trendContainer}>
+              <span style={{
+                ...styles.trend,
+                color: variacion >= 0 ? '#10B981' : '#EF4444'
+              }}>
+                {variacion >= 0 ? '▲' : '▼'} {Math.abs(variacion).toFixed(1)}%
+              </span>
+              <span style={styles.subtext}>
+                Anterior: {formatValue(columnName, values.previous)}
+              </span>
+            </div>
+          )}
+        </div>
+      </div>
+    );
+  };
+
+  if (loading) return <div style={styles.loading}>Cargando datos...</div>;
+  if (error) return <div style={styles.error}>Error: {error}</div>;
+
+  const kpiValues = getLatestValues();
+
+  return (
+    <div style={styles.container}>
+      <h1>
+        <img src={logo2} alt="mosca" className="logo2" />
+        Visualización KPI's
+      </h1>
+
+      <div className="welcome-message">
+        <p>
+          Bienvenido al panel de visualización de KPIs.  
+          Aquí puedes monitorear los indicadores clave de rendimiento en tiempo real y tomar decisiones basadas en datos.
+        </p>
+      </div>
+
+      <div className="buttons-container">
+        <button onClick={() => navigate(-1)} className="return-button">
+          Volver
+        </button>
+        <button onClick={() => navigate(-2)} className="menu-button">
+          Menú principal
+        </button>
+      </div>
+
+      <h2 style={styles.header}>
+        Indicadores Clave - Actualizado al {formatDate(kpiData[kpiData.length - 1]?.fecha)}
+      </h2>
+
+      {selectedChart && (
+        <div style={styles.modalOverlay}>
+          <div style={styles.modalContent}>
+            <div style={styles.modalHeader}>
+              <h3>{kpiNames[selectedChart]} - {formatWeekRange(weekRange.start, weekRange.end)}</h3>
+              <div>
+                <button 
+                  onClick={() => setCurrentWeekOffset(prev => prev - 1)}
+                  style={styles.navButton}
+                >
+                  ← Semana Anterior
+                </button>
+                <button 
+                  onClick={() => setCurrentWeekOffset(prev => prev + 1)}
+                  style={styles.navButton}
+                  disabled={currentWeekOffset >= 0}
+                >
+                  Semana Siguiente →
+                </button>
+              </div>
+              <button 
+                onClick={() => {
+                  setSelectedChart(null);
+                  setCurrentWeekOffset(0);
+                }}
+                style={styles.closeButton}
+              >
+                ×
+              </button>
+            </div>
+            <div style={styles.chartContainer}>
+              <Scatter 
+                data={getChartData()}
+                options={{
+                  responsive: true,
+                  maintainAspectRatio: false,
+                  scales: {
+                    x: {
+                      type: 'time',
+                      time: {
+                        unit: 'day',
+                        tooltipFormat: 'dd/MM/yyyy',
+                        displayFormats: {
+                          day: 'dd/MM'
+                        }
+                      },
+                      min: weekRange.start,
+                      max: weekRange.end,
+                      adapters: {
+                        date: {
+                          zone: 'America/Costa_Rica'
+                        }
+                      },
+                      ticks: {
+                        source: 'data',
+                        autoSkip: false
+                      },
+                      title: {
+                        display: true,
+                        text: 'Fecha'
+                      }
+                    },
+                    y: {
+                      title: {
+                        display: true,
+                        text: 'Valor'
+                      },
+                      beginAtZero: true
+                    }
+                  },
+                  plugins: {
+                    tooltip: {
+                      callbacks: {
+                        title: (context) => formatDate(context[0].raw.x),
+                        label: (context) => 
+                          `${context.dataset.label}: ${context.raw.y.toLocaleString('es-CR')}`
+                      }
+                    }
+                  }
+                }}
+              />
+            </div>
+          </div>
+        </div>
+      )}
+
+      <div style={styles.gridContainer}>
+        {Object.entries(kpiValues).map(([columnName, values]) => (
+          columnName !== 'fecha' && (
+            <KpiCard key={columnName} columnName={columnName} values={values} />
+          )
+        ))}
+      </div>
+    </div>
+  );
+};
+
+const styles = {
+  container: {
+    padding: '2rem',
+    fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif",
+    maxWidth: '1400px',
+    margin: '0 auto',
+    backgroundColor: '#f8fafc',
+    minHeight: '100vh'
+  },
+  header: {
+    marginBottom: '2.5rem',
+    textAlign: 'center',
+    fontSize: '1.8rem',
+    fontWeight: '600',
+    padding: '1.5rem',
+    background: 'linear-gradient(135deg, #6366f1 0%, #a855f7 100%)',
+    borderRadius: '12px',
+    color: 'white',
+    boxShadow: '0 4px 6px rgba(0, 0, 0, 0.05)',
+    textShadow: '0 2px 4px rgba(0, 0, 0, 0.1)'
+  },
+  gridContainer: {
+    display: 'grid',
+    gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))',
+    gap: '2rem',
+    padding: '1rem'
+  },
+  card: {
+    backgroundColor: '#ffffff',
+    borderRadius: '16px',
+    padding: '1.75rem',
+    boxShadow: '0 5px 15px rgba(0, 0, 0, 0.08)',
+    transition: 'transform 0.3s cubic-bezier(0.4, 0, 0.2, 1), box-shadow 0.3s ease',
+    position: 'relative',
+    overflow: 'hidden',
+    ':hover': {
+      transform: 'translateY(-5px)',
+      boxShadow: '0 10px 20px rgba(0, 0, 0, 0.12)'
+    }
+  },
+  cardHeader: {
+    display: 'flex',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: '1rem'
+  },
+  title: {
+    fontSize: '1.1rem',
+    color: '#374151',
+    margin: '0 0 1.2rem 0',
+    fontWeight: '600',
+    paddingBottom: '0.75rem',
+    borderBottom: '2px solid #e5e7eb'
+  },
+  valueContainer: {
+    display: 'flex',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginTop: '0.75rem'
+  },
+  value: {
+    fontSize: '1.8rem',
+    fontWeight: '700',
+    color: '#1f2937',
+    letterSpacing: '-0.5px',
+    fontFeatureSettings: '"tnum"'
+  },
+  trendContainer: {
+    display: 'flex',
+    flexDirection: 'column',
+    alignItems: 'flex-end',
+    gap: '0.3rem'
+  },
+  trend: {
+    fontSize: '0.95rem',
+    fontWeight: '600',
+    display: 'flex',
+    alignItems: 'center',
+    gap: '0.4rem'
+  },
+  subtext: {
+    fontSize: '0.8rem',
+    color: '#6b7280',
+    fontWeight: '500'
+  },
+  loading: {
+    textAlign: 'center',
+    padding: '3rem',
+    fontSize: '1.3rem',
+    color: '#3b82f6',
+    fontWeight: '500'
+  },
+  error: {
+    textAlign: 'center',
+    padding: '2rem',
+    color: '#dc2626',
+    fontWeight: '600',
+    backgroundColor: '#fef2f2',
+    borderRadius: '10px',
+    margin: '2rem',
+    border: '1px solid #fecaca'
+  },
+  chartButton: {
+    padding: '0.4rem 0.8rem',
+    backgroundColor: '#e0e7ff',
+    color: '#4f46e5',
+    border: 'none',
+    borderRadius: '6px',
+    cursor: 'pointer',
+    fontWeight: '600',
+    transition: 'all 0.2s',
+    ':hover': {
+      backgroundColor: '#c7d2fe'
+    }
+  },
+  modalOverlay: {
+    position: 'fixed',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    display: 'flex',
+    justifyContent: 'center',
+    alignItems: 'center',
+    zIndex: 1000
+  },
+  modalContent: {
+    backgroundColor: 'white',
+    borderRadius: '12px',
+    padding: '2rem',
+    width: '80%',
+    maxWidth: '1000px',
+    position: 'relative'
+  },
+  modalHeader: {
+    display: 'flex',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: '1.5rem'
+  },
+  closeButton: {
+    backgroundColor: 'transparent',
+    border: 'none',
+    fontSize: '1.5rem',
+    cursor: 'pointer',
+    color: '#6b7280',
+    ':hover': {
+      color: '#4b5563'
+    }
+  },
+  chartContainer: {
+    height: '60vh',
+    width: '100%'
+  }
+  
+};
+
+export default VisualizarKPIs;

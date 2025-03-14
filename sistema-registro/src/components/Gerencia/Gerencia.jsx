@@ -31,18 +31,7 @@ function Gerencia() {
             >
               Gestion de Usuarios
             </button>
-            <button
-              onClick={() => navigate("/Gerencia/GestionUsuarios")}
-              className="back-button"
-            >
-              Reporte KPIs
-            </button>
-            <button
-              onClick={() => navigate("/Gerencia/GestionUsuarios")}
-              className="back-button"
-            >
-              Flash Report
-            </button>
+            
             
             
 
