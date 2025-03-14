@@ -3,7 +3,7 @@ import { useNavigate } from "react-router-dom";
 
 //Imports de estilos
 import logo2 from "../../../assets/mosca.png";
-import "./NIB.css"; 
+import "./NIB.css";
 
 //Imports de Supabase
 import supabase from "../../../supabaseClient"; //Importa la variable supabase del archivo supabaseClient.js que sirve para conectarse con la base de datos y que funcione como API
@@ -29,12 +29,12 @@ import * as XLSX from "xlsx";
 import jsPDF from "jspdf";
 import "jspdf-autotable";
 
-
 function NIB() {
-
   //Variable de registro vacio
   let emptyRegister = {
     id: null,
+    base_numero_lote: "",
+    numero_lote: "",
     embudo: "",
     gm_colectados: "",
     cajas_inoculadas_destino: "",
@@ -59,21 +59,21 @@ function NIB() {
     { name: "8", value: "8" },
     { name: "9", value: "9" },
     { name: "10", value: "10" },
-    
   ];
 
   const [registros, setRegistros] = useState([]);
-    const [registro, setRegistro] = useState(emptyRegister);
-    const toast = useRef(null);
-    const dt = useRef(null);
-    const [selectedRegistros, setSelectedRegistros] = useState([]);
-    const [globalFilter, setGlobalFilter] = useState(null);
-    const [submitted, setSubmitted] = useState(false);
-    const [registroDialog, setRegistroDialog] = useState(false);
-    const navigate = useNavigate();
+  const [registro, setRegistro] = useState(emptyRegister);
+  const toast = useRef(null);
+  const dt = useRef(null);
+  const [selectedRegistros, setSelectedRegistros] = useState([]);
+  const [globalFilter, setGlobalFilter] = useState(null);
+  const [submitted, setSubmitted] = useState(false);
+  const [registroDialog, setRegistroDialog] = useState(false);
+  const navigate = useNavigate();
   //Errores de validación
   const [observacionesObligatorio, setObservacionesObligatorio] =
     useState(false);
+
   const [erroresValidacion, setErroresValidacion] = useState({
     embudo: false,
     gm_colectados: false,
@@ -81,36 +81,48 @@ function NIB() {
   });
 
   //Lote Variables
-  const [lotes, setLotes] = useState([]); // Estado para almacenar los lote_ids disponibles
+  const [lotes, setLotes] = useState([]); // Estado para almacenar los lotes disponibles
+  // const [lote_id, setLote_id] = useState(false); // Estado para almacenar si es un nuevo lote
 
-  
   //Inicio de FETCH REGISTROS
   const fetchNeonatos = async () => {
     try {
       const { data, error } = await supabase
         .from("Neonatos_Inoculados")
-        .select(); // Solo seleccionamos el campo lote_id
+        .select();
       if (error) throw error; // Si hay un error, lanzamos una excepción
       setRegistros(data || []); // Guardamos los datos obtenidos en el estado
     } catch (err) {
-      console.log("Error en la conexión a la base de datos", err);
+      console.log("Error en la conexión a la base de datos NIB", err);
     }
   };
-//Fin de FETCH REGISTROS
 
+  const fetchLotes = async () => {
+    try {
+      const { data, error } = await supabase
+        .from("Lotes")
+        .select() // Si solo necesitas el campo base_numero_lote, podrías especificarlo: .select("base_numero_lote")
+        .in("etapa_actual", ["Hatchery", "Dieta"]); // Filtra registros con etapa_actual igual a 'hatchery' o 'dieta'
+      if (error) throw error;
+      setLotes(data || []); // Actualiza el estado con los datos obtenidos
+    } catch (err) {
+      console.log("Error en la conexión a la base de datos Lotes", err);
+    }
+  };
+  //Fin de FETCH REGISTROS
 
   // Este useEffect se ejecuta cuando el componente se monta, para obtener los datos una vez
   useEffect(() => {
-    fetchNeonatos(); 
+    fetchNeonatos();
+    fetchLotes();
   }, []); // Agrega globalFilter como dependencia
   // El array vacío asegura que solo se ejecute una vez cuando el componente se monta
 
-  useEffect(() => { //Si se actualiza neonatos se ejecuta el useEffect osea se imprime en consola
-    console.log("Neonatos actualizados: ", registros); 
-  }, [registros]); 
+  useEffect(() => {
+    //Si se actualiza neonatos se ejecuta el useEffect osea se imprime en consola
+  }, [registros]);
 
   //Fin de FETCH REGISTROS
-
 
   const saveNeonatoInoculado = async () => {
     setSubmitted(true);
@@ -119,8 +131,8 @@ function NIB() {
     const isEmbudoInvalido = registro.embudo < 1 || registro.embudo > 10;
     // const isGmColectadosInvalido = neonato.gm_colectados < 1 || neonato.gm_colectados > 100;
     const isCajasInoculadasDestinoInvalido =
-    registro.cajas_inoculadas_destino < 100 ||
-    registro.cajas_inoculadas_destino > 500;
+      registro.cajas_inoculadas_destino < 100 ||
+      registro.cajas_inoculadas_destino > 500;
     // POR SI LO PIDEN MAS ADELANTE const isGmNeonatoCajaInvalido = neonato.gm_neonato_caja < 1 || neonato.gm_neonato_caja > 100;
 
     // Actualizar el estado de errores
@@ -134,6 +146,7 @@ function NIB() {
       // isGmColectadosInvalido ||
       isCajasInoculadasDestinoInvalido;
 
+    // Validaciones previas...
     if (
       !registro.embudo ||
       !registro.gm_colectados ||
@@ -147,7 +160,7 @@ function NIB() {
       toast.current.show({
         severity: "error",
         summary: "Error",
-        detail: "Llena todos los campos ",
+        detail: "Llena todos los campos",
         life: 3000,
       });
       return;
@@ -183,42 +196,93 @@ function NIB() {
     });
 
     try {
-      const currentDate = formatDateTime(new Date(), "DD/MM/YYYY"); // Solo fecha
-      const currentTime = formatDateTime(new Date(), "hh:mm A"); // Fecha en formato ISO 8601
-      const { data, error } = await supabase
-        .from("Neonatos_Inoculados")
-        .insert([
-          {
-            embudo: registro.embudo,
-            gm_colectados: registro.gm_colectados,
-            cajas_inoculadas_destino: registro.cajas_inoculadas_destino,
-            gm_neonato_caja: registro.gm_neonato_caja,
-            cantidad_dieta_caja: registro.cantidad_dieta_caja,
-            temp_ambiental: registro.temp_ambiental,
-            hum_ambiental: registro.hum_ambiental,
-            operario: registro.operario,
-            fec_colecta: currentDate,
-            hor_colecta: currentTime,
-            fec_registro: currentDate,
-            hor_registro: currentTime,
-            observaciones: registro.observaciones,
-            lote_id: registro.lote_id,
-          },
-        ]);
+      const currentDate = formatDateTime(new Date(), "DD/MM/YYYY");
+      const posibleLote = formatDateTime(new Date(), "DDMMYYYY");
+      const currentTime = formatDateTime(new Date(), "hh:mm A");
+      let baseNumeroLoteToInsert = registro.base_numero_lote;
+      console.log("Valor seleccionado en dropdown:", registro.base_numero_lote);
+      console.log("Valor a insertar en Neonatos_Inoculados:", baseNumeroLoteToInsert);
+      // Si el valor es "nuevo", crear un lote
+      if (registro.base_numero_lote === "Nuevo Lote") {
+          // Verificar si el lote ya existe
+          if (lotes.some((lote) => lote.base_numero_lote === posibleLote)) {
+              toast.current.show({ 
+                  severity: "warn", 
+                  detail: `El lote ${posibleLote} ya existe. Selecciónalo.` 
+              });
+              return;
+          }
 
-      if (error) {
-        console.error("Error en Supabase:", error);
-        throw new Error(
-          error.message || "Error desconocido al guardar en Supabase"
-        );
+          // Crear nuevo lote
+          const { data, error } = await supabase.rpc("crear_nuevo_lote", {
+              p_fecha_registro: currentDate,
+              p_hora_registro: currentTime,
+              p_destino: "PR",
+          });
+
+          if (error) {
+              toast.current.show({ 
+                  severity: "error", 
+                  detail: "Error al crear lote." 
+              });
+              return;
+          }
+
+          // Actualizar el valor local y el estado
+          baseNumeroLoteToInsert = data;
+          setRegistro({ ...registro, base_numero_lote: data });
+      } else {
+          // Verificar si el lote existe
+          const { data: loteExistente, error: loteError } = await supabase
+              .from("Lotes")
+              .select("base_numero_lote")
+              .eq("base_numero_lote", registro.base_numero_lote)
+              .single();
+
+          if (loteError || !loteExistente) {
+              toast.current.show({ 
+                  severity: "error", 
+                  detail: `El lote ${registro.base_numero_lote} no existe.` 
+              });
+              return;
+          }
       }
 
-      // console.log("Datos insertados:", data);
+      // Insertar en Neonatos_Inoculados
+      const { data: insertData, error: insertError } = await supabase
+          .from("Neonatos_Inoculados")
+          .insert([
+              {
+                  base_numero_lote: baseNumeroLoteToInsert,
+                  numero_lote: registro.numero_lote,
+                  embudo: registro.embudo,
+                  gm_colectados: registro.gm_colectados,
+                  cajas_inoculadas_destino: registro.cajas_inoculadas_destino,
+                  gm_neonato_caja: registro.gm_neonato_caja,
+                  cantidad_dieta_caja: registro.cantidad_dieta_caja,
+                  temp_ambiental: registro.temp_ambiental,
+                  hum_ambiental: registro.hum_ambiental,
+                  operario: registro.operario,
+                  fec_colecta: currentDate,
+                  hor_colecta: currentTime,
+                  fec_registro: currentDate,
+                  hor_registro: currentTime,
+                  observaciones: registro.observaciones,
+              },
+          ]);
+
+      if (insertError) {
+          console.error("Error al insertar en Neonatos_Inoculados:", insertError);
+          throw new Error(
+              insertError.message || "Error desconocido al guardar en Supabase"
+          );
+      }
+
       toast.current.show({
-        severity: "success",
-        summary: "Exitoso",
-        detail: "Registro guardado exitosamente",
-        life: 3000,
+          severity: "success",
+          summary: "Éxito",
+          detail: "Registro guardado exitosamente",
+          life: 3000,
       });
 
       // Limpia el estado
@@ -226,23 +290,23 @@ function NIB() {
       setRegistroDialog(false);
       setSubmitted(false);
       fetchNeonatos();
-    } catch (error) {
+      fetchLotes();
+  } catch (error) {
       toast.current.show({
-        severity: "error",
-        summary: "Error",
-        detail: error.message || "Ocurrió un error al crear el usuario",
-        life: 3000,
+          severity: "error",
+          summary: "Error",
+          detail: error.message || "Ocurrió un error al crear el usuario",
+          life: 3000,
       });
-    }
-  };
-  
+  }
+};
 
   //Inicio Formatear la FECHA DE REGISTRO
 
   const convertirFecha = (fecha) =>
     fecha ? fecha.split("-").reverse().join("/") : "";
 
-   const formatDateTime = (date, format = "DD-MM-YYYY hh:mm A") => {
+  const formatDateTime = (date, format = "DD-MM-YYYY hh:mm A") => {
     const fmt = new Intl.DateTimeFormat("en-US", {
       day: "2-digit",
       month: "2-digit",
@@ -264,11 +328,8 @@ function NIB() {
   };
   //Fin Formatear la FECHA DE REGISTRO
 
-  
-  
-
   // //Inicio de EDITAR TABLA
-  
+
   const dateEditor = (options) => {
     const convertToInputFormat = (date) => {
       if (!date) return "";
@@ -448,120 +509,122 @@ function NIB() {
         outlined
         onClick={hideDialog}
       />
-      <Button label="Guardar" icon="pi pi-check" onClick={saveNeonatoInoculado} />
+      <Button
+        label="Guardar"
+        icon="pi pi-check"
+        onClick={saveNeonatoInoculado}
+      />
     </React.Fragment>
   );
 
   //FIN DE EDITAR TABLA
 
-  
-
   //Inicio de EXPORTAR TABLA
 
   const exportPdf = () => {
-      if (selectedRegistros.length === 0) {
-        toast.current.show({
-          severity: "warn",
-          summary: "Advertencia",
-          detail: "No hay filas seleccionadas para exportar.",
-          life: 3000,
-        });
-        return;
+    if (selectedRegistros.length === 0) {
+      toast.current.show({
+        severity: "warn",
+        summary: "Advertencia",
+        detail: "No hay filas seleccionadas para exportar.",
+        life: 3000,
+      });
+      return;
+    }
+
+    const doc = new jsPDF();
+    doc.setFontSize(18);
+    doc.text("Registros de Neonatos Inoculados", 14, 22);
+
+    const exportData = selectedRegistros.map(
+      ({ fec_colecta, hor_colecta, ...row }) => ({
+        ...row,
+        registrado: `${fec_colecta || ""} ${hor_colecta || ""}`,
+      })
+    );
+
+    const columnsPerPage = 5;
+    const maxHeightPerColumn = 10;
+    const rowHeight = exportColumns.length * maxHeightPerColumn + 10;
+    let currentY = 30;
+
+    const headerColor = [41, 128, 185];
+    const textColor = [0, 0, 0];
+
+    for (let i = 0; i < exportData.length; i++) {
+      if (currentY + rowHeight > doc.internal.pageSize.height) {
+        doc.addPage();
+        currentY = 30;
       }
-  
-      const doc = new jsPDF();
-      doc.setFontSize(18);
-      doc.text("Registros de Neonatos Inoculados", 14, 22);
-  
-      const exportData = selectedRegistros.map(
-        ({ fec_colecta, hor_colecta, ...row }) => ({
-          ...row,
-          registrado: `${fec_colecta || ""} ${hor_colecta || ""}`,
-        })
-      );
-  
-      const columnsPerPage = 5;
-      const maxHeightPerColumn = 10;
-      const rowHeight = exportColumns.length * maxHeightPerColumn + 10;
-      let currentY = 30;
-  
-      const headerColor = [41, 128, 185];
-      const textColor = [0, 0, 0];
-  
-      for (let i = 0; i < exportData.length; i++) {
-        if (currentY + rowHeight > doc.internal.pageSize.height) {
-          doc.addPage();
-          currentY = 30;
-        }
-  
-        const row = exportData[i];
-        const startX = 14;
-  
-        exportColumns.forEach(({ title, dataKey }, index) => {
-          const value = row[dataKey];
-          doc.setFillColor(...headerColor);
-          doc.rect(
-            startX,
-            currentY + index * maxHeightPerColumn,
-            180,
-            maxHeightPerColumn,
-            "F"
-          );
-          doc.setTextColor(255);
-          doc.text(title, startX + 2, currentY + index * maxHeightPerColumn + 7);
-          doc.setTextColor(...textColor);
-          doc.text(
-            `${value}`,
-            startX + 90,
-            currentY + index * maxHeightPerColumn + 7
-          );
-        });
-  
-        currentY += rowHeight;
-      }
-  
-      doc.save("Neonatos Inoculados.pdf");
-    };
-  
-    const exportXlsx = () => {
-      if (selectedRegistros.length === 0) {
-        toast.current.show({
-          severity: "warn",
-          summary: "Advertencia",
-          detail: "No hay filas seleccionadas para exportar.",
-          life: 3000,
-        });
-        return;
-      }
-  
-      const headers = cols.map((col) => col.header);
-      const exportData = selectedRegistros.map(
-        ({ fec_colecta, hor_colecta, ...registro }) => ({
-          ...registro,
-          registrado: `${fec_colecta || ""} ${hor_colecta || ""}`,
-        })
-      );
-  
-      const rows = exportData.map((registro) =>
-        cols.map((col) => registro[col.field])
-      );
-  
-      const dataToExport = [headers, ...rows];
-      const ws = XLSX.utils.aoa_to_sheet(dataToExport);
-  
-      ws["!cols"] = cols.map((col) => ({
-        width: Math.max(col.header.length, 10),
-      }));
-  
-      const wb = XLSX.utils.book_new();
-      XLSX.utils.book_append_sheet(wb, ws, "Registros");
-      XLSX.writeFile(wb, "Neonatos Inoculados.xlsx");
-    };
+
+      const row = exportData[i];
+      const startX = 14;
+
+      exportColumns.forEach(({ title, dataKey }, index) => {
+        const value = row[dataKey];
+        doc.setFillColor(...headerColor);
+        doc.rect(
+          startX,
+          currentY + index * maxHeightPerColumn,
+          180,
+          maxHeightPerColumn,
+          "F"
+        );
+        doc.setTextColor(255);
+        doc.text(title, startX + 2, currentY + index * maxHeightPerColumn + 7);
+        doc.setTextColor(...textColor);
+        doc.text(
+          `${value}`,
+          startX + 90,
+          currentY + index * maxHeightPerColumn + 7
+        );
+      });
+
+      currentY += rowHeight;
+    }
+
+    doc.save("Neonatos Inoculados.pdf");
+  };
+
+  const exportXlsx = () => {
+    if (selectedRegistros.length === 0) {
+      toast.current.show({
+        severity: "warn",
+        summary: "Advertencia",
+        detail: "No hay filas seleccionadas para exportar.",
+        life: 3000,
+      });
+      return;
+    }
+
+    const headers = cols.map((col) => col.header);
+    const exportData = selectedRegistros.map(
+      ({ fec_colecta, hor_colecta, ...registro }) => ({
+        ...registro,
+        registrado: `${fec_colecta || ""} ${hor_colecta || ""}`,
+      })
+    );
+
+    const rows = exportData.map((registro) =>
+      cols.map((col) => registro[col.field])
+    );
+
+    const dataToExport = [headers, ...rows];
+    const ws = XLSX.utils.aoa_to_sheet(dataToExport);
+
+    ws["!cols"] = cols.map((col) => ({
+      width: Math.max(col.header.length, 10),
+    }));
+
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "Registros");
+    XLSX.writeFile(wb, "Neonatos Inoculados.xlsx");
+  };
 
   // Columnas de la tabla para exportar
   const cols = [
-    { header: "Fecha Colecta", field: "fec_colecta" },
-    { header: "Hora Colecta", field: "hor_colecta" },
+    { header: "Número Lote", field: "numero_lote" },
+    { header: "Fecha y Hora Colecta", field: "registrado" },
     { header: "# Embudo", field: "embudo" },
     { header: "g Colectados", field: "gm_colectados" },
     { header: "Cajas Inoculadas / Destino", field: "cajas_inoculadas_destino" },
@@ -571,7 +634,7 @@ function NIB() {
     { header: "Humedad ambiental (%)", field: "hum_ambiental" },
     { header: "Operario", field: "operario" },
     { header: "Observaciones", field: "observaciones" },
-    { header: "Lote", field: "lote_id" },
+    { field: "registrado", header: "Registrado" },
   ];
 
   // Mapeo de columnas para jsPDF-Autotable
@@ -633,6 +696,13 @@ function NIB() {
             header={header}
           >
             <Column selectionMode="multiple" exportable={false}></Column>
+            <Column
+              field="numero_lote"
+              header="Número Lote"
+              // editor={(options) => textEditor(options)}
+              sortable
+              style={{ minWidth: "10rem" }}
+            ></Column>
             <Column
               field="fec_colecta"
               header="Fecha Colecta"
@@ -710,15 +780,7 @@ function NIB() {
               sortable
               style={{ minWidth: "8rem" }}
             ></Column>
-
             <Column
-              field="lote_id"
-              header="Lote"
-              // editor={(options) => textEditor(options)}
-              sortable
-              style={{ minWidth: "8rem" }}
-            ></Column>
-<Column
               field="fec_registro"
               header="Fecha Registro"
               // editor={(options) => textEditor(options)}
@@ -753,6 +815,31 @@ function NIB() {
         onHide={hideDialog}
       >
         <div className="field">
+          <label htmlFor="base_numero_lote" className="font-bold">
+            Número de lote{" "}
+            {submitted && !registro.base_numero_lote && (
+              <small className="p-error">Requerido.</small>
+            )}
+          </label>
+
+
+          
+          <Dropdown
+    value={registro.base_numero_lote}
+    onChange={(e) => {
+        setRegistro({ ...registro, base_numero_lote: e.value });
+    }}
+    options={[
+        // Opción "Nuevo Lote" con valor "nuevo"
+        { base_numero_lote: "Nuevo Lote" }, 
+        ...(lotes || []),
+    ]}
+    optionLabel="base_numero_lote" // Mostrar el campo "label" en el dropdown
+    optionValue="base_numero_lote" // Guardar el valor de "base_numero_lote"
+    placeholder="Selecciona un Número de lote"
+    className="w-full md:w-14rem"
+/>
+          <br />
           <label htmlFor="embudo" className="font-bold">
             # de Embudo{" "}
             {submitted && !registro.embudo && (
@@ -764,15 +851,15 @@ function NIB() {
               </small>
             )}
           </label>
-          
+
           <Dropdown
-                      value={registro.embudo}
-                      onChange={(e) => setRegistro({ ...registro, embudo: e.value })}
-                      options={embudos}
-                      optionLabel="name"
-                      placeholder="Selecciona un # de Embudo"
-                      className="w-full md:w-14rem"
-                    />
+            value={registro.embudo}
+            onChange={(e) => setRegistro({ ...registro, embudo: e.value })}
+            options={embudos}
+            optionLabel="name"
+            placeholder="Selecciona un # de Embudo"
+            className="w-full md:w-14rem"
+          />
           <br />
 
           <label htmlFor="gm_colectados" className="font-bold">
@@ -909,8 +996,6 @@ function NIB() {
           />
         </div>
       </Dialog>
-
-     
     </>
   );
 }

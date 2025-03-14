@@ -47,7 +47,7 @@ function ControlRendimientoSecadoHornoMultilevel() {
   const [submitted, setSubmitted] = useState(false);
   const [registroDialog, setRegistroDialog] = useState(false);
   const navigate = useNavigate();
-
+  const [lotes, setLotes] = useState([]);
   // Opciones para el campo "linea_produc"
   const lineasProduccion = ["Producción", "Reproducción"];
   const tipoControl = ["Control", "Prueba"];
@@ -73,9 +73,27 @@ function ControlRendimientoSecadoHornoMultilevel() {
       console.log("Error en la conexión a la base de datos");
     }
   };
+  const fetchLotes = async () => {
+    try {
+      const { data, error } = await supabase
+        .from("Lotes")
+        .select() // Si solo necesitas el campo base_numero_lote, podrías especificarlo: .select("base_numero_lote")
+        .in("etapa_actual", [
+          "Cosecha",
+          "HornoMul",
+          "HornoMic",
+          "ProductoTerminado",
+        ]); // Filtra registros con etapa_actual igual a 'hatchery' o 'dieta'
+      if (error) throw error;
+      setLotes(data || []); // Actualiza el estado con los datos obtenidos
+    } catch (err) {
+      console.log("Error en la conexión a la base de datos Lotes", err);
+    }
+  };
 
   useEffect(() => {
     fetchRegistros();
+    fetchLotes();
   }, []);
 
   const formatDateTime = (date, format = "DD-MM-YYYY hh:mm A") => {
@@ -127,13 +145,30 @@ function ControlRendimientoSecadoHornoMultilevel() {
     }
 
     try {
-      const currentDate = formatDateTime(new Date(), "DD/MM/YYYY"); // Fecha actual
-      const currentTime = formatDateTime(new Date(), "hh:mm A"); // Hora actual
+      const currentDate = formatDateTime(new Date(), "DD/MM/YYYY");
+      const currentTime = formatDateTime(new Date(), "hh:mm A");
 
+      // Verificar si el lote seleccionado existe
+      const { data: loteExistente, error: loteError } = await supabase
+        .from("Lotes")
+        .select("base_numero_lote")
+        .eq("base_numero_lote", registro.base_numero_lote)
+        .single();
+
+      if (loteError || !loteExistente) {
+        toast.current.show({
+          severity: "error",
+          summary: "Error",
+          detail: `El lote ${registro.base_numero_lote} no existe.`,
+          life: 3000,
+        });
+        return;
+      }
       const { data, error } = await supabase
         .from("Control_Rendimiento_Secado_Horno_Microondas")
         .insert([
           {
+            base_numero_lote: registro.base_numero_lote, // Lote seleccionado
             kg_minuto: registro.kg_minuto,
             velocidad_banda: registro.velocidad_banda,
             temp_coccion: registro.temp_coccion,
@@ -157,6 +192,18 @@ function ControlRendimientoSecadoHornoMultilevel() {
         console.error("Error en Supabase:", error);
         throw new Error(
           error.message || "Error desconocido al guardar en Supabase"
+        );
+      }
+      // Actualizar la tabla Lotes con la nueva etapa_actual
+      const { error: updateError } = await supabase
+        .from("Lotes")
+        .update({ etapa_actual: "HornoMic" }) // Cambia "Control de Rendimiento" por la etapa que corresponda
+        .eq("base_numero_lote", registro.base_numero_lote);
+
+      if (updateError) {
+        console.error("Error al actualizar Lotes:", updateError);
+        throw new Error(
+          updateError.message || "Error desconocido al actualizar Lotes"
         );
       }
       toast.current.show({
@@ -513,6 +560,13 @@ function ControlRendimientoSecadoHornoMultilevel() {
           >
             <Column selectionMode="multiple" exportable={false}></Column>
             <Column
+              field="numero_lote"
+              header="Número Lote"
+              // editor={(options) => textEditor(options)}
+              sortable
+              style={{ minWidth: "10rem" }}
+            ></Column>
+            <Column
               field="kg_minuto"
               header="Kg Minuto"
               editor={(options) => floatEditor(options)}
@@ -624,6 +678,25 @@ function ControlRendimientoSecadoHornoMultilevel() {
         onHide={hideDialog}
       >
         <div className="field">
+          <label htmlFor="base_numero_lote" className="font-bold">
+            Número de lote{" "}
+            {submitted && !registro.base_numero_lote && (
+              <small className="p-error">Requerido.</small>
+            )}
+          </label>
+
+          <Dropdown
+            value={registro.base_numero_lote}
+            onChange={(e) => {
+              setRegistro({ ...registro, base_numero_lote: e.value });
+            }}
+            options={[...(lotes || [])]}
+            optionLabel="base_numero_lote" // Mostrar el campo "label" en el dropdown
+            optionValue="base_numero_lote" // Guardar el valor de "base_numero_lote"
+            placeholder="Selecciona un Número de lote"
+            className="w-full md:w-14rem"
+          />
+          <br />
           <label htmlFor="kg_minuto" className="font-bold">
             Kg Minuto{" "}
             {submitted && !registro.kg_minuto && (
