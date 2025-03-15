@@ -427,7 +427,7 @@ function NIB() {
     const { id, ...updatedData } = newData;
     try {
       const { error } = await supabase
-        .from("Neoantos_Inoculados")
+        .from("Neonatos_Inoculados")
         .update(updatedData)
         .eq("id", id);
 
