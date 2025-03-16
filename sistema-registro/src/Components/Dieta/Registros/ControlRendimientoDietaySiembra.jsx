@@ -568,7 +568,7 @@ function ControLRendimientoDietaySiembra() {
   );
 
   const cols = [
-    { field: "base_numero_lote", header: "Número Lote" },
+    { field: "numero_lote", header: "Número Lote" },
     { field: "cantidad_tandas", header: "Cantidad Tandas" },
     { field: "kg_dieta_caja", header: "Kg Dieta Caja" },
     { field: "kg_residuo_organico", header: "Kg Residuo Orgánico" },

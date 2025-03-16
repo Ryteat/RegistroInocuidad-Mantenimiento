@@ -572,6 +572,7 @@ function ControlRendimientoCosechayFrass() {
   );
 
   const cols = [
+    { field: "numero_lote", header: "Número Lote" },
     { field: "tipo_produccion", header: "Tipo Producción" },
     { field: "tipo_control", header: "Tipo Control" },
     { field: "fec_siembra", header: "Fecha Siembra" },

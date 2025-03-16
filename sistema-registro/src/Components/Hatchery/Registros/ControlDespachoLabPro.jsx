@@ -451,7 +451,7 @@ const ControlDespachoLabPro = () => {
   );
 
   const cols = [
-    { field: "base_numero_lote", header: "Número Lote" },
+    { field: "numero_lote", header: "Número Lote" },
     { field: "operario_hatchery", header: "Operario Hatchery" },
     { field: "coordinador_hatchery", header: "Coordinador Hatchery" },
     { field: "coordinador_produccion", header: "Coordinador Producción" },
