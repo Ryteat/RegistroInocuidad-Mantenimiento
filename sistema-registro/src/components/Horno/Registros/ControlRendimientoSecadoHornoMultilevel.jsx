@@ -27,6 +27,8 @@ function ControlRendimientoSecadoHornoMultilevel() {
     hora_proceso: "",
     larva_fresca_kg: "",
     cajas_totales: "",
+    cant_cajas_horno: 0,
+    _originalCajas: 0, // Nuevo campo para almacenar el valor original
     desecho_kg: "",
     observaciones: "",
   };
@@ -43,21 +45,8 @@ function ControlRendimientoSecadoHornoMultilevel() {
   const [lotes, setLotes] = useState([]);
 
   // Función para formatear la fecha en formato día/mes/año
-  const formatearFecha = (fecha) => {
-    if (!fecha) return "";
-    const date = new Date(fecha);
-    const dia = String(date.getDate()).padStart(2, "0");
-    const mes = String(date.getMonth() + 1).padStart(2, "0"); // Los meses comienzan en 0
-    const año = date.getFullYear();
-    return `${dia}/${mes}/${año}`;
-  };
-
-  // Función para convertir la fecha de día/mes/año a formato ISO (año-mes-día)
-  const convertirFechaISO = (fecha) => {
-    if (!fecha) return "";
-    const [dia, mes, año] = fecha.split("/");
-    return `${año}-${mes}-${dia}`;
-  };
+  const convertirFecha = (fecha) =>
+    fecha ? fecha.split("-").reverse().join("/") : "";
 
   // Opciones para el campo "tipo_control"
   const tiposControl = ["Prueba", "Control"];
@@ -68,14 +57,7 @@ function ControlRendimientoSecadoHornoMultilevel() {
         .from("Control_Rendimiento_Secado_Horno_Multilevel")
         .select();
       if (data) {
-        // Formatear las fechas al formato día/mes/año
-        const registrosFormateados = data.map((registro) => ({
-          ...registro,
-          fecha_registro: formatearFecha(registro.fecha_registro),
-          fecha_siembra: formatearFecha(registro.fecha_siembra),
-          fecha_produccion: formatearFecha(registro.fecha_produccion),
-        }));
-        setRegistros(registrosFormateados);
+        setRegistros(data);
       }
     } catch {
       console.log("Error en la conexión a la base de datos");
@@ -104,17 +86,42 @@ function ControlRendimientoSecadoHornoMultilevel() {
     fetchLotes();
   }, []);
 
-  const obtenerHoraActual = () => {
-    const ahora = new Date();
-    const horas = String(ahora.getHours()).padStart(2, "0");
-    const minutos = String(ahora.getMinutes()).padStart(2, "0");
-    return `${horas}:${minutos}`;
+  const formatDateTime = (date, format = "DD-MM-YYYY hh:mm A") => {
+    const fmt = new Intl.DateTimeFormat("en-US", {
+      day: "2-digit",
+      month: "2-digit",
+      year: "numeric",
+      hour: "2-digit",
+      minute: "2-digit",
+      hour12: true,
+    })
+      .formatToParts(date)
+      .reduce((acc, { type, value }) => ({ ...acc, [type]: value }), {});
+
+    return format
+      .replace("DD", fmt.day)
+      .replace("MM", fmt.month)
+      .replace("YYYY", fmt.year)
+      .replace("hh", fmt.hour.padStart(2, "0"))
+      .replace("mm", fmt.minute)
+      .replace("A", fmt.dayPeriod || "AM");
   };
+
 
   const saveRegistro = async () => {
     setSubmitted(true);
+
+    function isInvalid(value, min, max) {
+      return value < min || value > max;
+    }
+
+    const isCajasTotalesInvalido = isInvalid(
+      registro.cajas_totales,
+      0,
+      registro.cant_cajas_horno
+    );
+
     if (
-      !registro.fecha_registro ||
       !registro.tipo_control ||
       !registro.fecha_siembra ||
       !registro.fecha_produccion ||
@@ -131,27 +138,28 @@ function ControlRendimientoSecadoHornoMultilevel() {
       });
       return;
     }
-
-    const horaActual = obtenerHoraActual();
-    const registroConHora = {
-      ...registro,
-      fecha_registro: convertirFechaISO(registro.fecha_registro),
-      fecha_siembra: convertirFechaISO(registro.fecha_siembra),
-      fecha_produccion: convertirFechaISO(registro.fecha_produccion),
-      hora_registro: horaActual,
-    };
+    if (registro.cajas_totales > registro.cant_cajas_horno) {
+      toast.current.show({
+        severity: "error",
+        summary: "Error",
+        detail: `No puedes procesar más cajas (${registro.cajas_totales}) de las disponibles en el lote (${registro.cant_cajas_horno})`,
+        life: 3000,
+      });
+      return;
+    }
 
     try {
       const currentDate = formatDateTime(new Date(), "DD/MM/YYYY");
       const currentTime = formatDateTime(new Date(), "hh:mm A");
 
       // Verificar si el lote seleccionado existe
+     // Verificar si el lote seleccionado existe
       const { data: loteExistente, error: loteError } = await supabase
         .from("Lotes")
         .select("base_numero_lote")
         .eq("base_numero_lote", registro.base_numero_lote)
         .single();
-
+  
       if (loteError || !loteExistente) {
         toast.current.show({
           severity: "error",
@@ -161,34 +169,54 @@ function ControlRendimientoSecadoHornoMultilevel() {
         });
         return;
       }
-      const { id, ...registroSinId } = registroConHora;
+      
       const { data, error } = await supabase
         .from("Control_Rendimiento_Secado_Horno_Multilevel")
-        .insert([registroSinId]);
+        .insert([
+          {
+        fecha_registro: currentDate,
+        hora_registro: currentTime,
+        tipo_control: registro.tipo_control,
+        fecha_siembra: convertirFecha(registro.fecha_siembra),
+        fecha_produccion: convertirFecha(registro.fecha_produccion),
+        hora_proceso: registro.hora_proceso,
+        larva_fresca_kg: registro.larva_fresca_kg,
+        cajas_totales: registro.cajas_totales,
+        desecho_kg: registro.desecho_kg,
+        observaciones: registro.observaciones,
+        base_numero_lote: registro.base_numero_lote,
+          },
+        ]);
       if (error) {
         console.error("Error en Supabase:", error);
         throw new Error(
           error.message || "Error desconocido al guardar en Supabase"
         );
       }
-      // Actualizar la tabla Lotes con la nueva etapa_actual
+
+       // Actualizar la tabla Lotes con la nueva etapa_actual
+      const nuevasCajas = registro.cant_cajas_horno - registro.cajas_totales;
+  
       const { error: updateError } = await supabase
         .from("Lotes")
-        .update({ etapa_actual: "HornoMul" }) // Cambia "Control de Rendimiento" por la etapa que corresponda
+        .update({
+          cant_cajas_horno: nuevasCajas,
+          etapa_actual: "Horno",
+        })
         .eq("base_numero_lote", registro.base_numero_lote);
-
+  
       if (updateError) {
-        console.error("Error al actualizar Lotes:", updateError);
-        throw new Error(
-          updateError.message || "Error desconocido al actualizar Lotes"
-        );
+        console.error("Error actualizando lote:", updateError);
+        throw new Error("Error al actualizar información del lote");
       }
+  
       toast.current.show({
         severity: "success",
         summary: "Exitoso",
         detail: "Registro creado correctamente",
         life: 3000,
       });
+  
       setRegistro(emptyRegister);
       setRegistroDialog(false);
       setSubmitted(false);
@@ -202,6 +230,136 @@ function ControlRendimientoSecadoHornoMultilevel() {
       });
     }
   };
+
+  const dateEditor = (options) => {
+      const convertToInputFormat = (date) => {
+        if (!date) return "";
+        const [day, month, year] = date.split("/");
+        return `${year}-${month}-${day}`;
+      };
+      const convertToDatabaseFormat = (date) => {
+        if (!date) return "";
+        const [year, month, day] = date.split("-");
+        return `${day}/${month}/${year}`;
+      };
+  
+      return (
+        <InputText
+          type="date"
+          value={convertToInputFormat(options.value)}
+          onChange={(e) => {
+            const selectedDate = e.target.value;
+            options.editorCallback(convertToDatabaseFormat(selectedDate));
+          }}
+        />
+      );
+    };
+  
+    const timeEditor = (options) => {
+      return (
+        <InputText
+          type="time"
+          value={options.value}
+          onChange={(e) => options.editorCallback(e.target.value)}
+        />
+      );
+    };
+  
+    const textEditor = (options) => {
+      return (
+        <InputText
+          type="text"
+          value={options.value}
+          onChange={(e) => options.editorCallback(e.target.value)}
+        />
+      );
+    };
+  
+    const numberEditor = (options) => {
+      return (
+        <InputText
+          type="number"
+          value={options.value}
+          onChange={(e) => options.editorCallback(e.target.value)}
+        />
+      );
+    };
+  
+    const floatEditor = (options) => {
+      return (
+        <InputText
+          type="float"
+          value={options.value}
+          onChange={(e) => options.editorCallback(e.target.value)}
+        />
+      );
+    };
+  
+    const allowEdit = (rowData) => {
+      return rowData.name !== "Blue Band";
+    };
+  
+    // const onRowEditInit = (event) => {  EXPLICACION EN TABLA
+    //   setRegistro({
+    //     ...event.data,
+    //     _originalCajas: event.data.cajas_procesadas_neonatos
+    //   });
+    //   setRegistroDialog(true);
+    // };
+    const onRowEditComplete = async ({ newData, data: oldData }) => {
+      try {
+        // 1. Calcular diferencia de cajas
+        const diferencia = newData.cajas_totales - oldData.cajas_totales;
+        
+        // 2. Obtener lote actual
+        const { data: lote, error: loteError } = await supabase
+          .from('Lotes')
+          .select('cant_cajas_horno')
+          .eq('base_numero_lote', oldData.base_numero_lote)
+          .single();
+    
+        if (loteError) throw loteError;
+    
+        // 3. Calcular nuevo valor
+        const nuevasCajas = lote.cant_cajas_horno - diferencia;
+        
+        if (nuevasCajas < 0) {
+          throw new Error('Cantidad de cajas no puede ser negativa');
+        }
+    
+        // 4. Actualizar Control_Rendimiento_DietaySiembra
+        const { error: updateError } = await supabase
+          .from('Control_Rendimiento_Secado_Horno_Multilevel')
+          .update(newData)
+          .eq('id', newData.id);
+    
+        if (updateError) throw updateError;
+    
+        // 5. Actualizar Lotes
+        const { error: loteUpdateError } = await supabase
+          .from('Lotes')
+          .update({
+            cant_cajas_horno: nuevasCajas,
+            etapa_actual: "Horno"
+          })
+          .eq('base_numero_lote', oldData.base_numero_lote);
+    
+        if (loteUpdateError) throw loteUpdateError;
+    
+        // 6. Actualizar estado local
+        setRegistros(prev => prev.map(item => 
+          item.id === newData.id ? newData : item
+        ));
+    
+      } catch (error) {
+        toast.current.show({
+          severity: 'error',
+          summary: 'Error en edición',
+          detail: error.message || 'Error al actualizar el registro',
+          life: 3000
+        });
+      }
+    };
 
   const onInputChange = (e, name) => {
     let val = e.target.value;
@@ -275,98 +433,125 @@ function ControlRendimientoSecadoHornoMultilevel() {
     </React.Fragment>
   );
 
-  const exportPdf = () => {
-    if (selectedRegistros.length === 0) {
-      toast.current.show({
-        severity: "warn",
-        summary: "Advertencia",
-        detail: "No hay filas seleccionadas para exportar.",
-        life: 3000,
-      });
-      return;
-    }
-
-    const doc = new jsPDF();
-    doc.setFontSize(18);
-    doc.text("Registros de Control de Rendimiento y Secado", 14, 22);
-
-    doc.autoTable({
-      head: [
-        [
-          "Fecha Registro",
-          "Hora Registro",
-          "Tipo Control",
-          "Fecha Siembra",
-          "Fecha Producción",
-          "Hora Proceso",
-          "Larva Fresca (kg)",
-          "Cajas Totales",
-          "Desecho (kg)",
-          "Observaciones",
-        ],
-      ],
-      body: selectedRegistros.map((registro) => [
-        formatearFecha(registro.fecha_registro),
-        registro.hora_registro,
-        registro.tipo_control,
-        formatearFecha(registro.fecha_siembra),
-        formatearFecha(registro.fecha_produccion),
-        registro.hora_proceso,
-        registro.larva_fresca_kg,
-        registro.cajas_totales,
-        registro.desecho_kg,
-        registro.observaciones,
-      ]),
-      startY: 30,
-      styles: { fontSize: 10 },
-      headStyles: { fillColor: [41, 128, 185], textColor: 255 },
-    });
-
-    doc.save("Control_Rendimiento_Secado_Horno_Multilevel.pdf");
-  };
-
-  const exportXlsx = () => {
-    if (selectedRegistros.length === 0) {
-      toast.current.show({
-        severity: "warn",
-        summary: "Advertencia",
-        detail: "No hay filas seleccionadas para exportar.",
-        life: 3000,
-      });
-      return;
-    }
-
-    const headers = [
-      "Fecha Registro",
-      "Hora Registro",
-      "Tipo Control",
-      "Fecha Siembra",
-      "Fecha Producción",
-      "Hora Proceso",
-      "Larva Fresca (kg)",
-      "Cajas Totales",
-      "Desecho (kg)",
-      "Observaciones",
+  const cols = [
+      { field: "numero_lote", header: "Número Lote" },
+      { header: "Fecha Registro", field: "fecha_registro" },
+      { header: "Hora Registro", field: "hora_registro" },
+      { field: "tipo_control", header: "Tipo Control" },
+      { field: "fecha_siembra", header: "Fecha Siembra" },
+      { field: "fecha_produccion", header: "Fecha Producción" },
+      { field: "hora_proceso", header: "Hora Proceso" },
+      { field: "larva_fresca_kg", header: "Larva Fresca (kg)" },
+      { field: "cajas_totales", header: "Cajas Totales" },
+      { field: "desecho_kg", header: "Desecho (kg)" },
+      { field: "observaciones", header: "Observaciones" },
+      { field: "registrado", header: "Registrado" },
     ];
-    const rows = selectedRegistros.map((registro) => [
-      formatearFecha(registro.fecha_registro),
-      registro.hora_registro,
-      registro.tipo_control,
-      formatearFecha(registro.fecha_siembra),
-      formatearFecha(registro.fecha_produccion),
-      registro.hora_proceso,
-      registro.larva_fresca_kg,
-      registro.cajas_totales,
-      registro.desecho_kg,
-      registro.observaciones,
-    ]);
-
-    const dataToExport = [headers, ...rows];
-    const ws = XLSX.utils.aoa_to_sheet(dataToExport);
-    const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, "Registros");
-    XLSX.writeFile(wb, "Control_Rendimiento_Secado_Horno_Multilevel.xlsx");
-  };
+  
+    const exportColumns = cols.map((col) => ({
+      title: col.header,
+      dataKey: col.field,
+    }));
+  
+    const exportPdf = () => {
+      if (selectedRegistros.length === 0) {
+        toast.current.show({
+          severity: "warn",
+          summary: "Advertencia",
+          detail: "No hay filas seleccionadas para exportar.",
+          life: 3000,
+        });
+        return;
+      }
+  
+      const doc = new jsPDF();
+      doc.setFontSize(18);
+      doc.text("Registros de Control Rendimiento Secado Horno Multilevel", 14, 22);
+  
+      const exportData = selectedRegistros.map(
+        ({ fecha_registro, hora_registro, ...row }) => ({
+          ...row,
+          registrado: `${fecha_registro || ""} ${hora_registro || ""}`,
+        })
+      );
+  
+      const columnsPerPage = 5;
+      const maxHeightPerColumn = 10;
+      const rowHeight = exportColumns.length * maxHeightPerColumn + 10;
+      let currentY = 30;
+  
+      const headerColor = [41, 128, 185];
+      const textColor = [0, 0, 0];
+  
+      for (let i = 0; i < exportData.length; i++) {
+        if (currentY + rowHeight > doc.internal.pageSize.height) {
+          doc.addPage();
+          currentY = 30;
+        }
+  
+        const row = exportData[i];
+        const startX = 14;
+  
+        exportColumns.forEach(({ title, dataKey }, index) => {
+          const value = row[dataKey];
+          doc.setFillColor(...headerColor);
+          doc.rect(
+            startX,
+            currentY + index * maxHeightPerColumn,
+            180,
+            maxHeightPerColumn,
+            "F"
+          );
+          doc.setTextColor(255);
+          doc.text(title, startX + 2, currentY + index * maxHeightPerColumn + 7);
+          doc.setTextColor(...textColor);
+          doc.text(
+            `${value}`,
+            startX + 90,
+            currentY + index * maxHeightPerColumn + 7
+          );
+        });
+  
+        currentY += rowHeight;
+      }
+  
+      doc.save("Control Rendimiento Secado Horno Multilevel.pdf");
+    };
+  
+    const exportXlsx = () => {
+      if (selectedRegistros.length === 0) {
+        toast.current.show({
+          severity: "warn",
+          summary: "Advertencia",
+          detail: "No hay filas seleccionadas para exportar.",
+          life: 3000,
+        });
+        return;
+      }
+  
+      const headers = cols.map((col) => col.header);
+      const exportData = selectedRegistros.map(
+        ({ fecha_registro, hora_registro, ...registro }) => ({
+          ...registro,
+          registrado: `${fecha_registro || ""} ${hora_registro || ""}`,
+        })
+      );
+  
+      const rows = exportData.map((registro) =>
+        cols.map((col) => registro[col.field])
+      );
+  
+      const dataToExport = [headers, ...rows];
+      const ws = XLSX.utils.aoa_to_sheet(dataToExport);
+  
+      ws["!cols"] = cols.map((col) => ({
+        width: Math.max(col.header.length, 10),
+      }));
+  
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, ws, "Registros");
+      XLSX.writeFile(wb, "Control Rendimiento Secado Horno Multilevel.xlsx");
+    };
 
   return (
     <>
@@ -452,38 +637,41 @@ function ControlRendimientoSecadoHornoMultilevel() {
         onHide={hideDialog}
       >
         <div className="field">
-          <label htmlFor="base_numero_lote" className="font-bold">
+        <label htmlFor="base_numero_lote" className="font-bold">
             Número de lote{" "}
             {submitted && !registro.base_numero_lote && (
               <small className="p-error">Requerido.</small>
             )}
           </label>
-
           <Dropdown
             value={registro.base_numero_lote}
-            onChange={(e) => {
-              setRegistro({ ...registro, base_numero_lote: e.value });
+            onChange={async (e) => {
+              const loteSeleccionado = lotes.find(
+                (l) => l.base_numero_lote === e.value
+              );
+
+              if (loteSeleccionado) {
+                // Obtener los datos actualizados del lote desde Supabase
+                const { data: loteActual, error } = await supabase
+                  .from("Lotes")
+                  .select("cant_cajas_horno")
+                  .eq("base_numero_lote", e.value)
+                  .single();
+
+                if (!error && loteActual) {
+                  setRegistro({
+                    ...registro,
+                    base_numero_lote: e.value,
+                    cant_cajas_horno: loteActual.cant_cajas_horno || 0,
+                  });
+                }
+              }
             }}
             options={[...(lotes || [])]}
             optionLabel="base_numero_lote" // Mostrar el campo "label" en el dropdown
             optionValue="base_numero_lote" // Guardar el valor de "base_numero_lote"
             placeholder="Selecciona un Número de lote"
             className="w-full md:w-14rem"
-          />
-          <br />
-          <label htmlFor="fecha_registro" className="font-bold">
-            Fecha Registro{" "}
-            {submitted && !registro.fecha_registro && (
-              <small className="p-error">Requerido.</small>
-            )}
-          </label>
-          <InputText
-            type="date"
-            id="fecha_registro"
-            value={registro.fecha_registro}
-            onChange={(e) => onInputChange(e, "fecha_registro")}
-            required
-            autoFocus
           />
           <br />
           <label htmlFor="tipo_control" className="font-bold">

@@ -298,16 +298,17 @@ function VisualizarLotes() {
 
             {/* Horno Multilevel */}
             {renderRelatedTable('Secado Horno Microondas', relatedData.Control_Rendimiento_Secado_Horno_Multilevel, [
-                    { field: 'fec_registro', header: 'Fecha Registro' },
-                    { field: 'hor_registro', header: 'Hora Registro' },
-                    { field: 'tipo_control', header: 'Tipo Control' },
-                    { field: 'fec_siembra', header: 'Fecha Siembra' },
-                    { field: 'fec_produccion', header: 'Fecha Producción' },
-                    { field: 'hor_proceso', header: 'Hora Proceso' },
-                    { field: 'larva_fresca_kg', header: 'Larva Fresca (kg)' },
-                    { field: 'cajas_totales', header: 'Cajas Totales' },
-                    { field: 'desecho_kg', header: 'Desecho (kg)' },
-                    { field: 'observaciones', header: 'Observaciones' }
+                   { field: "numero_lote", header: "Número Lote" },
+                   { header: "Fecha Registro", field: "fecha_registro" },
+                   { header: "Hora Registro", field: "hora_registro" },
+                   { field: "tipo_control", header: "Tipo Control" },
+                   { field: "fecha_siembra", header: "Fecha Siembra" },
+                   { field: "fecha_produccion", header: "Fecha Producción" },
+                   { field: "hora_proceso", header: "Hora Proceso" },
+                   { field: "larva_fresca_kg", header: "Larva Fresca (kg)" },
+                   { field: "cajas_totales", header: "Cajas Totales" },
+                   { field: "desecho_kg", header: "Desecho (kg)" },
+                   { field: "observaciones", header: "Observaciones" },
                   ])}
             {renderRelatedTable('Producto Terminado', relatedData.Control_Rendimiento_Producto_Terminado, [
               { field: "fecha_produccion", header: "Fecha Producción" },
