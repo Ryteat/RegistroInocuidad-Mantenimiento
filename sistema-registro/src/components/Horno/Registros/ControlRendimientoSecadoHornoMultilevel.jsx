@@ -70,8 +70,7 @@ function ControlRendimientoSecadoHornoMultilevel() {
         .select() // Si solo necesitas el campo base_numero_lote, podrías especificarlo: .select("base_numero_lote")
         .in("etapa_actual", [
           "Cosecha",
-          "HornoMul",
-          "HornoMic",
+          "Horno",
           "ProductoTerminado",
         ]); // Filtra registros con etapa_actual igual a 'hatchery' o 'dieta'
       if (error) throw error;
@@ -152,7 +151,6 @@ function ControlRendimientoSecadoHornoMultilevel() {
       const currentDate = formatDateTime(new Date(), "DD/MM/YYYY");
       const currentTime = formatDateTime(new Date(), "hh:mm A");
 
-      // Verificar si el lote seleccionado existe
      // Verificar si el lote seleccionado existe
       const { data: loteExistente, error: loteError } = await supabase
         .from("Lotes")
@@ -340,7 +338,7 @@ function ControlRendimientoSecadoHornoMultilevel() {
           .from('Lotes')
           .update({
             cant_cajas_horno: nuevasCajas,
-            etapa_actual: "Horno"
+            etapa_actual: "HornoMul"
           })
           .eq('base_numero_lote', oldData.base_numero_lote);
     
@@ -435,8 +433,6 @@ function ControlRendimientoSecadoHornoMultilevel() {
 
   const cols = [
       { field: "numero_lote", header: "Número Lote" },
-      { header: "Fecha Registro", field: "fecha_registro" },
-      { header: "Hora Registro", field: "hora_registro" },
       { field: "tipo_control", header: "Tipo Control" },
       { field: "fecha_siembra", header: "Fecha Siembra" },
       { field: "fecha_produccion", header: "Fecha Producción" },
@@ -586,6 +582,8 @@ function ControlRendimientoSecadoHornoMultilevel() {
           ></Toolbar>
           <DataTable
             ref={dt}
+            editMode="row"
+            onRowEditComplete={onRowEditComplete}
             value={registros}
             selection={selectedRegistros}
             onSelectionChange={(e) => setSelectedRegistros(e.value)}

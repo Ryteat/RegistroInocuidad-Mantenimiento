@@ -29,6 +29,8 @@ function ControlRendimientoSecadoHornoMultilevel() {
     hor_proceso: "",
     kg_larva_fresca: "",
     cajas_totales: "",
+    cant_cajas_horno: 0,
+    _originalCajas: 0, // Nuevo campo para almacenar el valor original
     kg_desecho: "",
     hor_inicio: "",
     hor_fin: "",
@@ -78,12 +80,7 @@ function ControlRendimientoSecadoHornoMultilevel() {
       const { data, error } = await supabase
         .from("Lotes")
         .select() // Si solo necesitas el campo base_numero_lote, podrías especificarlo: .select("base_numero_lote")
-        .in("etapa_actual", [
-          "Cosecha",
-          "HornoMul",
-          "HornoMic",
-          "ProductoTerminado",
-        ]); // Filtra registros con etapa_actual igual a 'hatchery' o 'dieta'
+        .in("etapa_actual", ["Cosecha", "Horno", "ProductoTerminado"]); // Filtra registros con etapa_actual igual a 'hatchery' o 'dieta'
       if (error) throw error;
       setLotes(data || []); // Actualiza el estado con los datos obtenidos
     } catch (err) {
@@ -118,7 +115,19 @@ function ControlRendimientoSecadoHornoMultilevel() {
   };
 
   const saveRegistro = async () => {
+    console.log(registro.cant_cajas_horno)
     setSubmitted(true);
+
+    function isInvalid(value, min, max) {
+      return value < min || value > max;
+    }
+
+    const isCajasTotalesInvalido = isInvalid(
+      registro.cajas_totales,
+      0,
+      registro.cant_cajas_horno
+    );
+
     if (
       !registro.kg_minuto ||
       !registro.velocidad_banda ||
@@ -143,27 +152,35 @@ function ControlRendimientoSecadoHornoMultilevel() {
       });
       return;
     }
-
+    if (registro.cajas_totales > registro.cant_cajas_horno) {
+      toast.current.show({
+        severity: "error",
+        summary: "Error",
+        detail: `No puedes procesar más cajas (${registro.cajas_totales}) de las disponibles en el lote (${registro.cant_cajas_horno})`,
+        life: 3000,
+      });
+      return;
+    }
     try {
       const currentDate = formatDateTime(new Date(), "DD/MM/YYYY");
       const currentTime = formatDateTime(new Date(), "hh:mm A");
 
-      // Verificar si el lote seleccionado existe
-      const { data: loteExistente, error: loteError } = await supabase
-        .from("Lotes")
-        .select("base_numero_lote")
-        .eq("base_numero_lote", registro.base_numero_lote)
-        .single();
+     // Verificar si el lote seleccionado existe
+     const { data: loteExistente, error: loteError } = await supabase
+     .from("Lotes")
+     .select("base_numero_lote")
+     .eq("base_numero_lote", registro.base_numero_lote)
+     .single();
 
-      if (loteError || !loteExistente) {
-        toast.current.show({
-          severity: "error",
-          summary: "Error",
-          detail: `El lote ${registro.base_numero_lote} no existe.`,
-          life: 3000,
-        });
-        return;
-      }
+   if (loteError || !loteExistente) {
+     toast.current.show({
+       severity: "error",
+       summary: "Error",
+       detail: `El lote ${registro.base_numero_lote} no existe.`,
+       life: 3000,
+     });
+     return;
+   }
       const { data, error } = await supabase
         .from("Control_Rendimiento_Secado_Horno_Microondas")
         .insert([
@@ -195,23 +212,28 @@ function ControlRendimientoSecadoHornoMultilevel() {
         );
       }
       // Actualizar la tabla Lotes con la nueva etapa_actual
+      const nuevasCajas = registro.cant_cajas_horno - registro.cajas_totales;
+  
       const { error: updateError } = await supabase
         .from("Lotes")
-        .update({ etapa_actual: "HornoMic" }) // Cambia "Control de Rendimiento" por la etapa que corresponda
+        .update({
+          cant_cajas_horno: nuevasCajas,
+          etapa_actual: "Horno",
+        })
         .eq("base_numero_lote", registro.base_numero_lote);
-
+  
       if (updateError) {
-        console.error("Error al actualizar Lotes:", updateError);
-        throw new Error(
-          updateError.message || "Error desconocido al actualizar Lotes"
-        );
+        console.error("Error actualizando lote:", updateError);
+        throw new Error("Error al actualizar información del lote");
       }
+  
       toast.current.show({
         severity: "success",
         summary: "Exitoso",
         detail: "Registro creado correctamente",
         life: 3000,
       });
+  
       setRegistro(emptyRegister);
       setRegistroDialog(false);
       setSubmitted(false);
@@ -294,21 +316,58 @@ function ControlRendimientoSecadoHornoMultilevel() {
     return rowData.name !== "Blue Band";
   };
 
-  const onRowEditComplete = async ({ newData }) => {
-    const { id, ...updatedData } = newData;
+  const onRowEditComplete = async ({ newData, data: oldData }) => {
     try {
-      const { error } = await supabase
-        .from("Control_Rendimiento_Secado_Horno_Microondas")
-        .update(updatedData)
-        .eq("id", id);
-
-      if (error) return console.error("Error al actualizar:", error.message);
-
-      setRegistros((prev) =>
-        prev.map((n) => (n.id === id ? { ...n, ...newData } : n))
-      );
-    } catch (err) {
-      console.error("Error inesperado:", err);
+      // 1. Calcular diferencia de cajas
+      const diferencia = newData.cajas_totales - oldData.cajas_totales;
+      
+      // 2. Obtener lote actual
+      const { data: lote, error: loteError } = await supabase
+        .from('Lotes')
+        .select('cant_cajas_horno')
+        .eq('base_numero_lote', oldData.base_numero_lote)
+        .single();
+  
+      if (loteError) throw loteError;
+  
+      // 3. Calcular nuevo valor
+      const nuevasCajas = lote.cant_cajas_horno - diferencia;
+      
+      if (nuevasCajas < 0) {
+        throw new Error('Cantidad de cajas no puede ser negativa');
+      }
+  
+      // 4. Actualizar Control_Rendimiento_DietaySiembra
+      const { error: updateError } = await supabase
+        .from('Control_Rendimiento_Secado_Horno_Multilevel')
+        .update(newData)
+        .eq('id', newData.id);
+  
+      if (updateError) throw updateError;
+  
+      // 5. Actualizar Lotes
+      const { error: loteUpdateError } = await supabase
+        .from('Lotes')
+        .update({
+          cant_cajas_horno: nuevasCajas,
+          etapa_actual: "HornoMic"
+        })
+        .eq('base_numero_lote', oldData.base_numero_lote);
+  
+      if (loteUpdateError) throw loteUpdateError;
+  
+      // 6. Actualizar estado local
+      setRegistros(prev => prev.map(item => 
+        item.id === newData.id ? newData : item
+      ));
+  
+    } catch (error) {
+      toast.current.show({
+        severity: 'error',
+        summary: 'Error en edición',
+        detail: error.message || 'Error al actualizar el registro',
+        life: 3000
+      });
     }
   };
 
@@ -678,17 +737,35 @@ function ControlRendimientoSecadoHornoMultilevel() {
         onHide={hideDialog}
       >
         <div className="field">
-          <label htmlFor="base_numero_lote" className="font-bold">
+        <label htmlFor="base_numero_lote" className="font-bold">
             Número de lote{" "}
             {submitted && !registro.base_numero_lote && (
               <small className="p-error">Requerido.</small>
             )}
           </label>
-
           <Dropdown
             value={registro.base_numero_lote}
-            onChange={(e) => {
-              setRegistro({ ...registro, base_numero_lote: e.value });
+            onChange={async (e) => {
+              const loteSeleccionado = lotes.find(
+                (l) => l.base_numero_lote === e.value
+              );
+
+              if (loteSeleccionado) {
+                // Obtener los datos actualizados del lote desde Supabase
+                const { data: loteActual, error } = await supabase
+                  .from("Lotes")
+                  .select("cant_cajas_horno")
+                  .eq("base_numero_lote", e.value)
+                  .single();
+
+                if (!error && loteActual) {
+                  setRegistro({
+                    ...registro,
+                    base_numero_lote: e.value,
+                    cant_cajas_horno: loteActual.cant_cajas_horno || 0,
+                  });
+                }
+              }
             }}
             options={[...(lotes || [])]}
             optionLabel="base_numero_lote" // Mostrar el campo "label" en el dropdown
