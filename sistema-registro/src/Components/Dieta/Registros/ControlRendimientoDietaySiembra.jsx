@@ -336,6 +336,7 @@ function ControLRendimientoDietaySiembra() {
         .update({
           cant_cajas_dieta: nuevasCajas,
           etapa_actual: "Dieta",
+          fecha_siembra: currentDate,
         })
         .eq("base_numero_lote", registro.base_numero_lote);
   

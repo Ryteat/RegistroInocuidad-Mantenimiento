@@ -67,14 +67,11 @@ function ControlRendimientoSecadoHornoMultilevel() {
     try {
       const { data, error } = await supabase
         .from("Lotes")
-        .select() // Si solo necesitas el campo base_numero_lote, podrías especificarlo: .select("base_numero_lote")
-        .in("etapa_actual", [
-          "Cosecha",
-          "Horno",
-          "ProductoTerminado",
-        ]); // Filtra registros con etapa_actual igual a 'hatchery' o 'dieta'
+        .select()
+        .ilike('etapa_actual', '%Horno%', '%ProductoTerminado%'); // Busca "Horno" en cualquier posición del string
+        
       if (error) throw error;
-      setLotes(data || []); // Actualiza el estado con los datos obtenidos
+      setLotes(data || []);s
     } catch (err) {
       console.log("Error en la conexión a la base de datos Lotes", err);
     }
@@ -195,13 +192,24 @@ function ControlRendimientoSecadoHornoMultilevel() {
        // Actualizar la tabla Lotes con la nueva etapa_actual
       const nuevasCajas = registro.cant_cajas_horno - registro.cajas_totales;
   
-      const { error: updateError } = await supabase
-        .from("Lotes")
-        .update({
-          cant_cajas_horno: nuevasCajas,
-          etapa_actual: "Horno",
-        })
-        .eq("base_numero_lote", registro.base_numero_lote);
+     // Actualizar Lotes
+    let nuevasEtapas = [...registro.etapas_actualizar];
+    
+    if (registro.ingresoysalida === "Salida") {
+      // Agregar Producto Terminado si no existe
+      if (!nuevasEtapas.includes("Producto Terminado")) {
+        nuevasEtapas.push("Producto Terminado");
+      }
+    }
+
+    const { error: updateError } = await supabase
+      .from("Lotes")
+      .update({
+        cant_cajas_racks: nuevasCajas,
+        etapa_actual: nuevasEtapas.join(", "), // Unir todas las etapas
+        fecha_horneado: currentDate,
+      })
+      .eq("base_numero_lote", registro.base_numero_lote);
   
       if (updateError) {
         console.error("Error actualizando lote:", updateError);

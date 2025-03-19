@@ -25,18 +25,24 @@ function Cosecha() {
           <p>Esta es la página de registros de Cosecha.</p>
           </div>
           <div className="botones">
+          <button
+              onClick={() => navigate("/Cosecha/ControlIngresoySalidaRacks")}
+              className="back-button"
+            >
+              1- Control de Ingreso o Salida de Racks
+            </button>
             <button
               onClick={() => navigate("/Cosecha/ControlRendimientoCosechayFrass")}
               className="back-button"
             >
-              1- Control de Rendimiento Cosecha y Frass
+              2- Control de Rendimiento Cosecha y Frass
             </button>
             
              <button
               onClick={() => navigate("/ControlTiempos")}
               className="back-button"
             >
-              2-Control de Tiempos Perdidos
+              3-Control de Tiempos Perdidos
             </button>
 
             

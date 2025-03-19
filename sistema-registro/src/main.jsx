@@ -58,6 +58,7 @@ import PreoperacionalTeletruk from './pages/Mantenimiento/Registros/PagesPreoper
 //imports de paginas de Cosecha
 import Cosecha from './pages/Cosecha/PagesCosecha.jsx';
 import ControlRendimientoCosechayFrass from './pages/Cosecha/Registros/PagesControlRendimientoCosechayFrass.jsx'
+import ControlIngresoySalidaRacks from './pages/Cosecha/Registros/PagesControlIngresoySalidaRacks.jsx'
 
 //imports de páginas visualizar
 // En main.js
@@ -268,6 +269,10 @@ const router = createBrowserRouter([{
       {
         path: `ControlRendimientoCosechayFrass`,
         element: <ControlRendimientoCosechayFrass />,
+      },
+      {
+        path: `ControlIngresoySalidaRacks`,
+        element: <ControlIngresoySalidaRacks />,
       },
       
     ],

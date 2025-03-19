@@ -3,7 +3,7 @@ import { useNavigate } from "react-router-dom";
 
 // Imports de estilos
 import logo2 from "../../../assets/mosca.png";
-import "./ControlRendimientoCosechayFrass.css";
+import "./ControlIngresoySalidaRacks.css";
 
 // Imports de Supabase
 import supabase from "../../../supabaseClient";
@@ -21,33 +21,30 @@ import { Toolbar } from "primereact/toolbar";
 import { Dialog } from "primereact/dialog";
 import { InputText } from "primereact/inputtext";
 import { Dropdown } from "primereact/dropdown";
+import { MultiSelect } from "primereact/multiselect";
 
 // Imports de exportar
 import * as XLSX from "xlsx";
 import jsPDF from "jspdf";
 import "jspdf-autotable";
 
-function ControlRendimientoCosechayFrass() {
+function ControlIngresoySalidaRacks() {
   let emptyRegister = {
-    fec_siembra: "",
-    fec_cosecha: "",
-    cant_cajas_cosechadas: "",
-    cant_cajas_lote: 0,
-    _originalCajas: 0, // Nuevo campo para almacenar el valor original
-    kg_larva_fresca: "",
-    cant_cajas_desechadas: "",
-    kg_total_frass: "",
-    kg_material_grueso: "",
+    ingresoysalida: "",
+    base_numero_lote: "",
+    tipo_registro: "",
+    total_cajas: "",
+    responsable: "",
     fec_registro: "",
     hor_registro: "",
     observaciones: "",
-    fec_almacenaje_frass: "",
-    cant_sacos: "",
-    tipo_produccion: "",
-    tipo_control: "",
+    etapas_actualizar: [],
+    cant_cajas_lote: 0,
+    _originalCajas: 0, // Nuevo campo para almacenar el valor original
   };
 
   const [registros, setRegistros] = useState([]);
+  const [lotes, setLotes] = useState([]);
   const [registro, setRegistro] = useState(emptyRegister);
   const toast = useRef(null);
   const dt = useRef(null);
@@ -61,24 +58,16 @@ function ControlRendimientoCosechayFrass() {
   //Errores de validación
   const [observacionesObligatorio, setObservacionesObligatorio] =
     useState(false);
-  const [erroresValidacion, setErroresValidacion] = useState({
-    cant_cajas_cosechadas: false,
-    kg_larva_fresca: false,
-    cant_cajas_desechadas: false, //Si es mayor a 0
-    kg_total_frass: false,
-    kg_material_grueso: false,
-  });
-  const [lotes, setLotes] = useState([]);
+
+  const IngresoySalida = ["Ingreso", "Salida"];
+
   const convertirFecha = (fecha) =>
     fecha ? fecha.split("-").reverse().join("/") : "";
-
-  const tiposControl = ["Prueba", "Control"];
-  const tiposProduccion = ["Produccion", "Hatchery"];
 
   const fetchRegistros = async () => {
     try {
       const { data, error } = await supabase
-        .from("Control_Rendimiento_CosechayFrass")
+        .from("Control_Ingreso_Salida_Racks")
         .select();
       if (data) {
         setRegistros(data);
@@ -92,10 +81,9 @@ function ControlRendimientoCosechayFrass() {
       const { data, error } = await supabase
         .from("Lotes")
         .select()
-        .ilike('etapa_actual', '%Cosecha%'); // Busca "Cosecha" en cualquier posición del string
-        
+        .in("etapa_actual", ["Dieta"]); 
       if (error) throw error;
-      setLotes(data || []);s
+      setLotes(data || []); // Actualiza el estado con los datos obtenidos
     } catch (err) {
       console.log("Error en la conexión a la base de datos Lotes", err);
     }
@@ -129,46 +117,14 @@ function ControlRendimientoCosechayFrass() {
 
   const saveRegistro = async () => {
     setSubmitted(true);
-  
-    // Validar los campos con el nuevo rango dinámico
-    const isCantCajasCosechadasInvalido =
-      registro.cant_cajas_cosechadas < 0 ||
-      registro.cant_cajas_cosechadas > registro.cant_cajas_lote;
-    const isKgLarvaFrescaInvalido =
-      registro.kg_larva_fresca < 0 || registro.kg_larva_fresca > 12000;
-    const isCantCajasDesechadasInvalido = registro.cant_cajas_desechadas < 0; // Corregido: debe ser < 0
-    const isKgTotalFrassInvalido =
-      registro.kg_total_frass < 0 || registro.kg_total_frass > 6000;
-    const isKgMaterialGruesoInvalido =
-      registro.kg_material_grueso < 0 || registro.kg_material_grueso > 6000;
-  
-    // Actualizar el estado de errores
-    const erroresValidacion = {
-      cant_cajas_cosechadas: isCantCajasCosechadasInvalido,
-      kg_larva_fresca: isKgLarvaFrescaInvalido,
-      cant_cajas_desechadas: isCantCajasDesechadasInvalido,
-      kg_total_frass: isKgTotalFrassInvalido,
-      kg_material_grueso: isKgMaterialGruesoInvalido,
-    };
-  
-    // Verificar si algún valor está fuera de rango
-    const valoresFueraDeRango = Object.values(erroresValidacion).some(
-      (error) => error
-    );
-  
-    // Validación principal
+
+    // Validación de campos obligatorios
     if (
-      !registro.fec_siembra ||
-      !registro.fec_cosecha ||
-      !registro.cant_cajas_cosechadas ||
-      !registro.kg_larva_fresca ||
-      !registro.cant_cajas_desechadas ||
-      !registro.kg_total_frass ||
-      !registro.kg_material_grueso ||
-      !registro.tipo_control ||
-      !registro.tipo_produccion ||
-      !registro.fec_almacenaje_frass ||
-      !registro.cant_sacos
+      !registro.base_numero_lote ||
+      !registro.ingresoysalida ||
+      !registro.tipo_registro ||
+      !registro.total_cajas ||
+      !registro.responsable
     ) {
       toast.current.show({
         severity: "error",
@@ -178,100 +134,66 @@ function ControlRendimientoCosechayFrass() {
       });
       return;
     }
-  
-    // Mostrar mensajes de error específicos para cada campo fuera de rango
-    if (erroresValidacion.cant_cajas_cosechadas) {
+// Validación específica para salidas
+if (registro.ingresoysalida === "Salida") {
+  if (registro.etapas_actualizar.length === 0) {
+      toast.current.show({
+          severity: "error",
+          summary: "Error",
+          detail: "Debe seleccionar al menos una etapa para salidas",
+          life: 3000,
+      });
+      return;
+  }
+}
+
+// Validación para ingresos (forzar Engorde)
+if (registro.ingresoysalida === "Ingreso") {
+  registro.etapas_actualizar = ["Engorde"];
+}
+    const totalCajasNum = Number(registro.total_cajas);
+    const disponible = registro.cant_cajas_lote;
+
+    // Validación de valores negativos
+    if (totalCajasNum < 0) {
       toast.current.show({
         severity: "error",
         summary: "Error",
-        detail: `Cajas Cosechadas debe estar entre 0 y ${registro.cant_cajas_lote}`,
+        detail: "El total de cajas no puede ser negativo",
         life: 3000,
       });
-      return; // Detener el proceso si hay un error
+      return;
     }
-  
-    if (erroresValidacion.kg_larva_fresca) {
-      toast.current.show({
-        severity: "error",
-        summary: "Error",
-        detail: "Larva Fresca debe estar entre 0 y 12000 KG",
-        life: 3000,
-      });
-      return; // Detener el proceso si hay un error
+
+    // Validación de exceso de cajas
+    if (totalCajasNum > disponible) {
+      setObservacionesObligatorio(true);
+
+      if (!registro.observaciones) {
+        toast.current.show({
+          severity: "error",
+          summary: "Error",
+          detail:
+            "Observaciones es obligatorio cuando excedes las cajas disponibles",
+          life: 3000,
+        });
+        return;
+      }
+    } else {
+      setObservacionesObligatorio(false);
     }
-  
-    if (erroresValidacion.cant_cajas_desechadas) {
-      toast.current.show({
-        severity: "error",
-        summary: "Error",
-        detail: "Cajas Desechadas no puede ser menor que 0",
-        life: 3000,
-      });
-      return; // Detener el proceso si hay un error
-    }
-  
-    if (erroresValidacion.kg_total_frass) {
-      toast.current.show({
-        severity: "error",
-        summary: "Error",
-        detail: "Frass Fino Total debe estar entre 0 y 6000 KG",
-        life: 3000,
-      });
-      return; // Detener el proceso si hay un error
-    }
-  
-    if (erroresValidacion.kg_material_grueso) {
-      toast.current.show({
-        severity: "error",
-        summary: "Error",
-        detail: "Material Grueso debe estar entre 0 y 6000 KG",
-        life: 3000,
-      });
-      return; // Detener el proceso si hay un error
-    }
-  
-    // Si algún valor está fuera de rango y no hay observaciones, mostrar error
-    if (valoresFueraDeRango && !registro.observaciones) {
-      const camposInvalidos = Object.keys(erroresValidacion)
-        .filter((key) => erroresValidacion[key])
-        .map((key) => {
-          switch (key) {
-            case "cant_cajas_cosechadas":
-              return `Cajas Cosechadas (0 - ${registro.cant_cajas_lote})`;
-            case "kg_larva_fresca":
-              return "Larva Fresca (0 - 12000 KG)";
-            case "cant_cajas_desechadas":
-              return "Cajas Desechadas (no puede ser menor que 0)";
-            case "kg_total_frass":
-              return "Frass Fino Total (0 - 6000 KG)";
-            case "kg_material_grueso":
-              return "Material Grueso (0 - 6000 KG)";
-            default:
-              return "";
-          }
-        })
-        .join(", ");
-  
-      toast.current.show({
-        severity: "error",
-        summary: "Error",
-        detail: `Debe agregar observaciones. Campos inválidos: ${camposInvalidos}`,
-        life: 3000,
-      });
-      return; // Detener el proceso si hay un error
-    }
-  
+
     try {
       const currentDate = formatDateTime(new Date(), "DD/MM/YYYY");
       const currentTime = formatDateTime(new Date(), "hh:mm A");
-  
+
       // Verificar si el lote seleccionado existe
       const { data: loteExistente, error: loteError } = await supabase
         .from("Lotes")
-        .select("cant_cajas_cosecha")
+        .select("cant_cajas_racks")
         .eq("base_numero_lote", registro.base_numero_lote)
         .single();
-  
+
       if (loteError || !loteExistente) {
         toast.current.show({
           severity: "error",
@@ -281,81 +203,76 @@ function ControlRendimientoCosechayFrass() {
         });
         return;
       }
-  
-      // Sumar cajas cosechadas y desechadas
-      const totalCajasProcesadas =
-    parseInt(registro.cant_cajas_cosechadas, 10) + parseInt(registro.cant_cajas_desechadas, 10);
 
-
-  
       // Verificar si hay suficientes cajas para cosechar
-      if (totalCajasProcesadas > loteExistente.cant_cajas_cosecha) {
+      if (total_cajas > loteExistente.cant_cajas_racks) {
         toast.current.show({
           severity: "error",
           summary: "Error",
-          detail: `No hay suficientes cajas para cosechar. Disponibles: ${loteExistente.cant_cajas_cosecha}`,
+          detail: `No hay suficientes cajas para cosechar. Disponibles: ${loteExistente.cant_cajas_racks}`,
           life: 3000,
         });
+        setObservacionesObligatorio(true);
         return;
       }
-  
+
       // Actualizar Control_Rendimiento_CosechayFrass
       const { data, error } = await supabase
-        .from("Control_Rendimiento_CosechayFrass")
+        .from("Control_Ingreso_Salida_Racks")
         .insert([
           {
+            ingresoysalida: registro.ingresoysalida,
             base_numero_lote: registro.base_numero_lote,
-            fec_siembra: registro.fec_siembra,
-            fec_cosecha: registro.fec_cosecha,
-            cant_cajas_cosechadas: registro.cant_cajas_cosechadas,
-            kg_larva_fresca: registro.kg_larva_fresca,
-            cant_cajas_desechadas: registro.cant_cajas_desechadas,
-            kg_total_frass: registro.kg_total_frass,
-            kg_material_grueso: registro.kg_material_grueso,
+            tipo_registro: registro.tipo_registro,
+            total_cajas: registro.total_cajas,
+            responsable: registro.responsable,
             fec_registro: currentDate,
             hor_registro: currentTime,
             observaciones: registro.observaciones,
-            fec_almacenaje_frass: registro.fec_almacenaje_frass,
-            cant_sacos: registro.cant_sacos,
-            tipo_produccion: registro.tipo_produccion,
-            tipo_control: registro.tipo_control,
           },
         ]);
-  
+
       if (error) {
         console.error("Error en Supabase:", error);
         throw new Error(
           error.message || "Error desconocido al guardar en Supabase"
         );
       }
-  
+
       // Actualizar Lotes
-      const nuevasCajasCosecha =
-        loteExistente.cant_cajas_cosecha - totalCajasProcesadas;
-  
+      const nuevasCajasRacks = loteExistente.cant_cajas_racks - total_cajas;
+
       const { error: updateError } = await supabase
+      .from("Lotes")
+      .update({
+        cant_cajas_racks: nuevasCajasRacks,
+        etapa_actual: registro.etapas_actualizar.join(", "),
+      })
+      .eq("base_numero_lote", registro.base_numero_lote);
+
+      if(registro.ingresoysalida === "Ingreso") {
+        const { error: updateError } = await supabase
         .from("Lotes")
         .update({
-          cant_cajas_cosecha: nuevasCajasCosecha,
-          etapa_actual: "Cosecha",
-          fecha_cosecha: currentDate,
+          fecha_engorde: currentDate,
         })
         .eq("base_numero_lote", registro.base_numero_lote);
-  
+
+      }
       if (updateError) {
         console.error("Error al actualizar Lotes:", updateError);
         throw new Error(
           updateError.message || "Error desconocido al actualizar Lotes"
         );
       }
-  
+
       toast.current.show({
         severity: "success",
         summary: "Exitoso",
         detail: "Registro guardado exitosamente",
         life: 3000,
       });
-  
+
       // Limpia el estado
       setRegistro(emptyRegister);
       setRegistroDialog(false);
@@ -432,59 +349,55 @@ function ControlRendimientoCosechayFrass() {
   const onRowEditComplete = async ({ newData, data: oldData }) => {
     try {
       // Calcular diferencia en cajas cosechadas y desechadas
-      const diferenciaCosechadas =
-        newData.cant_cajas_cosechadas - oldData.cant_cajas_cosechadas;
-      const diferenciaDesechadas =
-        newData.cant_cajas_desechadas - oldData.cant_cajas_desechadas;
-      const diferenciaTotal = diferenciaCosechadas + diferenciaDesechadas;
-  
+      const diferenciaTotal = newData.total_cajas - oldData.total_cajas;
+
       // Obtener cantidad actual del lote
       const { data: lote, error: loteError } = await supabase
         .from("Lotes")
-        .select("cant_cajas_cosecha")
+        .select("cant_cajas_racks")
         .eq("base_numero_lote", oldData.base_numero_lote)
         .single();
-  
+
       if (loteError) throw loteError;
-  
+
       // Calcular nuevo valor
-      const nuevasCajasCosecha = lote.cant_cajas_cosecha - diferenciaTotal;
-  
-      if (nuevasCajasCosecha < 0) {
+      const nuevasCajasRacks = lote.cant_cajas_racks - diferenciaTotal;
+
+      if (nuevasCajasRacks < 0) {
         throw new Error("La cantidad de cajas no puede ser negativa");
       }
-  
+
       // Verificar si hay suficientes cajas para cosechar
-      if (diferenciaTotal > lote.cant_cajas_cosecha) {
+      if (diferenciaTotal > lote.cant_cajas_racks) {
         throw new Error(
-          `No hay suficientes cajas para cosechar. Disponibles: ${lote.cant_cajas_cosecha}`
+          `No hay suficientes cajas para cosechar. Disponibles: ${lote.cant_cajas_racks}`
         );
       }
-  
+
       // Actualizar Control_Rendimiento_CosechayFrass
       const { error: updateError } = await supabase
-        .from("Control_Rendimiento_CosechayFrass")
+        .from("Control_Ingreso_Salida_Racks")
         .update(newData)
         .eq("id", newData.id);
-  
+
       if (updateError) throw updateError;
-  
+
       // Actualizar Lotes
       const { error: loteUpdateError } = await supabase
         .from("Lotes")
         .update({
-          cant_cajas_cosecha: nuevasCajasCosecha,
+          cant_cajas_racks: nuevasCajasRacks,
           etapa_actual: "Cosecha",
         })
         .eq("base_numero_lote", oldData.base_numero_lote);
-  
+
       if (loteUpdateError) throw loteUpdateError;
-  
+
       // Actualizar estado local
       setRegistros((prev) =>
         prev.map((item) => (item.id === newData.id ? newData : item))
       );
-  
+
       toast.current.show({
         severity: "success",
         summary: "Éxito",
@@ -574,18 +487,11 @@ function ControlRendimientoCosechayFrass() {
   );
 
   const cols = [
-    { field: "numero_lote", header: "Número Lote" },
-    { field: "tipo_produccion", header: "Tipo Producción" },
-    { field: "tipo_control", header: "Tipo Control" },
-    { field: "fec_siembra", header: "Fecha Siembra" },
-    { field: "fec_cosecha", header: "Fecha Cosecha" },
-    { field: "cant_cajas_cosechadas", header: "Cajas Cosechadas" },
-    { field: "kg_larva_fresca", header: "Larva Fresca (KG)" },
-    { field: "cant_cajas_desechadas", header: "Cajas Desechadas" },
-    { field: "kg_total_frass", header: "Total Frass (KG)" },
-    { field: "kg_material_grueso", header: "Material Grueso (KG)" },
-    { field: "cant_sacos", header: "Sacos" },
-    { field: "fec_almacenaje_frass", header: "Fecha Almacenaje Frass" },
+    { field: "ingresoysalida", header: "Ingreso/Salida" },
+    { field: "base_numero_lote", header: "Número de Lote" },
+    { field: "tipo_registro", header: "Tipo de Registro" },
+    { field: "total_cajas", header: "Total de Cajas" },
+    { field: "responsable", header: "Responsable" },
     { field: "observaciones", header: "Observaciones" },
     { field: "registrado", header: "Registrado" },
   ];
@@ -608,7 +514,7 @@ function ControlRendimientoCosechayFrass() {
 
     const doc = new jsPDF();
     doc.setFontSize(18);
-    doc.text("Registros de Control Rendimiento Cosecha y Frass", 14, 22);
+    doc.text("Registros de ControlIngresoySalidaRacks", 14, 22);
 
     const exportData = selectedRegistros.map(
       ({ fec_registro, hor_registro, ...row }) => ({
@@ -657,7 +563,7 @@ function ControlRendimientoCosechayFrass() {
       currentY += rowHeight;
     }
 
-    doc.save("Control Rendimiento Cosecha y Frass.pdf");
+    doc.save("ControlIngresoySalidaRacks.pdf");
   };
 
   const exportXlsx = () => {
@@ -692,7 +598,7 @@ function ControlRendimientoCosechayFrass() {
 
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, "Registros");
-    XLSX.writeFile(wb, "Control Rendimiento Cosecha y Frass.xlsx");
+    XLSX.writeFile(wb, "ControlIngresoySalidaRacks.xlsx");
   };
 
   return (
@@ -701,11 +607,11 @@ function ControlRendimientoCosechayFrass() {
         <Toast ref={toast} />
         <h1>
           <img src={logo2} alt="mosca" className="logo2" />
-          Control de Rendimiento Cosecha y Frass
+          Control de Ingreso y Salida de Racks
         </h1>
         <div className="welcome-message">
           <p>
-            Bienvenido al sistema de Control de Rendimiento Cosecha y Frass.
+            Bienvenido al sistema de Control de Ingreso y Salida de Racks.
             Aquí puedes gestionar los registros de producción.
           </p>
         </div>
@@ -743,74 +649,30 @@ function ControlRendimientoCosechayFrass() {
           >
             <Column selectionMode="multiple" exportable={false}></Column>
             <Column
-              field="numero_lote"
+              field="base_numero_lote"
               header="Número Lote"
               // editor={(options) => textEditor(options)}
               sortable
               style={{ minWidth: "10rem" }}
             ></Column>
-            <Column field="fec_registro" header="Fecha Registro" sortable />
-            <Column field="hor_registro" header="Hora Registro" sortable />
+
             <Column
-              field="tipo_produccion"
-              header="Tipo Producción"
+              field="tipo_registro"
+              header="Tipo Registro"
               editor={(options) => textEditor(options)}
               sortable
             />
             <Column
-              field="tipo_control"
-              header="Tipo Control"
+              field="total_cajas"
+              header="Total Cajas"
+              sortable
+              editor={(options) => numberEditor(options)}
+            />
+            <Column
+              field="responsable"
+              header="Responsable"
+              sortable
               editor={(options) => textEditor(options)}
-              sortable
-            />
-            <Column
-              field="fec_siembra"
-              header="Fecha Siembra"
-              editor={(options) => dateEditor(options)}
-              sortable
-            />
-            <Column
-              field="fec_cosecha"
-              header="Fecha Cosecha"
-              editor={(options) => dateEditor(options)}
-              sortable
-            />
-            <Column
-              field="cant_cajas_cosechadas"
-              header="Cajas Cosechadas"
-              sortable
-              editor={(options) => numberEditor(options)}
-            />
-            <Column
-              field="kg_larva_fresca"
-              header="Larva Fresca (KG)"
-              sortable
-              editor={(options) => floatEditor(options)}
-            />
-            <Column
-              field="cant_cajas_desechadas"
-              header="Cajas Desechadas"
-              sortable
-              editor={(options) => numberEditor(options)}
-            />
-            <Column
-              field="kg_total_frass"
-              header="Total Frass (KG)"
-              editor={(options) => floatEditor(options)}
-              sortable
-            />
-            <Column
-              field="kg_material_grueso"
-              header="Material Grueso (KG)"
-              sortable
-              editor={(options) => floatEditor(options)}
-            />
-            <Column field="cant_sacos" header="Sacos" sortable />
-            <Column
-              field="fec_almacenaje_frass"
-              header="Fecha Almacenaje Frass"
-              sortable
-              editor={(options) => dateEditor(options)}
             />
             <Column
               field="observaciones"
@@ -844,234 +706,143 @@ function ControlRendimientoCosechayFrass() {
               <small className="p-error">Requerido.</small>
             )}
           </label>
-
           <Dropdown
-            value={registro.base_numero_lote}
-            onChange={async (e) => {
-              const loteSeleccionado = lotes.find(
-                (l) => l.base_numero_lote === e.value
-              );
+  value={registro.base_numero_lote}
+  onChange={async (e) => {
+    const loteSeleccionado = lotes.find(
+      (l) => l.base_numero_lote === e.value
+    );
 
-              if (loteSeleccionado) {
-                // Obtener datos actualizados del lote desde Supabase
-                const { data: loteActual, error } = await supabase
-                  .from("Lotes")
-                  .select("cant_cajas_cosecha")
-                  .eq("base_numero_lote", e.value)
-                  .single();
+    if (loteSeleccionado) {
+      const { data: loteActual, error } = await supabase
+        .from("Lotes")
+        .select("cant_cajas_racks, etapa_actual")
+        .eq("base_numero_lote", e.value)
+        .single();
 
-                if (!error && loteActual) {
-                  setRegistro({
-                    ...registro,
-                    base_numero_lote: e.value,
-                    cant_cajas_lote: loteActual.cant_cajas_cosecha || 0,
-                  });
-                }
-              }
-            }}
-            options={[...(lotes || [])]}
+      if (!error && loteActual) {
+        setRegistro({
+          ...registro,
+          base_numero_lote: e.value,
+          cant_cajas_lote: loteActual.cant_cajas_racks || 0,
+          // Limpiar etapas al seleccionar nuevo lote
+          etapas_actualizar: [] 
+        });
+      }
+    }
+  }}
+  options={[...(lotes || [])]}
             optionLabel="base_numero_lote"
             optionValue="base_numero_lote"
             placeholder="Selecciona un Número de lote"
             className="w-full md:w-14rem"
-          />
-          <br />
-          <label htmlFor="fec_siembra" className="font-bold">
-            Fecha Siembra{" "}
-            {submitted && !registro.fec_siembra && (
-              <small className="p-error">Requerido.</small>
-            )}
-          </label>
-          <InputText
-            type="date"
-            id="fec_siembra"
-            value={registro.fec_siembra}
-            onChange={(e) => onInputChange(e, "fec_siembra")}
-            required
             autoFocus
-          />
+/>            
           <br />
-          <label htmlFor="fec_cosecha" className="font-bold">
-            Fecha Cosecha{" "}
-            {submitted && !registro.fec_cosecha && (
+          <label htmlFor="ingresoysalida" className="font-bold">
+            Registro de Ingreso o Salida{" "}
+            {submitted && !registro.ingresoysalida && (
               <small className="p-error">Requerido.</small>
             )}
           </label>
-          <InputText
-            type="date"
-            id="fec_cosecha"
-            value={registro.fec_cosecha}
-            onChange={(e) => onInputChange(e, "fec_cosecha")}
-            required
-            autoFocus
-          />
-          <br />
-          <label htmlFor="cant_cajas_cosechadas" className="font-bold">
-            Cajas Cosechadas (0 - {registro.cant_cajas_lote}){" "}
-            {submitted && !registro.cant_cajas_cosechadas && (
-              <small className="p-error">Requerido.</small>
-            )}
-            {erroresValidacion.cant_cajas_cosechadas && (
-              <small className="p-error">
-                {`Cantidad Cajas Procesadas Fuera de rango 500 a ${registro.cant_cajas_lote}`}
-              </small>
-            )}
-          </label>
-          <InputText
-            type="number"
-            id="cant_cajas_cosechadas"
-            value={registro.cant_cajas_cosechadas}
-            onChange={(e) => onInputChange(e, "cant_cajas_cosechadas")}
-            required
-          />
-          <br />
-          <label htmlFor="kg_larva_fresca" className="font-bold">
-            Larva Fresca Estandar (KG) (0 - 12000){" "}
-            {submitted && !registro.kg_larva_fresca && (
-              <small className="p-error">Requerido.</small>
-            )}
-            {erroresValidacion.kg_larva_fresca && (
-              <small className="p-error">
-                Kg Larva Fresca fuera de rango 0 a 12000.
-              </small>
-            )}
-          </label>
-          <InputText
-            type="number"
-            id="kg_larva_fresca"
-            value={registro.kg_larva_fresca}
-            onChange={(e) => onInputChange(e, "kg_larva_fresca")}
-            required
-          />
-          <br />
-          <label htmlFor="cant_cajas_desechadas" className="font-bold">
-            Cajas Desechadas (=0){" "}
-            {submitted && !registro.cant_cajas_desechadas && (
-              <small className="p-error">Requerido.</small>
-            )}
-            {erroresValidacion.cant_cajas_desechadas && (
-              <small className="p-error">
-                Kg Larva Fresca fuera de rango 0 a 12000.
-              </small>
-            )}
-          </label>
-          <InputText
-            type="number"
-            id="cant_cajas_desechadas"
-            value={registro.cant_cajas_desechadas}
-            onChange={(e) => onInputChange(e, "cant_cajas_desechadas")}
-            required
-          />
-          <br />
-          <label htmlFor="kg_total_frass" className="font-bold">
-            Frass Fino Total (KG) (0 - 6000){" "}
-            {submitted && !registro.kg_total_frass && (
-              <small className="p-error">Requerido.</small>
-            )}
-            {erroresValidacion.kg_total_frass && (
-              <small className="p-error">
-                Kg Total Frass Fuera de rango 0 a 6000.
-              </small>
-            )}
-          </label>
-          <InputText
-            type="number"
-            id="kg_total_frass"
-            value={registro.kg_total_frass}
-            onChange={(e) => onInputChange(e, "kg_total_frass")}
-            required
-          />
-          <br />
-          <label htmlFor="kg_material_grueso" className="font-bold">
-            Total Material Grueso (KG) (0 - 6000){" "}
-            {submitted && !registro.kg_material_grueso && (
-              <small className="p-error">Requerido.</small>
-            )}
-            {erroresValidacion.kg_material_grueso && (
-              <small className="p-error">
-                Kg Material Grueso Fuera de rango 0 a 6000.
-              </small>
-            )}
-          </label>
-          <InputText
-            type="number"
-            id="kg_material_grueso"
-            value={registro.kg_material_grueso}
-            onChange={(e) => onInputChange(e, "kg_material_grueso")}
-            required
-          />
-          <br />
-          <label htmlFor="tipo_control" className="font-bold">
-            Tipo Control{" "}
-            {submitted && !registro.tipo_control && (
-              <small className="p-error">Requerido.</small>
-            )}
-          </label>
-          <Dropdown
-            id="tipo_control"
-            value={registro.tipo_control}
-            options={tiposControl}
-            onChange={(e) => onInputChange(e, "tipo_control")}
-            placeholder="Selecciona un tipo"
-            required
-          />
-          <br />
+         {/* Dropdown de Ingreso/Salida - Modificar el onChange */}
+<Dropdown
+    id="ingresoysalida"
+    value={registro.ingresoysalida}
+    options={IngresoySalida}
+    onChange={(e) => {
+        // Resetear etapas al cambiar tipo
+        const nuevasEtapas = e.value === "Ingreso" ? ["Engorde"] : [];
+        setRegistro({
+            ...registro,
+            ingresoysalida: e.value,
+            etapas_actualizar: nuevasEtapas
+        });
+    }}
+    placeholder="Selecciona si es ingreso o salida"
+    required
+/>
 
-          <label htmlFor="tipo_produccion" className="font-bold">
-            Tipo Producción{" "}
-            {submitted && !registro.tipo_produccion && (
-              <small className="p-error">Requerido.</small>
-            )}
-          </label>
-          <Dropdown
-            id="tipo_produccion"
-            value={registro.tipo_produccion}
-            options={tiposProduccion}
-            onChange={(e) => onInputChange(e, "tipo_produccion")}
-            placeholder="Selecciona un tipo"
-            required
-          />
           <br />
-
-          <label htmlFor="fec_almacenaje_frass" className="font-bold">
-            Fecha Almacenaje Frass{" "}
-            {submitted && !registro.fec_almacenaje_frass && (
+          <label htmlFor="tipo_registro" className="font-bold">
+            Tipo de Ingreso o Salida{" "}
+            {submitted && !registro.tipo_registro && (
               <small className="p-error">Requerido.</small>
             )}
           </label>
           <InputText
-            type="date"
-            id="fec_almacenaje_frass"
-            value={registro.fec_almacenaje_frass}
-            onChange={(e) => onInputChange(e, "fec_almacenaje_frass")}
+            id="tipo_registro"
+            value={registro.tipo_registro}
+            onChange={(e) => onInputChange(e, "tipo_registro")}
             required
-            autoFocus
           />
           <br />
-          <label htmlFor="cant_sacos" className="font-bold">
-            Cantidad Sacos{" "}
-            {submitted && !registro.cant_sacos && (
+          <label htmlFor="total_cajas" className="font-bold">
+            Total cajas{" "}
+            {submitted && !registro.total_cajas && (
               <small className="p-error">Requerido.</small>
             )}
           </label>
           <InputText
             type="number"
-            id="cant_sacos"
-            value={registro.cant_sacos}
-            onChange={(e) => onInputChange(e, "cant_sacos")}
+            id="total_cajas"
+            value={registro.total_cajas}
+            onChange={(e) => onInputChange(e, "total_cajas")}
+            required
+            className={
+              registro.total_cajas > registro.cant_cajas_lote ? "p-invalid" : ""
+            }
+          />
+          {registro.total_cajas > registro.cant_cajas_lote && (
+            <small className="p-error">
+              Excede las {registro.cant_cajas_lote} cajas disponibles
+            </small>
+          )}
+          
+          {/* Sección de Etapas - Modificado */}
+{registro.ingresoysalida === "Salida" && (
+    <>
+        <label htmlFor="etapas_actualizar" className="font-bold">
+            Etapas a actualizar{" "}
+            {submitted && registro.etapas_actualizar.length === 0 && (
+                <small className="p-error">Requerido.</small>
+            )}
+        </label>
+        <MultiSelect
+            value={registro.etapas_actualizar}
+            options={["Cosecha", "Horno"]}
+            onChange={(e) => setRegistro({...registro, etapas_actualizar: e.value})}
+            placeholder="Seleccione las etapas"
+            className="w-full"
+        />
+    </>
+)}
+
+  <br />
+          <label htmlFor="responsable" className="font-bold">
+            Responsable{" "}
+            {submitted && !registro.responsable && (
+              <small className="p-error">Requerido.</small>
+            )}
+          </label>
+          <InputText
+            id="responsable"
+            value={registro.responsable}
+            onChange={(e) => onInputChange(e, "responsable")}
             required
           />
           <br />
           <label htmlFor="observaciones" className="font-bold">
             Observaciones{" "}
             {observacionesObligatorio && (
-              <small className="p-error">Requerido por fuera de rango.</small>
+              <small className="p-error">Requerido</small>
             )}
           </label>
           <InputText
             id="observaciones"
             value={registro.observaciones}
             onChange={(e) => onInputChange(e, "observaciones")}
+            className={observacionesObligatorio ? "p-invalid" : ""}
           />
           <br />
         </div>
@@ -1079,5 +850,4 @@ function ControlRendimientoCosechayFrass() {
     </>
   );
 }
-
-export default ControlRendimientoCosechayFrass;
+export default ControlIngresoySalidaRacks;
