@@ -29,6 +29,9 @@ function Visualizar() {
             <button onClick={() => navigate("/Visualizar/VisualizarLotes")}>
               Visualizar Lotes
             </button>
+            <button onClick={() => navigate("/Visualizar/VisualizarSKUs")}>
+              Visualizar SKUs
+            </button>
             <button onClick={() => navigate(-1)}>
               Volver al Menú Principal
             </button>

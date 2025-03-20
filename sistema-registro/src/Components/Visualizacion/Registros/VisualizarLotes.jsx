@@ -45,7 +45,7 @@ function VisualizarLotes() {
         { data: cosechaFrass },
         { data: microondas },
         { data: multilevel },
-        { data: terminado },
+        // { data: terminado },
       ] = await Promise.all([
         supabase
           .from("Neonatos_Inoculados")
@@ -71,23 +71,12 @@ function VisualizarLotes() {
           .from("Control_Rendimiento_Secado_Horno_Multilevel")
           .select("*")
           .eq("base_numero_lote", loteNumber),
-        supabase
-          .from("Control_Rendimiento_Producto_Terminado")
-          .select("*")
-          .eq("base_numero_lote", loteNumber),
+        // supabase
+        //   .from("Control_Rendimiento_Producto_Terminado")
+        //   .select("*")
+        //   .eq("base_numero_lote", loteNumber),
       ]);
-
-      // Logs para verificar datos
-      console.log("Datos relacionados para lote", loteNumber, {
-        Neonatos_Inoculados: neonatos,
-        Control_Despacho_5dols_LabPro: despacho,
-        Control_Rendimiento_DietaySiembra: dietaSiembra,
-        Control_Rendimiento_CosechayFrass: cosechaFrass,
-        Control_Rendimiento_Secado_Horno_Microondas: microondas,
-        Control_Rendimiento_Secado_Horno_Multilevel: multilevel,
-        Control_Rendimiento_Producto_Terminado: terminado,
-      });
-
+      
       setRelatedData({
         Neonatos_Inoculados: neonatos,
         Control_Despacho_5dols_LabPro: despacho,
@@ -95,7 +84,7 @@ function VisualizarLotes() {
         Control_Rendimiento_CosechayFrass: cosechaFrass,
         Control_Rendimiento_Secado_Horno_Microondas: microondas,
         Control_Rendimiento_Secado_Horno_Multilevel: multilevel,
-        Control_Rendimiento_Producto_Terminado: terminado,
+        // Control_Rendimiento_Producto_Terminado: terminado,
       });
     } catch (err) {
       console.error("Error fetching related data:", err);
@@ -388,7 +377,7 @@ function VisualizarLotes() {
                 { field: "observaciones", header: "Observaciones" },
               ]
             )}
-            {renderRelatedTable(
+            {/* {renderRelatedTable(
               "Producto Terminado",
               relatedData.Control_Rendimiento_Producto_Terminado,
               [
@@ -431,7 +420,7 @@ function VisualizarLotes() {
                 { field: "dese_bolsagrande", header: "Desecho Bolsa Grande" },
                 { field: "cons_gazaplastica", header: "Consumo Gasa Plástica" },
               ]
-            )}
+            )} */}
           </div>
         ) : (
           <div className="loading-container">

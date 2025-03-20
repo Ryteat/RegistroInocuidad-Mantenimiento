@@ -13,6 +13,7 @@ import { InputText } from "primereact/inputtext";
 import { Toast } from "primereact/toast";
 import { Dropdown } from "primereact/dropdown";
 import { Divider } from "primereact/divider";
+import { MultiSelect } from "primereact/multiselect";
 import * as XLSX from "xlsx";
 import jsPDF from "jspdf";
 import "jspdf-autotable";
@@ -20,11 +21,13 @@ import logo2 from "../../../assets/mosca.png";
 
 const ControlRendimientoProductoTerminado = () => {
   let emptyRegister = {
+    base_codigo_sku: "",
+    numero_sku: "",
+    lote: [],
+
     fecha_produccion: "",
     hora: "",
-    lote: "",
     cant_bolsas: "",
-    SKU: "",
     operario: "",
     fecha_registro: "",
     hora_registro: "",
@@ -68,6 +71,7 @@ const ControlRendimientoProductoTerminado = () => {
   const [registroDialog, setRegistroDialog] = useState(false);
   const navigate = useNavigate();
   const [lotes, setLotes] = useState([]);
+  const [skus, setSKUs] = useState([]);
   const convertirFecha = (fecha) =>
     fecha ? fecha.split("-").reverse().join("/") : "";
 
@@ -87,17 +91,33 @@ const ControlRendimientoProductoTerminado = () => {
     try {
       const { data, error } = await supabase
         .from("Lotes")
-        .select() // Si solo necesitas el campo base_numero_lote, podrías especificarlo: .select("base_numero_lote")
-        .in("etapa_actual", ["HornoMul", "HornoMic", "ProductoTerminado"]); // Filtra registros con etapa_actual igual a 'hatchery' o 'dieta'
+        .select()
+        .or(
+          "etapa_actual.ilike.%Horno%,etapa_actual.ilike.%ProductoTerminado%"
+        );
+
       if (error) throw error;
-      setLotes(data || []); // Actualiza el estado con los datos obtenidos
+      setLotes(data || []); // Eliminar la 's' extraña aquí
     } catch (err) {
       console.log("Error en la conexión a la base de datos Lotes", err);
+    }
+  };
+  const fetchSKU = async () => {
+    try {
+      const { data, error } = await supabase
+        .from("SKU")
+        .select("base_codigo_sku");
+
+      if (error) throw error;
+      setSKUs(data || []);
+    } catch (err) {
+      console.log("Error obteniendo SKUs", err);
     }
   };
   useEffect(() => {
     fetchRegistros();
     fetchLotes();
+    fetchSKU();
   }, []);
 
   const formatDateTime = (date, format = "DD-MM-YYYY hh:mm A") => {
@@ -121,6 +141,24 @@ const ControlRendimientoProductoTerminado = () => {
       .replace("A", fmt.dayPeriod || "AM");
   };
 
+  function generarFormatoJuliano(currentDate) {
+    // Dividir la fecha en día, mes y año
+    const [dia, mes, año] = currentDate.split("/").map(Number);
+
+    // Crear fechas en UTC para evitar problemas con husos horarios
+    const fecha = new Date(Date.UTC(año, mes - 1, dia));
+    const inicioAño = new Date(Date.UTC(año, 0, 1)); // 1 de enero del mismo año
+
+    // Calcular diferencia en milisegundos y convertir a días
+    const diferencia = fecha - inicioAño;
+    const diaJuliano = Math.floor(diferencia / (1000 * 60 * 60 * 24)) + 1; // +1 porque el año empieza en día 1
+
+    // Formatear componentes
+    const diaJulianoFormateado = diaJuliano.toString().padStart(3, "0"); // 3 dígitos con ceros a la izquierda
+    const año2Digitos = año.toString().slice(-2); // Últimos 2 dígitos del año
+
+    return `PR${diaJulianoFormateado}${año2Digitos}`;
+  }
   const saveRegistro = async () => {
     setSubmitted(true);
     if (
@@ -128,7 +166,6 @@ const ControlRendimientoProductoTerminado = () => {
       !registro.hora ||
       !registro.lote ||
       !registro.cant_bolsas ||
-      !registro.SKU ||
       !registro.operario ||
       !registro.cons_cartonnormal ||
       !registro.dese_cartonnormal ||
@@ -159,7 +196,7 @@ const ControlRendimientoProductoTerminado = () => {
       toast.current.show({
         severity: "error",
         summary: "Error",
-        detail: "Llena todos los campos",
+        detail: "Debes completar todos los campos requeridos",
         life: 3000,
       });
       return;
@@ -167,34 +204,93 @@ const ControlRendimientoProductoTerminado = () => {
 
     try {
       const currentDate = formatDateTime(new Date(), "DD/MM/YYYY");
+      const posibleSKU = generarFormatoJuliano(currentDate);
       const currentTime = formatDateTime(new Date(), "hh:mm A");
+      let baseCodigoSKUToInsert = registro.base_codigo_sku;
+      console.log("Valor seleccionado en dropdown:", registro.base_codigo_sku);
+      console.log(
+        "Valor a insertar en Neonatos_Inoculados:",
+        baseCodigoSKUToInsert
+      );
+      // Si el valor es "nuevo", crear un lote
+      if (registro.base_codigo_sku === "Nuevo SKU") {
+        // Verificar si el lote ya existe
+        if (skus.some((sku) => sku.base_codigo_sku === posibleSKU)) {
+          toast.current.show({
+            severity: "warn",
+            detail: `El lote ${posibleSKU} ya existe. Selecciónalo.`,
+          });
+          return;
+        }
 
-      // Verificar si el lote seleccionado existe
-      const { data: loteExistente, error: loteError } = await supabase
-        .from("Lotes")
-        .select("base_numero_lote")
-        .eq("base_numero_lote", registro.base_numero_lote)
-        .single();
-
-      if (loteError || !loteExistente) {
-        toast.current.show({
-          severity: "error",
-          summary: "Error",
-          detail: `El lote ${registro.base_numero_lote} no existe.`,
-          life: 3000,
+        // Crear nuevo lote
+        const { data, error } = await supabase.rpc("generar_sku_base", {
+          p_fecha_registro: currentDate,
+          p_hora_registro: currentTime,
         });
-        return;
+
+        if (error) {
+          toast.current.show({
+            severity: "error",
+            detail: "Error al crear lote.",
+          });
+          return;
+        }
+
+        // Actualizar el valor local y el estado
+        baseCodigoSKUToInsert = data;
+        setRegistro({ ...registro, base_codigo_sku: data });
+      } else {
+        // Verificar si el lote existe
+        const { data: skuExistente, error: skuError } = await supabase
+          .from("SKU")
+          .select("base_codigo_sku")
+          .eq("base_codigo_sku", registro.base_codigo_sku)
+          .single();
+
+        if (skuError || !skuExistente) {
+          toast.current.show({
+            severity: "error",
+            detail: `El lote ${registro.base_codigo_sku} no existe.`,
+          });
+          return;
+        }
       }
+
+      // 2. Insertar relaciones en sku_lotes
+    const lotesIdssku_lotes = registro.lote.map((l) => l.base_numero_lote);
+    const relacionesInsert = lotesIdssku_lotes.map((loteId) => ({
+      sku_base: baseCodigoSKUToInsert,
+      base_numero_lote: loteId,
+    }));
+
+    const { error: relacionesError } = await supabase
+      .from("sku_lotes")
+      .insert(relacionesInsert);
+
+    if (relacionesError) {
+      throw new Error("Error al guardar relaciones SKU-Lotes: " + relacionesError.message);
+    }
+
+
+      // 2. Convertir lotes a string
+      const lotesString = registro.lote
+        .map((l) => l.base_numero_lote)
+        .join(", ");
+
+
+        
+      // 3. Insertar registro (sin incluir SKU)
       const { data, error } = await supabase
         .from("Control_Rendimiento_Producto_Terminado")
         .insert([
           {
-            base_numero_lote: registro.base_numero_lote,
+            base_codigo_sku: baseCodigoSKUToInsert, // Solo enviamos la base
+            numero_sku: registro.numero_sku,
             fecha_produccion: convertirFecha(registro.fecha_produccion),
             hora: registro.hora,
-            lote: registro.lote,
+            lote: lotesString,
             cant_bolsas: registro.cant_bolsas,
-            SKU: registro.SKU,
             operario: registro.operario,
             fecha_registro: currentDate,
             hora_registro: currentTime,
@@ -226,39 +322,47 @@ const ControlRendimientoProductoTerminado = () => {
             encargado_planta: registro.encargado_planta,
           },
         ]);
-      if (error) {
-        console.error("Error en Supabase:", error);
-        throw new Error(
-          error.message || "Error desconocido al guardar en Supabase"
-        );
-      }
-      // Actualizar la tabla Lotes con la nueva etapa_actual
-      const { error: updateError } = await supabase
-        .from("Lotes")
-        .update({ etapa_actual: "ProductoTerminado" }) // Cambia "Control de Rendimiento" por la etapa que corresponda
-        .eq("base_numero_lote", registro.base_numero_lote);
 
-      if (updateError) {
-        console.error("Error al actualizar Lotes:", updateError);
+      if (error) {
         throw new Error(
-          updateError.message || "Error desconocido al actualizar Lotes"
+          "Error al guardar en Control Rendimiento: " + error.message
         );
       }
+      // Actualizar estado de los lotes seleccionados
+    const lotesIds = registro.lote.map((l) => l.base_numero_lote);
+    const { error: updateError } = await supabase
+      .from("Lotes")
+      .update({ etapa_actual: "ProductoTerminado",
+        fecha_empaque: currentDate }
+)
+      .in("base_numero_lote", lotesIds);
+
+    if (updateError) {
+      throw new Error("Error al actualizar estado de los lotes: " + updateError.message);
+    }
+
       toast.current.show({
         severity: "success",
-        summary: "Exitoso",
+        summary: "Éxito",
         detail: "Registro creado correctamente",
         life: 3000,
       });
+
+      // Resetear formulario
       setRegistro(emptyRegister);
       setRegistroDialog(false);
       setSubmitted(false);
+
+      // Actualizar datos
       fetchRegistros();
+      fetchLotes();
+      fetchSKU();
     } catch (error) {
+      console.error("Error en saveRegistro:", error);
       toast.current.show({
         severity: "error",
         summary: "Error",
-        detail: error.message || "Ocurrió un error al crear el registro",
+        detail: error.message || "Error al crear el registro",
         life: 3000,
       });
     }
@@ -448,9 +552,12 @@ const ControlRendimientoProductoTerminado = () => {
   );
 
   const cols = [
+    { field: "base_codigo_sku", header: "Codigo SKU" },
+    { field: "numero_sku", header: "SKU Generado" },
+    { field: "lote", header: "Lotes" },
     { field: "fecha_produccion", header: "Fecha Producción" },
     { field: "hora", header: "Hora" },
-    { field: "lote", header: "Lote" },
+
     { field: "cant_bolsas", header: "Cantidad Bolsas" },
     { field: "SKU", header: "SKU" },
     { field: "operario", header: "Operario" },
@@ -635,9 +742,15 @@ const ControlRendimientoProductoTerminado = () => {
           >
             <Column selectionMode="multiple" exportable={false}></Column>
             <Column
-              field="numero_lote"
-              header="Número Lote"
-              // editor={(options) => textEditor(options)}
+              field="numero_sku"
+              header="SKU Generado"
+              sortable
+              style={{ minWidth: "12rem" }}
+            ></Column>
+
+            <Column
+              field="base_codigo_sku"
+              header="Base SKU"
               sortable
               style={{ minWidth: "10rem" }}
             ></Column>
@@ -676,7 +789,6 @@ const ControlRendimientoProductoTerminado = () => {
               header="Cantidad Bolsas"
               editor={(options) => numberEditor(options)}
             ></Column>
-            <Column field="SKU" header="SKU"></Column>
             <Column
               field="operario"
               header="Operario"
@@ -818,21 +930,25 @@ const ControlRendimientoProductoTerminado = () => {
         onHide={hideDialog}
       >
         <div className="p-field">
-          <label htmlFor="base_numero_lote" className="font-bold">
-            Número de lote{" "}
-            {submitted && !registro.base_numero_lote && (
+          <label htmlFor="base_codigo_sku" className="font-bold">
+            Código SKU{" "}
+            {submitted && !registro.base_codigo_sku && (
               <small className="p-error">Requerido.</small>
             )}
           </label>
 
           <Dropdown
-            value={registro.base_numero_lote}
+            value={registro.base_codigo_sku}
             onChange={(e) => {
-              setRegistro({ ...registro, base_numero_lote: e.value });
+              setRegistro({ ...registro, base_codigo_sku: e.value });
             }}
-            options={[...(lotes || [])]}
-            optionLabel="base_numero_lote" // Mostrar el campo "label" en el dropdown
-            optionValue="base_numero_lote" // Guardar el valor de "base_numero_lote"
+            options={[
+              // Opción "Nuevo Lote" con valor "nuevo"
+              { base_codigo_sku: "Nuevo SKU" },
+              ...(skus || []),
+            ]}
+            optionLabel="base_codigo_sku" // Mostrar el campo "label" en el dropdown
+            optionValue="base_codigo_sku" // Guardar el valor de "base_numero_lote"
             placeholder="Selecciona un Número de lote"
             className="w-full md:w-14rem"
           />
@@ -915,15 +1031,21 @@ const ControlRendimientoProductoTerminado = () => {
           <br />
 
           <label htmlFor="lote" className="font-bold">
-            Lote{" "}
-            {submitted && !registro.lote && (
+            Lotes{" "}
+            {submitted && registro.lote.length === 0 && (
               <small className="p-error">Requerido.</small>
             )}
           </label>
-          <InputText
-            id="lote"
+          <MultiSelect
             value={registro.lote}
-            onChange={(e) => onInputChange(e, "lote")}
+            onChange={(e) =>
+              onInputChange({ target: { value: e.value } }, "lote")
+            }
+            options={lotes}
+            optionLabel="base_numero_lote" // Asegúrate que este campo existe en tus lotes
+            placeholder="Seleccione Lotes"
+            maxSelectedLabels={3}
+            className="w-full"
           />
 
           <br />
@@ -941,9 +1063,9 @@ const ControlRendimientoProductoTerminado = () => {
             onChange={(e) => onInputChange(e, "cant_bolsas")}
           />
 
-          <br />
+          {/* <br /> */}
 
-          <label htmlFor="SKU" className="font-bold">
+          {/* <label htmlFor="SKU" className="font-bold">
             SKU{" "}
             {submitted && !registro.SKU && (
               <small className="p-error">Requerido.</small>
@@ -953,7 +1075,7 @@ const ControlRendimientoProductoTerminado = () => {
             id="SKU"
             value={registro.SKU}
             onChange={(e) => onInputChange(e, "SKU")}
-          />
+          /> */}
 
           <br />
 

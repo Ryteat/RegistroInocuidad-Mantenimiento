@@ -65,8 +65,7 @@ import ControlIngresoySalidaRacks from './pages/Cosecha/Registros/PagesControlIn
 import Visualizar from './pages/Visualizar/PagesVisualizar';
 import VisualizarKPIs from './pages/Visualizar/Registros/PagesVisualizarKPIs';
 import VisualizarLotes from './pages/Visualizar/Registros/PagesVisualizarLotes';
-
-
+import VisualizarSKUs from './pages/Visualizar/Registros/PagesVisuazlizarSKUs';
 const Layout = () => {
   return (
     <div>
@@ -157,6 +156,10 @@ const router = createBrowserRouter([{
         {
           path: `VisualizarLotes`,
           element: <VisualizarLotes />, // Componente hijo
+        },
+        {
+          path: `VisualizarSKUs`,
+          element: <VisualizarSKUs />, // Componente hijo
         },
       ],
     },
