@@ -102,7 +102,7 @@ function NIB() {
       const { data, error } = await supabase
         .from("Lotes")
         .select() // Si solo necesitas el campo base_numero_lote, podrías especificarlo: .select("base_numero_lote")
-        .in("etapa_actual", ["Hatchery", "Dieta"]); // Filtra registros con etapa_actual igual a 'hatchery' o 'dieta'
+        .in("etapa_actual", ["Hatchery"]); // Filtra registros con etapa_actual igual a 'hatchery' o 'dieta'
       if (error) throw error;
       setLotes(data || []); // Actualiza el estado con los datos obtenidos
     } catch (err) {
@@ -201,88 +201,97 @@ function NIB() {
       const currentTime = formatDateTime(new Date(), "hh:mm A");
       let baseNumeroLoteToInsert = registro.base_numero_lote;
       console.log("Valor seleccionado en dropdown:", registro.base_numero_lote);
-      console.log("Valor a insertar en Neonatos_Inoculados:", baseNumeroLoteToInsert);
+      console.log(
+        "Valor a insertar en Neonatos_Inoculados:",
+        baseNumeroLoteToInsert
+      );
       // Si el valor es "nuevo", crear un lote
       if (registro.base_numero_lote === "Nuevo Lote") {
-          // Verificar si el lote ya existe
-          if (lotes.some((lote) => lote.base_numero_lote === posibleLote)) {
-              toast.current.show({ 
-                  severity: "warn", 
-                  detail: `El lote ${posibleLote} ya existe. Selecciónalo.` 
-              });
-              return;
-          }
-
-          // Crear nuevo lote
-          const { data, error } = await supabase.rpc("crear_nuevo_lote", {
-              p_fecha_registro: currentDate,
-              p_hora_registro: currentTime,
-              p_destino: "PR",
+        // Verificar si el lote ya existe
+        if (lotes.some((lote) => lote.base_numero_lote === posibleLote)) {
+          toast.current.show({
+            severity: "warn",
+            detail: `El lote ${posibleLote} ya existe. Selecciónalo.`,
           });
+          return;
+        }
 
-          if (error) {
-              toast.current.show({ 
-                  severity: "error", 
-                  detail: "Error al crear lote." 
-              });
-              return;
-          }
+        // Crear nuevo lote
+        const { data, error } = await supabase.rpc("crear_nuevo_lote", {
+          p_fecha_registro: currentDate,
+          p_hora_registro: currentTime,
+          p_destino: "PR",
+        });
 
-          // Actualizar el valor local y el estado
-          baseNumeroLoteToInsert = data;
-          setRegistro({ ...registro, base_numero_lote: data });
+        if (error) {
+          toast.current.show({
+            severity: "error",
+            detail: "Error al crear lote.",
+          });
+          return;
+        }
+
+        // Actualizar el valor local y el estado
+        baseNumeroLoteToInsert = data;
+        setRegistro({ ...registro, base_numero_lote: data });
       } else {
-          // Verificar si el lote existe
-          const { data: loteExistente, error: loteError } = await supabase
-              .from("Lotes")
-              .select("base_numero_lote")
-              .eq("base_numero_lote", registro.base_numero_lote)
-              .single();
+        // Verificar si el lote existe
+        const { data: loteExistente, error: loteError } = await supabase
+          .from("Lotes")
+          .select("base_numero_lote")
+          .eq("base_numero_lote", registro.base_numero_lote)
+          .single();
 
-          if (loteError || !loteExistente) {
-              toast.current.show({ 
-                  severity: "error", 
-                  detail: `El lote ${registro.base_numero_lote} no existe.` 
-              });
-              return;
-          }
+        if (loteError || !loteExistente) {
+          toast.current.show({
+            severity: "error",
+            detail: `El lote ${registro.base_numero_lote} no existe.`,
+          });
+          return;
+        }
       }
 
       // Insertar en Neonatos_Inoculados
       const { data: insertData, error: insertError } = await supabase
-          .from("Neonatos_Inoculados")
-          .insert([
-              {
-                  base_numero_lote: baseNumeroLoteToInsert,
-                  numero_lote: registro.numero_lote,
-                  embudo: registro.embudo,
-                  gm_colectados: registro.gm_colectados,
-                  cajas_inoculadas_destino: registro.cajas_inoculadas_destino,
-                  gm_neonato_caja: registro.gm_neonato_caja,
-                  cantidad_dieta_caja: registro.cantidad_dieta_caja,
-                  temp_ambiental: registro.temp_ambiental,
-                  hum_ambiental: registro.hum_ambiental,
-                  operario: registro.operario,
-                  fec_colecta: currentDate,
-                  hor_colecta: currentTime,
-                  fec_registro: currentDate,
-                  hor_registro: currentTime,
-                  observaciones: registro.observaciones,
-              },
-          ]);
+        .from("Neonatos_Inoculados")
+        .insert([
+          {
+            base_numero_lote: baseNumeroLoteToInsert,
+            numero_lote: registro.numero_lote,
+            embudo: registro.embudo,
+            gm_colectados: registro.gm_colectados,
+            cajas_inoculadas_destino: registro.cajas_inoculadas_destino,
+            gm_neonato_caja: registro.gm_neonato_caja,
+            cantidad_dieta_caja: registro.cantidad_dieta_caja,
+            temp_ambiental: registro.temp_ambiental,
+            hum_ambiental: registro.hum_ambiental,
+            operario: registro.operario,
+            fec_colecta: currentDate,
+            hor_colecta: currentTime,
+            fec_registro: currentDate,
+            hor_registro: currentTime,
+            observaciones: registro.observaciones,
+          },
+        ]);
 
       if (insertError) {
-          console.error("Error al insertar en Neonatos_Inoculados:", insertError);
-          throw new Error(
-              insertError.message || "Error desconocido al guardar en Supabase"
-          );
+        console.error("Error al insertar en Neonatos_Inoculados:", insertError);
+        throw new Error(
+          insertError.message || "Error desconocido al guardar en Supabase"
+        );
       }
+      const { error: updateError } = await supabase
+            .from("Lotes")
+            .update({
+              fecha_inoculacion: currentDate,
+            })
+            .eq("base_numero_lote", registro.base_numero_lote);
 
       toast.current.show({
-          severity: "success",
-          summary: "Éxito",
-          detail: "Registro guardado exitosamente",
-          life: 3000,
+        severity: "success",
+        summary: "Éxito",
+        detail: "Registro guardado exitosamente",
+        life: 3000,
       });
 
       // Limpia el estado
@@ -291,15 +300,15 @@ function NIB() {
       setSubmitted(false);
       fetchNeonatos();
       fetchLotes();
-  } catch (error) {
+    } catch (error) {
       toast.current.show({
-          severity: "error",
-          summary: "Error",
-          detail: error.message || "Ocurrió un error al crear el usuario",
-          life: 3000,
+        severity: "error",
+        summary: "Error",
+        detail: error.message || "Ocurrió un error al crear el usuario",
+        life: 3000,
       });
-  }
-};
+    }
+  };
 
   //Inicio Formatear la FECHA DE REGISTRO
 
@@ -427,7 +436,7 @@ function NIB() {
     const { id, ...updatedData } = newData;
     try {
       const { error } = await supabase
-        .from("Neoantos_Inoculados")
+        .from("Neonatos_Inoculados")
         .update(updatedData)
         .eq("id", id);
 
@@ -822,23 +831,21 @@ function NIB() {
             )}
           </label>
 
-
-          
           <Dropdown
-    value={registro.base_numero_lote}
-    onChange={(e) => {
-        setRegistro({ ...registro, base_numero_lote: e.value });
-    }}
-    options={[
-        // Opción "Nuevo Lote" con valor "nuevo"
-        { base_numero_lote: "Nuevo Lote" }, 
-        ...(lotes || []),
-    ]}
-    optionLabel="base_numero_lote" // Mostrar el campo "label" en el dropdown
-    optionValue="base_numero_lote" // Guardar el valor de "base_numero_lote"
-    placeholder="Selecciona un Número de lote"
-    className="w-full md:w-14rem"
-/>
+            value={registro.base_numero_lote}
+            onChange={(e) => {
+              setRegistro({ ...registro, base_numero_lote: e.value });
+            }}
+            options={[
+              // Opción "Nuevo Lote" con valor "nuevo"
+              { base_numero_lote: "Nuevo Lote" },
+              ...(lotes || []),
+            ]}
+            optionLabel="base_numero_lote" // Mostrar el campo "label" en el dropdown
+            optionValue="base_numero_lote" // Guardar el valor de "base_numero_lote"
+            placeholder="Selecciona un Número de lote"
+            className="w-full md:w-14rem"
+          />
           <br />
           <label htmlFor="embudo" className="font-bold">
             # de Embudo{" "}

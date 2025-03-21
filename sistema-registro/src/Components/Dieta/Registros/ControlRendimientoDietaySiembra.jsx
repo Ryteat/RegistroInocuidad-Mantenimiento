@@ -12,7 +12,7 @@ import { Dialog } from "primereact/dialog";
 import { InputText } from "primereact/inputtext";
 import { Toast } from "primereact/toast";
 import { Dropdown } from "primereact/dropdown";
-import { Divider } from 'primereact/divider';
+import { Divider } from "primereact/divider";
 import * as XLSX from "xlsx";
 import jsPDF from "jspdf";
 import "jspdf-autotable";
@@ -33,6 +33,8 @@ function ControLRendimientoDietaySiembra() {
     kg_total: "",
     tipo_dieta: "",
     cajas_procesadas_neonatos: "",
+    cant_cajas_dieta: 0,
+    _originalCajas: 0, // Nuevo campo para almacenar el valor original
     cajas_sembradas_rep: "",
     cajas_dieta_no_sembradas_rep: "",
     g_neonatos_sembrados_caja_rep: "",
@@ -72,7 +74,7 @@ function ControLRendimientoDietaySiembra() {
     cajas_dieta_no_sembradas_pro: false,
     g_neonatos_sembrados_caja_pro: false,
   });
-   const [lotes, setLotes] = useState([]); 
+  const [lotes, setLotes] = useState([]);
 
   const convertirFecha = (fecha) =>
     fecha ? fecha.split("-").reverse().join("/") : "";
@@ -90,17 +92,17 @@ function ControLRendimientoDietaySiembra() {
     }
   };
   const fetchLotes = async () => {
-      try {
-        const { data, error } = await supabase
-          .from("Lotes")
-          .select() // Si solo necesitas el campo base_numero_lote, podrías especificarlo: .select("base_numero_lote")
-          .in("etapa_actual", ["Hatchery", "Dieta", "Cosecha"]); // Filtra registros con etapa_actual igual a 'hatchery' o 'dieta'
-        if (error) throw error;
-        setLotes(data || []); // Actualiza el estado con los datos obtenidos
-      } catch (err) {
-        console.log("Error en la conexión a la base de datos Lotes", err);
-      }
-    };
+    try {
+      const { data, error } = await supabase
+        .from("Lotes")
+        .select() // Si solo necesitas el campo base_numero_lote, podrías especificarlo: .select("base_numero_lote")
+        .in("etapa_actual", ["DespachoHatchery", "Dieta"]); // Filtra registros con etapa_actual igual a 'hatchery' o 'dieta'
+      if (error) throw error;
+      setLotes(data || []); // Actualiza el estado con los datos obtenidos
+    } catch (err) {
+      console.log("Error en la conexión a la base de datos Lotes", err);
+    }
+  };
 
   useEffect(() => {
     fetchRegistros();
@@ -130,38 +132,67 @@ function ControLRendimientoDietaySiembra() {
 
   const saveRegistro = async () => {
     setSubmitted(true);
-
+  
     function isInvalid(value, min, max) {
-        return value < min || value > max;
-      }
-      
-      const isCajasProcesadasNeonatosInvalido = isInvalid(registro.cajas_procesadas_neonatos, 0, 200);
-      const isCajasSembradasRepInvalido = isInvalid(registro.cajas_sembradas_rep, 0, 500);
-      const isCajasDietaNoSembradasRepInvalido = isInvalid(registro.cajas_dieta_no_sembradas_rep, 0, 100);
-      const isNeonatosSembradosCajaRepInvalido = isInvalid(registro.g_neonatos_sembrados_caja_rep, 0, 300);
-      const isCajasSembradasProInvalido = isInvalid(registro.cajas_sembradas_pro, 0, 2000);
-      const isCajasDietaNoSembradasProInvalido = isInvalid(registro.cajas_dieta_no_sembradas_pro, 0, 100);
-      const isNeonatosSembradosCajaProInvalido = isInvalid(registro.g_neonatos_sembrados_caja_pro, 0, 300);
-
+      return value < min || value > max;
+    }
+  
+    const isCajasProcesadasNeonatosInvalido = isInvalid(
+      registro.cajas_procesadas_neonatos,
+      0,
+      registro.cant_cajas_dieta
+    );
+    const isCajasSembradasRepInvalido = isInvalid(
+      registro.cajas_sembradas_rep,
+      0,
+      500
+    );
+    const isCajasDietaNoSembradasRepInvalido = isInvalid(
+      registro.cajas_dieta_no_sembradas_rep,
+      0,
+      100
+    );
+    const isNeonatosSembradosCajaRepInvalido = isInvalid(
+      registro.g_neonatos_sembrados_caja_rep,
+      0,
+      300
+    );
+    const isCajasSembradasProInvalido = isInvalid(
+      registro.cajas_sembradas_pro,
+      0,
+      2000
+    );
+    const isCajasDietaNoSembradasProInvalido = isInvalid(
+      registro.cajas_dieta_no_sembradas_pro,
+      0,
+      100
+    );
+    const isNeonatosSembradosCajaProInvalido = isInvalid(
+      registro.g_neonatos_sembrados_caja_pro,
+      0,
+      300
+    );
+  
     // Actualizar el estado de errores
     setErroresValidacion({
-        cajas_procesadas_neonatos: isCajasProcesadasNeonatosInvalido,
-        cajas_sembradas_rep: isCajasSembradasRepInvalido,
-        cajas_dieta_no_sembradas_rep: isCajasDietaNoSembradasRepInvalido,
-        g_neonatos_sembrados_caja_rep: isNeonatosSembradosCajaRepInvalido,
-        cajas_sembradas_pro: isCajasSembradasProInvalido,
-        cajas_dieta_no_sembradas_pro: isCajasDietaNoSembradasProInvalido,
-        g_neonatos_sembrados_caja_pro: isNeonatosSembradosCajaProInvalido,
+      cajas_procesadas_neonatos: isCajasProcesadasNeonatosInvalido,
+      cajas_sembradas_rep: isCajasSembradasRepInvalido,
+      cajas_dieta_no_sembradas_rep: isCajasDietaNoSembradasRepInvalido,
+      g_neonatos_sembrados_caja_rep: isNeonatosSembradosCajaRepInvalido,
+      cajas_sembradas_pro: isCajasSembradasProInvalido,
+      cajas_dieta_no_sembradas_pro: isCajasDietaNoSembradasProInvalido,
+      g_neonatos_sembrados_caja_pro: isNeonatosSembradosCajaProInvalido,
     });
+  
     const valoresFueraDeRango =
-        isCajasProcesadasNeonatosInvalido ||
-        isCajasSembradasRepInvalido ||
-        isCajasDietaNoSembradasRepInvalido ||
-        isNeonatosSembradosCajaRepInvalido ||
-        isCajasSembradasProInvalido ||
-        isCajasDietaNoSembradasProInvalido ||
-        isNeonatosSembradosCajaProInvalido;
-
+      isCajasProcesadasNeonatosInvalido ||
+      isCajasSembradasRepInvalido ||
+      isCajasDietaNoSembradasRepInvalido ||
+      isNeonatosSembradosCajaRepInvalido ||
+      isCajasSembradasProInvalido ||
+      isCajasDietaNoSembradasProInvalido ||
+      isNeonatosSembradosCajaProInvalido;
+  
     if (
       !registro.cantidad_tandas ||
       !registro.kg_dieta_caja ||
@@ -192,7 +223,17 @@ function ControLRendimientoDietaySiembra() {
       });
       return;
     }
-
+  
+    if (registro.cajas_procesadas_neonatos > registro.cant_cajas_dieta) {
+      toast.current.show({
+        severity: "error",
+        summary: "Error",
+        detail: `No puedes procesar más cajas (${registro.cajas_procesadas_neonatos}) de las disponibles en el lote (${registro.cant_cajas_dieta})`,
+        life: 3000,
+      });
+      return;
+    }
+  
     // Validación principal
     if (valoresFueraDeRango && !registro.observaciones) {
       setObservacionesObligatorio(true);
@@ -205,7 +246,7 @@ function ControLRendimientoDietaySiembra() {
         "Cajas No Sembradas Produccion": isCajasDietaNoSembradasProInvalido,
         "G Neonatos Sembrados Produccion": isNeonatosSembradosCajaProInvalido,
       };
-
+  
       toast.current.show({
         severity: "error",
         summary: "Error",
@@ -218,45 +259,44 @@ function ControLRendimientoDietaySiembra() {
       });
       return;
     }
-
+  
     setObservacionesObligatorio(false);
     setErroresValidacion({
-        cajas_procesadas_neonatos: false,
-        cajas_sembradas_rep: false,
-        cajas_dieta_no_sembradas_rep: false,
-        g_neonatos_sembrados_caja_rep: false,
-        cajas_sembradas_pro: false,
-        cajas_dieta_no_sembradas_pro: false,
-        g_neonatos_sembrados_caja_pro: false,
-
+      cajas_procesadas_neonatos: false,
+      cajas_sembradas_rep: false,
+      cajas_dieta_no_sembradas_rep: false,
+      g_neonatos_sembrados_caja_rep: false,
+      cajas_sembradas_pro: false,
+      cajas_dieta_no_sembradas_pro: false,
+      g_neonatos_sembrados_caja_pro: false,
     });
-
+  
     try {
       const currentDate = formatDateTime(new Date(), "DD/MM/YYYY");
       const currentTime = formatDateTime(new Date(), "hh:mm A");
-
+  
       // Verificar si el lote seleccionado existe
       const { data: loteExistente, error: loteError } = await supabase
-          .from("Lotes")
-          .select("base_numero_lote")
-          .eq("base_numero_lote", registro.base_numero_lote)
-          .single();
-
+        .from("Lotes")
+        .select("base_numero_lote")
+        .eq("base_numero_lote", registro.base_numero_lote)
+        .single();
+  
       if (loteError || !loteExistente) {
-          toast.current.show({
-              severity: "error",
-              summary: "Error",
-              detail: `El lote ${registro.base_numero_lote} no existe.`,
-              life: 3000,
-          });
-          return;
+        toast.current.show({
+          severity: "error",
+          summary: "Error",
+          detail: `El lote ${registro.base_numero_lote} no existe.`,
+          life: 3000,
+        });
+        return;
       }
-
+  
       const { data, error } = await supabase
         .from("Control_Rendimiento_DietaySiembra")
         .insert([
           {
-            base_numero_lote: registro.base_numero_lote, // Lote seleccionado
+            base_numero_lote: registro.base_numero_lote,
             cantidad_tandas: registro.cantidad_tandas,
             kg_dieta_caja: registro.kg_dieta_caja,
             kg_residuo_organico: registro.kg_residuo_organico,
@@ -272,42 +312,46 @@ function ControLRendimientoDietaySiembra() {
             cajas_procesadas_neonatos: registro.cajas_procesadas_neonatos,
             cajas_sembradas_rep: registro.cajas_sembradas_rep,
             cajas_dieta_no_sembradas_rep: registro.cajas_dieta_no_sembradas_rep,
-            g_neonatos_sembrados_caja_rep:
-              registro.g_neonatos_sembrados_caja_rep,
+            g_neonatos_sembrados_caja_rep: registro.g_neonatos_sembrados_caja_rep,
             cajas_sembradas_pro: registro.cajas_sembradas_pro,
             cajas_dieta_no_sembradas_pro: registro.cajas_dieta_no_sembradas_pro,
-            g_neonatos_sembrados_caja_pro:
-              registro.g_neonatos_sembrados_caja_pro,
+            g_neonatos_sembrados_caja_pro: registro.g_neonatos_sembrados_caja_pro,
             tipo_control: registro.tipo_control,
             fec_registro: currentDate,
             hor_registro: currentTime,
             observaciones: registro.observaciones,
           },
-        ]); //Cambiar aqui este insert y poner cada columna ya que las fechas se tienen que formatear
+        ]);
+  
       if (error) {
         console.error("Error en Supabase:", error);
-        throw new Error(
-          error.message || "Error desconocido al guardar en Supabase"
-        );
+        throw new Error(error.message || "Error desconocido al guardar en Supabase");
       }
-       // Actualizar la tabla Lotes con la nueva etapa_actual
-       const { error: updateError } = await supabase
-       .from("Lotes")
-       .update({ etapa_actual: "Dieta" }) // Cambia "Control de Rendimiento" por la etapa que corresponda
-       .eq("base_numero_lote", registro.base_numero_lote);
-
-   if (updateError) {
-       console.error("Error al actualizar Lotes:", updateError);
-       throw new Error(
-           updateError.message || "Error desconocido al actualizar Lotes"
-       );
-   }
+  
+      // Actualizar la tabla Lotes con la nueva etapa_actual
+      const nuevasCajas = registro.cant_cajas_dieta - registro.cajas_procesadas_neonatos;
+  
+      const { error: updateError } = await supabase
+        .from("Lotes")
+        .update({
+          cant_cajas_dieta: nuevasCajas,
+          etapa_actual: "Dieta",
+          fecha_siembra: currentDate,
+        })
+        .eq("base_numero_lote", registro.base_numero_lote);
+  
+      if (updateError) {
+        console.error("Error actualizando lote:", updateError);
+        throw new Error("Error al actualizar información del lote");
+      }
+  
       toast.current.show({
         severity: "success",
         summary: "Exitoso",
         detail: "Registro creado correctamente",
         life: 3000,
       });
+  
       setRegistro(emptyRegister);
       setRegistroDialog(false);
       setSubmitted(false);
@@ -390,21 +434,64 @@ function ControLRendimientoDietaySiembra() {
     return rowData.name !== "Blue Band";
   };
 
-  const onRowEditComplete = async ({ newData }) => {
-    const { id, ...updatedData } = newData;
+  // const onRowEditInit = (event) => {  EXPLICACION EN TABLA
+  //   setRegistro({
+  //     ...event.data,
+  //     _originalCajas: event.data.cajas_procesadas_neonatos
+  //   });
+  //   setRegistroDialog(true);
+  // };
+  const onRowEditComplete = async ({ newData, data: oldData }) => {
     try {
-      const { error } = await supabase
-        .from("Control_Rendimiento_DietaySiembra")
-        .update(updatedData)
-        .eq("id", id);
-
-      if (error) return console.error("Error al actualizar:", error.message);
-
-      setRegistros((prev) =>
-        prev.map((n) => (n.id === id ? { ...n, ...newData } : n))
-      );
-    } catch (err) {
-      console.error("Error inesperado:", err);
+      // 1. Calcular diferencia de cajas
+      const diferencia = newData.cajas_procesadas_neonatos - oldData.cajas_procesadas_neonatos;
+      
+      // 2. Obtener lote actual
+      const { data: lote, error: loteError } = await supabase
+        .from('Lotes')
+        .select('cant_cajas_dieta')
+        .eq('base_numero_lote', oldData.base_numero_lote)
+        .single();
+  
+      if (loteError) throw loteError;
+  
+      // 3. Calcular nuevo valor
+      const nuevasCajas = lote.cant_cajas_dieta - diferencia;
+      
+      if (nuevasCajas < 0) {
+        throw new Error('Cantidad de cajas no puede ser negativa');
+      }
+  
+      // 4. Actualizar Control_Rendimiento_DietaySiembra
+      const { error: updateError } = await supabase
+        .from('Control_Rendimiento_DietaySiembra')
+        .update(newData)
+        .eq('id', newData.id);
+  
+      if (updateError) throw updateError;
+  
+      // 5. Actualizar Lotes
+      const { error: loteUpdateError } = await supabase
+        .from('Lotes')
+        .update({
+          cant_cajas_dieta: nuevasCajas,
+        })
+        .eq('base_numero_lote', oldData.base_numero_lote);
+  
+      if (loteUpdateError) throw loteUpdateError;
+  
+      // 6. Actualizar estado local
+      setRegistros(prev => prev.map(item => 
+        item.id === newData.id ? newData : item
+      ));
+  
+    } catch (error) {
+      toast.current.show({
+        severity: 'error',
+        summary: 'Error en edición',
+        detail: error.message || 'Error al actualizar el registro',
+        life: 3000
+      });
     }
   };
 
@@ -481,6 +568,7 @@ function ControLRendimientoDietaySiembra() {
   );
 
   const cols = [
+    { field: "numero_lote", header: "Número Lote" },
     { field: "cantidad_tandas", header: "Cantidad Tandas" },
     { field: "kg_dieta_caja", header: "Kg Dieta Caja" },
     { field: "kg_residuo_organico", header: "Kg Residuo Orgánico" },
@@ -655,6 +743,7 @@ function ControLRendimientoDietaySiembra() {
           ></Toolbar>
           <DataTable
             editMode="row"
+            // onRowEditInit={onRowEditInit} SE USA PARA ABRIR NUEVAMENTE EL DIALOGO PARA EDITARLO VALORARLO
             onRowEditComplete={onRowEditComplete}
             ref={dt}
             value={registros}
@@ -670,12 +759,11 @@ function ControLRendimientoDietaySiembra() {
           >
             <Column selectionMode="multiple" exportable={false}></Column>
             <Column
-                          field="numero_lote"
-                          header="Número Lote"
-                          // editor={(options) => textEditor(options)}
-                          sortable
-                          style={{ minWidth: "10rem" }}
-                        ></Column>
+              field="numero_lote"
+              header="Número Lote"
+              sortable
+              style={{ minWidth: "10rem" }}
+            ></Column>
             <Column
               field="cantidad_tandas"
               header="Cantidad Tandas"
@@ -742,7 +830,7 @@ function ControLRendimientoDietaySiembra() {
               editor={(options) => floatEditor(options)}
               sortable
             />
-            
+
             <Column
               field="cajas_procesadas_neonatos"
               header="Cajas Procesadas Neonatos"
@@ -826,26 +914,40 @@ function ControLRendimientoDietaySiembra() {
       >
         <div className="field">
           <label htmlFor="base_numero_lote" className="font-bold">
-                      Número de lote{" "}
-                      {submitted && !registro.base_numero_lote && (
-                        <small className="p-error">Requerido.</small>
-                      )}
-                    </label>
-          
-          
-                    
-                    <Dropdown
-              value={registro.base_numero_lote}
-              onChange={(e) => {
-                  setRegistro({ ...registro, base_numero_lote: e.value });
-              }}
-              options={[
-                  ...(lotes || []),
-              ]}
-              optionLabel="base_numero_lote" // Mostrar el campo "label" en el dropdown
-              optionValue="base_numero_lote" // Guardar el valor de "base_numero_lote"
-              placeholder="Selecciona un Número de lote"
-              className="w-full md:w-14rem"
+            Número de lote{" "}
+            {submitted && !registro.base_numero_lote && (
+              <small className="p-error">Requerido.</small>
+            )}
+          </label>
+          <Dropdown
+            value={registro.base_numero_lote}
+            onChange={async (e) => {
+              const loteSeleccionado = lotes.find(
+                (l) => l.base_numero_lote === e.value
+              );
+
+              if (loteSeleccionado) {
+                // Obtener los datos actualizados del lote desde Supabase
+                const { data: loteActual, error } = await supabase
+                  .from("Lotes")
+                  .select("cant_cajas_dieta")
+                  .eq("base_numero_lote", e.value)
+                  .single();
+
+                if (!error && loteActual) {
+                  setRegistro({
+                    ...registro,
+                    base_numero_lote: e.value,
+                    cant_cajas_dieta: loteActual.cant_cajas_dieta || 0,
+                  });
+                }
+              }
+            }}
+            options={[...(lotes || [])]}
+            optionLabel="base_numero_lote" // Mostrar el campo "label" en el dropdown
+            optionValue="base_numero_lote" // Guardar el valor de "base_numero_lote"
+            placeholder="Selecciona un Número de lote"
+            className="w-full md:w-14rem"
           />
           <br />
           <label htmlFor="cantidad_tandas" className="font-bold">
@@ -1046,7 +1148,9 @@ function ControLRendimientoDietaySiembra() {
           />
           <br />
           <Divider />
-          <h3><strong>Neonatos:</strong></h3>
+          <h3>
+            <strong>Neonatos:</strong>
+          </h3>
           <label htmlFor="cajas_procesadas_neonatos" className="font-bold">
             Cajas Procesadas Neonatos{" "}
             {submitted && !registro.cajas_procesadas_neonatos && (
@@ -1054,7 +1158,8 @@ function ControLRendimientoDietaySiembra() {
             )}
             {erroresValidacion.cajas_procesadas_neonatos && (
               <small className="p-error">
-                Cajas Procesadas Neonatos debe de estar entre 0 a 200.
+                Cajas Procesadas Neonatos debe de estar entre 0 a{" "}
+                {registro.cant_cajas_dieta}.
               </small>
             )}
           </label>
@@ -1067,7 +1172,9 @@ function ControLRendimientoDietaySiembra() {
           />
           <br />
           <Divider />
-          <h3><strong>Reproducción:</strong></h3>
+          <h3>
+            <strong>Reproducción:</strong>
+          </h3>
           <label htmlFor="cajas_sembradas_rep" className="font-bold">
             Cajas Sembradas Reproduccion{" "}
             {submitted && !registro.cajas_sembradas_rep && (
@@ -1129,7 +1236,9 @@ function ControLRendimientoDietaySiembra() {
           />
           <br />
           <Divider />
-          <h3><strong>Producción:</strong></h3>
+          <h3>
+            <strong>Producción:</strong>
+          </h3>
           <label htmlFor="cajas_sembradas_pro" className="font-bold">
             Cajas Sembradas Produccion{" "}
             {submitted && !registro.cajas_sembradas_pro && (

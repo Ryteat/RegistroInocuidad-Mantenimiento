@@ -58,14 +58,14 @@ import PreoperacionalTeletruk from './pages/Mantenimiento/Registros/PagesPreoper
 //imports de paginas de Cosecha
 import Cosecha from './pages/Cosecha/PagesCosecha.jsx';
 import ControlRendimientoCosechayFrass from './pages/Cosecha/Registros/PagesControlRendimientoCosechayFrass.jsx'
+import ControlIngresoySalidaRacks from './pages/Cosecha/Registros/PagesControlIngresoySalidaRacks.jsx'
 
 //imports de páginas visualizar
 // En main.js
 import Visualizar from './pages/Visualizar/PagesVisualizar';
 import VisualizarKPIs from './pages/Visualizar/Registros/PagesVisualizarKPIs';
 import VisualizarLotes from './pages/Visualizar/Registros/PagesVisualizarLotes';
-
-
+import VisualizarSKUs from './pages/Visualizar/Registros/PagesVisuazlizarSKUs';
 const Layout = () => {
   return (
     <div>
@@ -156,6 +156,10 @@ const router = createBrowserRouter([{
         {
           path: `VisualizarLotes`,
           element: <VisualizarLotes />, // Componente hijo
+        },
+        {
+          path: `VisualizarSKUs`,
+          element: <VisualizarSKUs />, // Componente hijo
         },
       ],
     },
@@ -268,6 +272,10 @@ const router = createBrowserRouter([{
       {
         path: `ControlRendimientoCosechayFrass`,
         element: <ControlRendimientoCosechayFrass />,
+      },
+      {
+        path: `ControlIngresoySalidaRacks`,
+        element: <ControlIngresoySalidaRacks />,
       },
       
     ],

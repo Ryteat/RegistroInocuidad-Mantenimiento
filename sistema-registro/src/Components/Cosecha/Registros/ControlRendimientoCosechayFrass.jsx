@@ -32,6 +32,8 @@ function ControlRendimientoCosechayFrass() {
     fec_siembra: "",
     fec_cosecha: "",
     cant_cajas_cosechadas: "",
+    cant_cajas_lote: 0,
+    _originalCajas: 0, // Nuevo campo para almacenar el valor original
     kg_larva_fresca: "",
     cant_cajas_desechadas: "",
     kg_total_frass: "",
@@ -89,10 +91,11 @@ function ControlRendimientoCosechayFrass() {
     try {
       const { data, error } = await supabase
         .from("Lotes")
-        .select() // Si solo necesitas el campo base_numero_lote, podrías especificarlo: .select("base_numero_lote")
-        .in("etapa_actual", ["Dieta", "Cosecha", "HornoMul", "HornoMic"]); // Filtra registros con etapa_actual igual a 'hatchery' o 'dieta'
+        .select()
+        .ilike("etapa_actual","%Cosecha%"); // Busca "Cosecha" en cualquier posición del string
+
       if (error) throw error;
-      setLotes(data || []); // Actualiza el estado con los datos obtenidos
+      setLotes(data || []);
     } catch (err) {
       console.log("Error en la conexión a la base de datos Lotes", err);
     }
@@ -127,13 +130,13 @@ function ControlRendimientoCosechayFrass() {
   const saveRegistro = async () => {
     setSubmitted(true);
 
-    // Validar los campos
+    // Validar los campos con el nuevo rango dinámico
     const isCantCajasCosechadasInvalido =
-      registro.cant_cajas_cosechadas < 500 ||
-      registro.cant_cajas_cosechadas > 2000;
+      registro.cant_cajas_cosechadas < 0 ||
+      registro.cant_cajas_cosechadas > registro.cant_cajas_lote;
     const isKgLarvaFrescaInvalido =
       registro.kg_larva_fresca < 0 || registro.kg_larva_fresca > 12000;
-    const isCantCajasDesechadasInvalido = registro.cant_cajas_desechadas === 0;
+    const isCantCajasDesechadasInvalido = registro.cant_cajas_desechadas < 0; // Corregido: debe ser < 0
     const isKgTotalFrassInvalido =
       registro.kg_total_frass < 0 || registro.kg_total_frass > 6000;
     const isKgMaterialGruesoInvalido =
@@ -176,6 +179,57 @@ function ControlRendimientoCosechayFrass() {
       return;
     }
 
+    // Mostrar mensajes de error específicos para cada campo fuera de rango
+    if (erroresValidacion.cant_cajas_cosechadas) {
+      toast.current.show({
+        severity: "error",
+        summary: "Error",
+        detail: `Cajas Cosechadas debe estar entre 0 y ${registro.cant_cajas_lote}`,
+        life: 3000,
+      });
+      return; // Detener el proceso si hay un error
+    }
+
+    if (erroresValidacion.kg_larva_fresca) {
+      toast.current.show({
+        severity: "error",
+        summary: "Error",
+        detail: "Larva Fresca debe estar entre 0 y 12000 KG",
+        life: 3000,
+      });
+      return; // Detener el proceso si hay un error
+    }
+
+    if (erroresValidacion.cant_cajas_desechadas) {
+      toast.current.show({
+        severity: "error",
+        summary: "Error",
+        detail: "Cajas Desechadas no puede ser menor que 0",
+        life: 3000,
+      });
+      return; // Detener el proceso si hay un error
+    }
+
+    if (erroresValidacion.kg_total_frass) {
+      toast.current.show({
+        severity: "error",
+        summary: "Error",
+        detail: "Frass Fino Total debe estar entre 0 y 6000 KG",
+        life: 3000,
+      });
+      return; // Detener el proceso si hay un error
+    }
+
+    if (erroresValidacion.kg_material_grueso) {
+      toast.current.show({
+        severity: "error",
+        summary: "Error",
+        detail: "Material Grueso debe estar entre 0 y 6000 KG",
+        life: 3000,
+      });
+      return; // Detener el proceso si hay un error
+    }
+
     // Si algún valor está fuera de rango y no hay observaciones, mostrar error
     if (valoresFueraDeRango && !registro.observaciones) {
       const camposInvalidos = Object.keys(erroresValidacion)
@@ -183,11 +237,11 @@ function ControlRendimientoCosechayFrass() {
         .map((key) => {
           switch (key) {
             case "cant_cajas_cosechadas":
-              return "Cajas Cosechadas (500 - 2000)";
+              return `Cajas Cosechadas (0 - ${registro.cant_cajas_lote})`;
             case "kg_larva_fresca":
               return "Larva Fresca (0 - 12000 KG)";
             case "cant_cajas_desechadas":
-              return "Cajas Desechadas (debe ser 0)";
+              return "Cajas Desechadas (no puede ser menor que 0)";
             case "kg_total_frass":
               return "Frass Fino Total (0 - 6000 KG)";
             case "kg_material_grueso":
@@ -204,7 +258,7 @@ function ControlRendimientoCosechayFrass() {
         detail: `Debe agregar observaciones. Campos inválidos: ${camposInvalidos}`,
         life: 3000,
       });
-      return;
+      return; // Detener el proceso si hay un error
     }
 
     try {
@@ -214,7 +268,7 @@ function ControlRendimientoCosechayFrass() {
       // Verificar si el lote seleccionado existe
       const { data: loteExistente, error: loteError } = await supabase
         .from("Lotes")
-        .select("base_numero_lote")
+        .select("cant_cajas_cosecha")
         .eq("base_numero_lote", registro.base_numero_lote)
         .single();
 
@@ -227,13 +281,31 @@ function ControlRendimientoCosechayFrass() {
         });
         return;
       }
+
+      // Sumar cajas cosechadas y desechadas
+      const totalCajasProcesadas =
+        parseInt(registro.cant_cajas_cosechadas, 10) +
+        parseInt(registro.cant_cajas_desechadas, 10);
+
+      // Verificar si hay suficientes cajas para cosechar
+      if (totalCajasProcesadas > loteExistente.cant_cajas_cosecha) {
+        toast.current.show({
+          severity: "error",
+          summary: "Error",
+          detail: `No hay suficientes cajas para cosechar. Disponibles: ${loteExistente.cant_cajas_cosecha}`,
+          life: 3000,
+        });
+        return;
+      }
+
+      // Actualizar Control_Rendimiento_CosechayFrass
       const { data, error } = await supabase
         .from("Control_Rendimiento_CosechayFrass")
         .insert([
           {
-            base_numero_lote: registro.base_numero_lote, // Lote seleccionado
-            fec_siembra: registro.fec_siembra,
-            fec_cosecha: registro.fec_cosecha,
+            base_numero_lote: registro.base_numero_lote,
+            fec_siembra: convertirFecha(registro.fec_siembra),
+            fec_cosecha: convertirFecha(registro.fec_cosecha),
             cant_cajas_cosechadas: registro.cant_cajas_cosechadas,
             kg_larva_fresca: registro.kg_larva_fresca,
             cant_cajas_desechadas: registro.cant_cajas_desechadas,
@@ -242,7 +314,7 @@ function ControlRendimientoCosechayFrass() {
             fec_registro: currentDate,
             hor_registro: currentTime,
             observaciones: registro.observaciones,
-            fec_almacenaje_frass: registro.fec_almacenaje_frass,
+            fec_almacenaje_frass: convertirFecha(registro.fec_almacenaje_frass),
             cant_sacos: registro.cant_sacos,
             tipo_produccion: registro.tipo_produccion,
             tipo_control: registro.tipo_control,
@@ -255,10 +327,18 @@ function ControlRendimientoCosechayFrass() {
           error.message || "Error desconocido al guardar en Supabase"
         );
       }
-      // Actualizar la tabla Lotes con la nueva etapa_actual
+
+      // Actualizar Lotes
+      const nuevasCajasCosecha =
+        loteExistente.cant_cajas_cosecha - totalCajasProcesadas;
+
       const { error: updateError } = await supabase
         .from("Lotes")
-        .update({ etapa_actual: "Cosecha" }) // Cambia "Control de Rendimiento" por la etapa que corresponda
+        .update({
+          cant_cajas_cosecha: nuevasCajasCosecha,
+          etapa_actual: "Cosecha",
+          fecha_cosecha: currentDate,
+        })
         .eq("base_numero_lote", registro.base_numero_lote);
 
       if (updateError) {
@@ -348,21 +428,75 @@ function ControlRendimientoCosechayFrass() {
     return rowData.name !== "Blue Band";
   };
 
-  const onRowEditComplete = async ({ newData }) => {
-    const { id, ...updatedData } = newData;
+  const onRowEditComplete = async ({ newData, data: oldData }) => {
     try {
-      const { error } = await supabase
+      // Calcular diferencia en cajas cosechadas y desechadas
+      const diferenciaCosechadas =
+        newData.cant_cajas_cosechadas - oldData.cant_cajas_cosechadas;
+      const diferenciaDesechadas =
+        newData.cant_cajas_desechadas - oldData.cant_cajas_desechadas;
+      const diferenciaTotal = diferenciaCosechadas + diferenciaDesechadas;
+
+      // Obtener cantidad actual del lote
+      const { data: lote, error: loteError } = await supabase
+        .from("Lotes")
+        .select("cant_cajas_cosecha")
+        .eq("base_numero_lote", oldData.base_numero_lote)
+        .single();
+
+      if (loteError) throw loteError;
+
+      // Calcular nuevo valor
+      const nuevasCajasCosecha = lote.cant_cajas_cosecha - diferenciaTotal;
+
+      if (nuevasCajasCosecha < 0) {
+        throw new Error("La cantidad de cajas no puede ser negativa");
+      }
+
+      // Verificar si hay suficientes cajas para cosechar
+      if (diferenciaTotal > lote.cant_cajas_cosecha) {
+        throw new Error(
+          `No hay suficientes cajas para cosechar. Disponibles: ${lote.cant_cajas_cosecha}`
+        );
+      }
+
+      // Actualizar Control_Rendimiento_CosechayFrass
+      const { error: updateError } = await supabase
         .from("Control_Rendimiento_CosechayFrass")
-        .update(updatedData)
-        .eq("id", id);
+        .update(newData)
+        .eq("id", newData.id);
 
-      if (error) return console.error("Error al actualizar:", error.message);
+      if (updateError) throw updateError;
 
+      // Actualizar Lotes
+      const { error: loteUpdateError } = await supabase
+        .from("Lotes")
+        .update({
+          cant_cajas_cosecha: nuevasCajasCosecha,
+          etapa_actual: "Cosecha",
+        })
+        .eq("base_numero_lote", oldData.base_numero_lote);
+
+      if (loteUpdateError) throw loteUpdateError;
+
+      // Actualizar estado local
       setRegistros((prev) =>
-        prev.map((n) => (n.id === id ? { ...n, ...newData } : n))
+        prev.map((item) => (item.id === newData.id ? newData : item))
       );
-    } catch (err) {
-      console.error("Error inesperado:", err);
+
+      toast.current.show({
+        severity: "success",
+        summary: "Éxito",
+        detail: "Registro actualizado correctamente",
+        life: 3000,
+      });
+    } catch (error) {
+      toast.current.show({
+        severity: "error",
+        summary: "Error en edición",
+        detail: error.message || "Error al actualizar el registro",
+        life: 3000,
+      });
     }
   };
 
@@ -439,6 +573,7 @@ function ControlRendimientoCosechayFrass() {
   );
 
   const cols = [
+    { field: "numero_lote", header: "Número Lote" },
     { field: "tipo_produccion", header: "Tipo Producción" },
     { field: "tipo_control", header: "Tipo Control" },
     { field: "fec_siembra", header: "Fecha Siembra" },
@@ -711,14 +846,34 @@ function ControlRendimientoCosechayFrass() {
 
           <Dropdown
             value={registro.base_numero_lote}
-            onChange={(e) => {
-              setRegistro({ ...registro, base_numero_lote: e.value });
+            onChange={async (e) => {
+              const loteSeleccionado = lotes.find(
+                (l) => l.base_numero_lote === e.value
+              );
+
+              if (loteSeleccionado) {
+                // Obtener datos actualizados del lote desde Supabase
+                const { data: loteActual, error } = await supabase
+                  .from("Lotes")
+                  .select("cant_cajas_cosecha")
+                  .eq("base_numero_lote", e.value)
+                  .single();
+
+                if (!error && loteActual) {
+                  setRegistro({
+                    ...registro,
+                    base_numero_lote: e.value,
+                    cant_cajas_lote: loteActual.cant_cajas_cosecha || 0,
+                  });
+                }
+              }
             }}
             options={[...(lotes || [])]}
-            optionLabel="base_numero_lote" // Mostrar el campo "label" en el dropdown
-            optionValue="base_numero_lote" // Guardar el valor de "base_numero_lote"
+            optionLabel="base_numero_lote"
+            optionValue="base_numero_lote"
             placeholder="Selecciona un Número de lote"
             className="w-full md:w-14rem"
+            autoFocus
           />
           <br />
           <label htmlFor="fec_siembra" className="font-bold">
@@ -733,7 +888,7 @@ function ControlRendimientoCosechayFrass() {
             value={registro.fec_siembra}
             onChange={(e) => onInputChange(e, "fec_siembra")}
             required
-            autoFocus
+            
           />
           <br />
           <label htmlFor="fec_cosecha" className="font-bold">
@@ -748,17 +903,17 @@ function ControlRendimientoCosechayFrass() {
             value={registro.fec_cosecha}
             onChange={(e) => onInputChange(e, "fec_cosecha")}
             required
-            autoFocus
+            
           />
           <br />
           <label htmlFor="cant_cajas_cosechadas" className="font-bold">
-            Cajas Cosechadas (500 - 2000){" "}
+            Cajas Cosechadas (0 - {registro.cant_cajas_lote}){" "}
             {submitted && !registro.cant_cajas_cosechadas && (
               <small className="p-error">Requerido.</small>
             )}
             {erroresValidacion.cant_cajas_cosechadas && (
               <small className="p-error">
-                Cantidad Cajas Procesadas Fuera de rango 500 a 2000.
+                {`Cantidad Cajas Procesadas Fuera de rango 500 a ${registro.cant_cajas_lote}`}
               </small>
             )}
           </label>
@@ -890,7 +1045,7 @@ function ControlRendimientoCosechayFrass() {
             value={registro.fec_almacenaje_frass}
             onChange={(e) => onInputChange(e, "fec_almacenaje_frass")}
             required
-            autoFocus
+            
           />
           <br />
           <label htmlFor="cant_sacos" className="font-bold">
