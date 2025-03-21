@@ -102,7 +102,7 @@ function NIB() {
       const { data, error } = await supabase
         .from("Lotes")
         .select() // Si solo necesitas el campo base_numero_lote, podrías especificarlo: .select("base_numero_lote")
-        .in("etapa_actual", ["Hatchery", "Dieta"]); // Filtra registros con etapa_actual igual a 'hatchery' o 'dieta'
+        .in("etapa_actual", ["Hatchery"]); // Filtra registros con etapa_actual igual a 'hatchery' o 'dieta'
       if (error) throw error;
       setLotes(data || []); // Actualiza el estado con los datos obtenidos
     } catch (err) {

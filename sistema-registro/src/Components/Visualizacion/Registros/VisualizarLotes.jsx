@@ -12,7 +12,6 @@ import { Toast } from "primereact/toast";
 import { Divider } from "primereact/divider";
 import { InputText } from "primereact/inputtext";
 
-
 function VisualizarLotes() {
   const navigate = useNavigate();
   const [lotes, setLotes] = useState([]);
@@ -42,9 +41,12 @@ function VisualizarLotes() {
         { data: neonatos },
         { data: despacho },
         { data: dietaSiembra },
+        { data: despachoDieta },
+        { data: ingresoSalidaRacks },
         { data: cosechaFrass },
         { data: microondas },
         { data: multilevel },
+
         // { data: terminado },
       ] = await Promise.all([
         supabase
@@ -57,6 +59,14 @@ function VisualizarLotes() {
           .eq("base_numero_lote", loteNumber),
         supabase
           .from("Control_Rendimiento_DietaySiembra")
+          .select("*")
+          .eq("base_numero_lote", loteNumber),
+        supabase
+          .from("Control_Movimiento_Cajas_Proceso")
+          .select("*")
+          .eq("base_numero_lote", loteNumber),
+        supabase
+          .from("Control_Ingreso_Salida_Racks")
           .select("*")
           .eq("base_numero_lote", loteNumber),
         supabase
@@ -76,7 +86,7 @@ function VisualizarLotes() {
         //   .select("*")
         //   .eq("base_numero_lote", loteNumber),
       ]);
-      
+
       setRelatedData({
         Neonatos_Inoculados: neonatos,
         Control_Despacho_5dols_LabPro: despacho,
@@ -84,6 +94,9 @@ function VisualizarLotes() {
         Control_Rendimiento_CosechayFrass: cosechaFrass,
         Control_Rendimiento_Secado_Horno_Microondas: microondas,
         Control_Rendimiento_Secado_Horno_Multilevel: multilevel,
+        Control_Movimiento_Cajas_Proceso: despachoDieta,
+        Control_Ingreso_Salida_Racks: ingresoSalidaRacks,
+
         // Control_Rendimiento_Producto_Terminado: terminado,
       });
     } catch (err) {
@@ -96,7 +109,6 @@ function VisualizarLotes() {
       });
     }
   };
-
   // const formatDate = (dateString) => {
   //   if (!dateString) return 'N/A';
   //   const options = { year: 'numeric', month: '2-digit', day: '2-digit' };
@@ -120,12 +132,7 @@ function VisualizarLotes() {
         <Divider align="left">
           <span className="p-tag">{tableName}</span>
         </Divider>
-        <DataTable
-          
-          value={data}
-          size="small"
-          className="p-datatable-sm"
-        >
+        <DataTable value={data} size="small" className="p-datatable-sm">
           {columns.map((col) => (
             <Column
               key={col.field}
@@ -165,8 +172,8 @@ function VisualizarLotes() {
       </div>
 
       <DataTable
-      header={header}
-      globalFilter={globalFilter}
+        header={header}
+        globalFilter={globalFilter}
         value={lotes}
         selectionMode="single"
         selection={selectedLote}
@@ -267,7 +274,6 @@ function VisualizarLotes() {
               "Control Rendimiento Dieta y Siembra",
               relatedData.Control_Rendimiento_DietaySiembra,
               [
-                { field: "numero_lote", header: "Número Lote" },
                 { field: "cantidad_tandas", header: "Cantidad Tandas" },
                 { field: "kg_dieta_caja", header: "Kg Dieta Caja" },
                 { field: "kg_residuo_organico", header: "Kg Residuo Orgánico" },
@@ -308,7 +314,40 @@ function VisualizarLotes() {
                 { header: "Hora Registro", field: "hor_registro" },
               ]
             )}
+            {/* Control Movimientos Cajas */}
+            {renderRelatedTable(
+              "Movimientos Cajas, Despacho Dieta",
+              relatedData.Control_Movimiento_Cajas_Proceso,
+              [
+                { field: "base_numero_lote", header: "Número de Lote" },
+                {
+                  field: "coordinador_planta",
+                  header: "Coordinador de Planta",
+                },
+                { field: "tipo_dieta", header: "Tipo de Dieta" },
+                { field: "cantidad_tarimas", header: "Cantidad de Tarimas" },
+                { field: "total_cajas", header: "Total de Cajas" },
+                { field: "responsable", header: "Responsable" },
+                { field: "observaciones", header: "Observaciones" },
+                { field: "registrado", header: "Registrado" },
+              ]
+            )}
 
+            {/* Control Ingreso y Salida Racks */}
+            {renderRelatedTable(
+              "Control Ingreso y Salida Racks",
+              relatedData.Control_Ingreso_Salida_Racks,
+              [
+                { field: "base_numero_lote", header: "Número de Lote" },
+                { field: "ingresoysalida", header: "Ingreso/Salida" },
+                { field: "tipo_registro", header: "Tipo de Registro" },
+                { field: "total_cajas", header: "Total de Cajas" },
+                { field: "responsable", header: "Responsable" },
+                { field: "observaciones", header: "Observaciones" },
+                { field: "fecha_registro", header: "Fecha Registro" },
+                { field: "hora_registro", header: "Hora Registro" },
+              ]
+            )}
             {/* Control Rendimiento Cosecha y Frass */}
             {renderRelatedTable(
               "Control Rendimiento Cosecha y Frass",
@@ -377,6 +416,7 @@ function VisualizarLotes() {
                 { field: "observaciones", header: "Observaciones" },
               ]
             )}
+
             {/* {renderRelatedTable(
               "Producto Terminado",
               relatedData.Control_Rendimiento_Producto_Terminado,

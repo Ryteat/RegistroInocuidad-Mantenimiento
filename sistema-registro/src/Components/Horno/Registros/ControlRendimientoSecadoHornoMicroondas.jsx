@@ -228,7 +228,7 @@ function ControlRendimientoSecadoHornoMultilevel() {
     const { error: updateError } = await supabase
       .from("Lotes")
       .update({
-        cant_cajas_racks: nuevasCajas,
+        cant_cajas_horno: nuevasCajas,
         etapa_actual: nuevasEtapas.join(", "), // Unir todas las etapas
           fecha_horneado: currentDate,
         })

@@ -207,11 +207,6 @@ const ControlRendimientoProductoTerminado = () => {
       const posibleSKU = generarFormatoJuliano(currentDate);
       const currentTime = formatDateTime(new Date(), "hh:mm A");
       let baseCodigoSKUToInsert = registro.base_codigo_sku;
-      console.log("Valor seleccionado en dropdown:", registro.base_codigo_sku);
-      console.log(
-        "Valor a insertar en Neonatos_Inoculados:",
-        baseCodigoSKUToInsert
-      );
       // Si el valor es "nuevo", crear un lote
       if (registro.base_codigo_sku === "Nuevo SKU") {
         // Verificar si el lote ya existe

@@ -92,10 +92,10 @@ function ControlRendimientoCosechayFrass() {
       const { data, error } = await supabase
         .from("Lotes")
         .select()
-        .ilike('etapa_actual', '%Cosecha%'); // Busca "Cosecha" en cualquier posición del string
-        
+        .ilike("etapa_actual","%Cosecha%"); // Busca "Cosecha" en cualquier posición del string
+
       if (error) throw error;
-      setLotes(data || []);s
+      setLotes(data || []);
     } catch (err) {
       console.log("Error en la conexión a la base de datos Lotes", err);
     }
@@ -129,7 +129,7 @@ function ControlRendimientoCosechayFrass() {
 
   const saveRegistro = async () => {
     setSubmitted(true);
-  
+
     // Validar los campos con el nuevo rango dinámico
     const isCantCajasCosechadasInvalido =
       registro.cant_cajas_cosechadas < 0 ||
@@ -141,7 +141,7 @@ function ControlRendimientoCosechayFrass() {
       registro.kg_total_frass < 0 || registro.kg_total_frass > 6000;
     const isKgMaterialGruesoInvalido =
       registro.kg_material_grueso < 0 || registro.kg_material_grueso > 6000;
-  
+
     // Actualizar el estado de errores
     const erroresValidacion = {
       cant_cajas_cosechadas: isCantCajasCosechadasInvalido,
@@ -150,12 +150,12 @@ function ControlRendimientoCosechayFrass() {
       kg_total_frass: isKgTotalFrassInvalido,
       kg_material_grueso: isKgMaterialGruesoInvalido,
     };
-  
+
     // Verificar si algún valor está fuera de rango
     const valoresFueraDeRango = Object.values(erroresValidacion).some(
       (error) => error
     );
-  
+
     // Validación principal
     if (
       !registro.fec_siembra ||
@@ -178,7 +178,7 @@ function ControlRendimientoCosechayFrass() {
       });
       return;
     }
-  
+
     // Mostrar mensajes de error específicos para cada campo fuera de rango
     if (erroresValidacion.cant_cajas_cosechadas) {
       toast.current.show({
@@ -189,7 +189,7 @@ function ControlRendimientoCosechayFrass() {
       });
       return; // Detener el proceso si hay un error
     }
-  
+
     if (erroresValidacion.kg_larva_fresca) {
       toast.current.show({
         severity: "error",
@@ -199,7 +199,7 @@ function ControlRendimientoCosechayFrass() {
       });
       return; // Detener el proceso si hay un error
     }
-  
+
     if (erroresValidacion.cant_cajas_desechadas) {
       toast.current.show({
         severity: "error",
@@ -209,7 +209,7 @@ function ControlRendimientoCosechayFrass() {
       });
       return; // Detener el proceso si hay un error
     }
-  
+
     if (erroresValidacion.kg_total_frass) {
       toast.current.show({
         severity: "error",
@@ -219,7 +219,7 @@ function ControlRendimientoCosechayFrass() {
       });
       return; // Detener el proceso si hay un error
     }
-  
+
     if (erroresValidacion.kg_material_grueso) {
       toast.current.show({
         severity: "error",
@@ -229,7 +229,7 @@ function ControlRendimientoCosechayFrass() {
       });
       return; // Detener el proceso si hay un error
     }
-  
+
     // Si algún valor está fuera de rango y no hay observaciones, mostrar error
     if (valoresFueraDeRango && !registro.observaciones) {
       const camposInvalidos = Object.keys(erroresValidacion)
@@ -251,7 +251,7 @@ function ControlRendimientoCosechayFrass() {
           }
         })
         .join(", ");
-  
+
       toast.current.show({
         severity: "error",
         summary: "Error",
@@ -260,18 +260,18 @@ function ControlRendimientoCosechayFrass() {
       });
       return; // Detener el proceso si hay un error
     }
-  
+
     try {
       const currentDate = formatDateTime(new Date(), "DD/MM/YYYY");
       const currentTime = formatDateTime(new Date(), "hh:mm A");
-  
+
       // Verificar si el lote seleccionado existe
       const { data: loteExistente, error: loteError } = await supabase
         .from("Lotes")
         .select("cant_cajas_cosecha")
         .eq("base_numero_lote", registro.base_numero_lote)
         .single();
-  
+
       if (loteError || !loteExistente) {
         toast.current.show({
           severity: "error",
@@ -281,13 +281,12 @@ function ControlRendimientoCosechayFrass() {
         });
         return;
       }
-  
+
       // Sumar cajas cosechadas y desechadas
       const totalCajasProcesadas =
-    parseInt(registro.cant_cajas_cosechadas, 10) + parseInt(registro.cant_cajas_desechadas, 10);
+        parseInt(registro.cant_cajas_cosechadas, 10) +
+        parseInt(registro.cant_cajas_desechadas, 10);
 
-
-  
       // Verificar si hay suficientes cajas para cosechar
       if (totalCajasProcesadas > loteExistente.cant_cajas_cosecha) {
         toast.current.show({
@@ -298,15 +297,15 @@ function ControlRendimientoCosechayFrass() {
         });
         return;
       }
-  
+
       // Actualizar Control_Rendimiento_CosechayFrass
       const { data, error } = await supabase
         .from("Control_Rendimiento_CosechayFrass")
         .insert([
           {
             base_numero_lote: registro.base_numero_lote,
-            fec_siembra: registro.fec_siembra,
-            fec_cosecha: registro.fec_cosecha,
+            fec_siembra: convertirFecha(registro.fec_siembra),
+            fec_cosecha: convertirFecha(registro.fec_cosecha),
             cant_cajas_cosechadas: registro.cant_cajas_cosechadas,
             kg_larva_fresca: registro.kg_larva_fresca,
             cant_cajas_desechadas: registro.cant_cajas_desechadas,
@@ -315,24 +314,24 @@ function ControlRendimientoCosechayFrass() {
             fec_registro: currentDate,
             hor_registro: currentTime,
             observaciones: registro.observaciones,
-            fec_almacenaje_frass: registro.fec_almacenaje_frass,
+            fec_almacenaje_frass: convertirFecha(registro.fec_almacenaje_frass),
             cant_sacos: registro.cant_sacos,
             tipo_produccion: registro.tipo_produccion,
             tipo_control: registro.tipo_control,
           },
         ]);
-  
+
       if (error) {
         console.error("Error en Supabase:", error);
         throw new Error(
           error.message || "Error desconocido al guardar en Supabase"
         );
       }
-  
+
       // Actualizar Lotes
       const nuevasCajasCosecha =
         loteExistente.cant_cajas_cosecha - totalCajasProcesadas;
-  
+
       const { error: updateError } = await supabase
         .from("Lotes")
         .update({
@@ -341,21 +340,21 @@ function ControlRendimientoCosechayFrass() {
           fecha_cosecha: currentDate,
         })
         .eq("base_numero_lote", registro.base_numero_lote);
-  
+
       if (updateError) {
         console.error("Error al actualizar Lotes:", updateError);
         throw new Error(
           updateError.message || "Error desconocido al actualizar Lotes"
         );
       }
-  
+
       toast.current.show({
         severity: "success",
         summary: "Exitoso",
         detail: "Registro guardado exitosamente",
         life: 3000,
       });
-  
+
       // Limpia el estado
       setRegistro(emptyRegister);
       setRegistroDialog(false);
@@ -437,38 +436,38 @@ function ControlRendimientoCosechayFrass() {
       const diferenciaDesechadas =
         newData.cant_cajas_desechadas - oldData.cant_cajas_desechadas;
       const diferenciaTotal = diferenciaCosechadas + diferenciaDesechadas;
-  
+
       // Obtener cantidad actual del lote
       const { data: lote, error: loteError } = await supabase
         .from("Lotes")
         .select("cant_cajas_cosecha")
         .eq("base_numero_lote", oldData.base_numero_lote)
         .single();
-  
+
       if (loteError) throw loteError;
-  
+
       // Calcular nuevo valor
       const nuevasCajasCosecha = lote.cant_cajas_cosecha - diferenciaTotal;
-  
+
       if (nuevasCajasCosecha < 0) {
         throw new Error("La cantidad de cajas no puede ser negativa");
       }
-  
+
       // Verificar si hay suficientes cajas para cosechar
       if (diferenciaTotal > lote.cant_cajas_cosecha) {
         throw new Error(
           `No hay suficientes cajas para cosechar. Disponibles: ${lote.cant_cajas_cosecha}`
         );
       }
-  
+
       // Actualizar Control_Rendimiento_CosechayFrass
       const { error: updateError } = await supabase
         .from("Control_Rendimiento_CosechayFrass")
         .update(newData)
         .eq("id", newData.id);
-  
+
       if (updateError) throw updateError;
-  
+
       // Actualizar Lotes
       const { error: loteUpdateError } = await supabase
         .from("Lotes")
@@ -477,14 +476,14 @@ function ControlRendimientoCosechayFrass() {
           etapa_actual: "Cosecha",
         })
         .eq("base_numero_lote", oldData.base_numero_lote);
-  
+
       if (loteUpdateError) throw loteUpdateError;
-  
+
       // Actualizar estado local
       setRegistros((prev) =>
         prev.map((item) => (item.id === newData.id ? newData : item))
       );
-  
+
       toast.current.show({
         severity: "success",
         summary: "Éxito",
@@ -874,6 +873,7 @@ function ControlRendimientoCosechayFrass() {
             optionValue="base_numero_lote"
             placeholder="Selecciona un Número de lote"
             className="w-full md:w-14rem"
+            autoFocus
           />
           <br />
           <label htmlFor="fec_siembra" className="font-bold">
@@ -888,7 +888,7 @@ function ControlRendimientoCosechayFrass() {
             value={registro.fec_siembra}
             onChange={(e) => onInputChange(e, "fec_siembra")}
             required
-            autoFocus
+            
           />
           <br />
           <label htmlFor="fec_cosecha" className="font-bold">
@@ -903,7 +903,7 @@ function ControlRendimientoCosechayFrass() {
             value={registro.fec_cosecha}
             onChange={(e) => onInputChange(e, "fec_cosecha")}
             required
-            autoFocus
+            
           />
           <br />
           <label htmlFor="cant_cajas_cosechadas" className="font-bold">
@@ -1045,7 +1045,7 @@ function ControlRendimientoCosechayFrass() {
             value={registro.fec_almacenaje_frass}
             onChange={(e) => onInputChange(e, "fec_almacenaje_frass")}
             required
-            autoFocus
+            
           />
           <br />
           <label htmlFor="cant_sacos" className="font-bold">

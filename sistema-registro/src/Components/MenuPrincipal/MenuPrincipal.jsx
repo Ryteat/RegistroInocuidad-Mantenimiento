@@ -9,9 +9,6 @@ function MenuPrincipal() {
   const location = useLocation();
   const { departamento } = location.state || {};
 
-  // Depuración: Mostrar en consola el valor recibido
-  console.log('Departamentos recibidos:', departamento);
-
   // Función mejorada para verificar departamentos
   const hasDepartment = (requiredDepartments) => {
     try {

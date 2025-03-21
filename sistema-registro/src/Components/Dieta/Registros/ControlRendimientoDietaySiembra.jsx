@@ -96,7 +96,7 @@ function ControLRendimientoDietaySiembra() {
       const { data, error } = await supabase
         .from("Lotes")
         .select() // Si solo necesitas el campo base_numero_lote, podrías especificarlo: .select("base_numero_lote")
-        .in("etapa_actual", ["Hatchery", "Dieta", "Cosecha"]); // Filtra registros con etapa_actual igual a 'hatchery' o 'dieta'
+        .in("etapa_actual", ["DespachoHatchery", "Dieta"]); // Filtra registros con etapa_actual igual a 'hatchery' o 'dieta'
       if (error) throw error;
       setLotes(data || []); // Actualiza el estado con los datos obtenidos
     } catch (err) {
@@ -475,7 +475,6 @@ function ControLRendimientoDietaySiembra() {
         .from('Lotes')
         .update({
           cant_cajas_dieta: nuevasCajas,
-          etapa_actual: "Dieta"
         })
         .eq('base_numero_lote', oldData.base_numero_lote);
   

@@ -76,7 +76,7 @@ const ControlDespachoLabPro = () => {
       const { data, error } = await supabase
         .from("Lotes")
         .select() // Si solo necesitas el campo base_numero_lote, podrías especificarlo: .select("base_numero_lote")
-        .in("etapa_actual", ["Hatchery", "Dieta", "Cosecha"]); // Filtra registros con etapa_actual igual a 'hatchery' o 'dieta'
+        .in("etapa_actual", ["Hatchery"]); // Filtra registros con etapa_actual igual a 'hatchery' o 'dieta'
       if (error) throw error;
       setLotes(data || []); // Actualiza el estado con los datos obtenidos
     } catch (err) {
@@ -225,22 +225,19 @@ const ControlDespachoLabPro = () => {
         );
       }
       // Actualizar la tabla Lotes con la nueva etapa_actual
+      let cajasDe1X1 = registro.cant_cajas / 2;
       const { error: updateError } = await supabase
         .from("Lotes")
-        .update({ etapa_actual: "Dieta" }) // Cambia "Control de Rendimiento" por la etapa que corresponda
+        .update({
+          cant_cajas_despachoLabPro: cajasDe1X1,
+          cant_cajas_dieta: cajasDe1X1,
+          cant_cajas_despachodieta: cajasDe1X1,
+          cant_cajas_cosecha: cajasDe1X1,
+          cant_cajas_racks_salida: cajasDe1X1,
+          etapa_actual: "DespachoHatchery",
+        })
         .eq("base_numero_lote", registro.base_numero_lote);
-      if(registro.destino === "Producción"){
-        let cajasDe1X1 = registro.cant_cajas / 2;
-        const { error: updateError } = await supabase
-  .from("Lotes")
-  .update({ 
-    cant_cajas_despachoLabPro: cajasDe1X1, 
-    cant_cajas_dieta: cajasDe1X1,
-    cant_cajas_cosecha: cajasDe1X1,
-    cant_cajas_horno: cajasDe1X1,
-  })
-  .eq("base_numero_lote", registro.base_numero_lote);
-      }
+
       if (updateError) {
         console.error("Error al actualizar Lotes:", updateError);
         throw new Error(
@@ -360,24 +357,77 @@ const ControlDespachoLabPro = () => {
     return rowData.name !== "Blue Band";
   };
 
-  const onRowEditComplete = async ({ newData }) => {
+  const onRowEditComplete = async ({ newData, data: oldData }) => {
     const { id, ...updatedData } = newData;
     try {
-      const { error } = await supabase
+      // 1. Obtener datos del lote
+      const { data: lote, error: fetchError } = await supabase
+        .from("Lotes")
+        .select("etapa_actual")
+        .eq("base_numero_lote", newData.base_numero_lote)
+        .maybeSingle();
+
+      if (fetchError) throw fetchError;
+      if (!lote) throw new Error("Lote no encontrado");
+
+      // 2. Validar etapa
+      if (lote.etapa_actual !== "DespachoHatchery") {
+        throw new Error("Solo se puede editar en etapa 'DespachoHatchery'.");
+      }
+
+      // 3. Calcular NUEVAS CAJAS (¡ESTE ERA EL ERROR!)
+      const nuevasCajas = newData.cant_cajas / 2; // Dividir directamente el nuevo valor
+      
+      if (nuevasCajas < 0) {
+        throw new Error("La cantidad de cajas no puede ser negativa.");
+      }
+
+      // 4. Actualizar tablas
+      const { error: updateError } = await supabase
+        .from("Lotes")
+        .update({
+          cant_cajas_despachoLabPro: nuevasCajas,
+          cant_cajas_dieta: nuevasCajas,
+          cant_cajas_despachodieta: nuevasCajas,
+          cant_cajas_cosecha: nuevasCajas,
+          cant_cajas_racks_salida: nuevasCajas,
+        })
+        .eq("base_numero_lote", newData.base_numero_lote);
+
+      if (updateError) throw updateError;
+
+      // 5. Actualizar tabla de control
+      const { error: controlError } = await supabase
         .from("Control_Despacho_5dols_LabPro")
         .update(updatedData)
         .eq("id", id);
 
-      if (error) return console.error("Error al actualizar:", error.message);
+      if (controlError) throw controlError;
 
+      // 6. Actualizar estado local
       setRegistros((prev) =>
-        prev.map((n) => (n.id === id ? { ...n, ...newData } : n))
+        prev.map((n) => 
+          n.id === id ? { ...n, ...newData, cant_cajas: newData.cant_cajas } : n
+        )
       );
-    } catch (err) {
-      console.error("Error inesperado:", err);
-    }
-  };
 
+      toast.current.show({
+        severity: "success",
+        summary: "Actualizado",
+        detail: "¡Cajas convertidas a 1x1 correctamente!",
+        life: 3000,
+      });
+
+    } catch (err) {
+      console.error("Error:", err);
+      toast.current.show({
+        severity: "error",
+        summary: "Error",
+        detail: err.message || "Error al procesar la solicitud",
+        life: 3000,
+      });
+    }
+};
   const onInputChange = (e, name) => {
     let val = e.target.value;
     let _registro = { ...registro };
@@ -906,7 +956,7 @@ const ControlDespachoLabPro = () => {
             onChange={(e) => onInputChange(e, "destino")}
             placeholder="Selecciona un destino"
             required
-            />
+          />
         </div>
 
         <div className="field">

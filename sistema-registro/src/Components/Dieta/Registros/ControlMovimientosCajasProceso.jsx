@@ -28,6 +28,8 @@ const RecepcionMateriasPrimas = () => {
     fecha_registro: "",
     hora_registro: "",
     observaciones: "",
+    cant_cajas_despachodieta: 0,
+    _originalCajas: 0, // Nuevo campo para almacenar el valor original
   };
   const [registros, setRegistros] = useState([]);
   const [registro, setRegistro] = useState(emptyRegister);
@@ -38,6 +40,13 @@ const RecepcionMateriasPrimas = () => {
   const [submitted, setSubmitted] = useState(false);
   const [registroDialog, setRegistroDialog] = useState(false);
   const navigate = useNavigate();
+  const [lotes, setLotes] = useState([]);
+
+  const [observacionesObligatorio, setObservacionesObligatorio] =
+    useState(false);
+  const [erroresValidacion, setErroresValidacion] = useState({
+    total_cajas: false,
+  });
 
   const tipoDieta = ["Producción", "Reproducción"];
 
@@ -56,9 +65,22 @@ const RecepcionMateriasPrimas = () => {
       console.log("Error en la conexión a la base de datos");
     }
   };
+  const fetchLotes = async () => {
+    try {
+      const { data, error } = await supabase
+        .from("Lotes")
+        .select() // Si solo necesitas el campo base_numero_lote, podrías especificarlo: .select("base_numero_lote")
+        .in("etapa_actual", ["Dieta"]); // Filtra registros con etapa_actual igual a 'hatchery' o 'dieta'
+      if (error) throw error;
+      setLotes(data || []); // Actualiza el estado con los datos obtenidos
+    } catch (err) {
+      console.log("Error en la conexión a la base de datos Lotes", err);
+    }
+  };
 
   useEffect(() => {
     fetchRegistros();
+    fetchLotes();
   }, []);
 
   const formatDateTime = (date, format = "DD-MM-YYYY hh:mm A") => {
@@ -84,6 +106,21 @@ const RecepcionMateriasPrimas = () => {
 
   const saveRegistro = async () => {
     setSubmitted(true);
+    function isInvalid(value, min, max) {
+      return value < min || value > max;
+    }
+
+    const isTotalCajasInvalido = isInvalid(
+      registro.total_cajas,
+      0,
+      registro.cant_cajas_despachodieta
+    );
+
+    setErroresValidacion({
+      total_cajas: isTotalCajasInvalido,
+    });
+
+    const valoresFueraDeRango = isTotalCajasInvalido;
     if (
       !registro.coordinador_planta ||
       !registro.tipo_dieta ||
@@ -99,14 +136,68 @@ const RecepcionMateriasPrimas = () => {
       });
       return;
     }
+    if (
+      registro.cajas_procesadas_neonatos > registro.cant_cajas_despachodieta
+    ) {
+      toast.current.show({
+        severity: "error",
+        summary: "Error",
+        detail: `No puedes procesar más cajas (${registro.cajas_procesadas_neonatos}) de las disponibles en el lote (${registro.cant_cajas_despachodieta})`,
+        life: 3000,
+      });
+      return;
+    }
+
+    // Validación principal
+    if (valoresFueraDeRango && !registro.observaciones) {
+      setObservacionesObligatorio(true);
+      const currentErrores = {
+        "Total Cajas": isTotalCajasInvalido,
+      };
+
+      toast.current.show({
+        severity: "error",
+        summary: "Error",
+        detail: `Debe agregar observaciones. Campos inválidos: ${Object.keys(
+          currentErrores
+        )
+          .filter((k) => currentErrores[k])
+          .join(", ")}`,
+        life: 3000,
+      });
+      return;
+    }
+
+    setObservacionesObligatorio(false);
+    setErroresValidacion({
+      total_cajas: false,
+    });
+
     try {
       const currentDate = formatDateTime(new Date(), "DD/MM/YYYY"); // Fecha actual
       const currentTime = formatDateTime(new Date(), "hh:mm A"); // Hora actual
 
+      // Verificar si el lote seleccionado existe
+      const { data: loteExistente, error: loteError } = await supabase
+        .from("Lotes")
+        .select("base_numero_lote")
+        .eq("base_numero_lote", registro.base_numero_lote)
+        .single();
+
+      if (loteError || !loteExistente) {
+        toast.current.show({
+          severity: "error",
+          summary: "Error",
+          detail: `El lote ${registro.base_numero_lote} no existe.`,
+          life: 3000,
+        });
+        return;
+      }
       const { data, error } = await supabase
         .from("Control_Movimiento_Cajas_Proceso")
         .insert([
           {
+            base_numero_lote: registro.base_numero_lote,
             coordinador_planta: registro.coordinador_planta,
             tipo_dieta: registro.tipo_dieta,
             cantidad_tarimas: registro.cantidad_tarimas,
@@ -123,12 +214,36 @@ const RecepcionMateriasPrimas = () => {
           error.message || "Error desconocido al guardar en Supabase"
         );
       }
+
+      // Actualizar la tabla Lotes con la nueva etapa_actual
+      const nuevasCajas =
+        registro.cant_cajas_despachodieta - registro.total_cajas;
+
+      // Actualizar la tabla Lotes con la nueva etapa_actual
+      if (registro.tipo_dieta === "Producción") {
+        const { error: updateError } = await supabase
+          .from("Lotes")
+          .update({
+            cant_cajas_horno: registro.total_cajas,
+            cant_cajas_despachodieta: nuevasCajas,
+            etapa_actual: "DespachoDieta",
+          })
+          .eq("base_numero_lote", registro.base_numero_lote);
+      
+      if (updateError) {
+        console.error("Error al actualizar Lotes:", updateError);
+        throw new Error(
+          updateError.message || "Error desconocido al actualizar Lotes"
+        );
+      }
+    }
       toast.current.show({
         severity: "success",
         summary: "Exitoso",
         detail: "Registro creado correctamente",
         life: 3000,
       });
+
       setRegistro(emptyRegister);
       setRegistroDialog(false);
       setSubmitted(false);
@@ -236,21 +351,57 @@ const RecepcionMateriasPrimas = () => {
     return rowData.name !== "Blue Band";
   };
 
-  const onRowEditComplete = async ({ newData }) => {
-    const { id, ...updatedData } = newData;
+  const onRowEditComplete = async ({ newData, data: oldData }) => {
     try {
-      const { error } = await supabase
+      // 1. Calcular diferencia de cajas
+      const diferencia =
+        newData.cajas_procesadas_neonatos - oldData.cajas_procesadas_neonatos;
+
+      // 2. Obtener lote actual
+      const { data: lote, error: loteError } = await supabase
+        .from("Lotes")
+        .select("cant_cajas_despachodieta")
+        .eq("base_numero_lote", oldData.base_numero_lote)
+        .single();
+
+      if (loteError) throw loteError;
+
+      // 3. Calcular nuevo valor
+      const nuevasCajas = lote.cant_cajas_despachodieta - diferencia;
+
+      if (nuevasCajas < 0) {
+        throw new Error("Cantidad de cajas no puede ser negativa");
+      }
+
+      // 4. Actualizar Control_Rendimiento_DietaySiembra
+      const { error: updateError } = await supabase
         .from("Control_Movimiento_Cajas_Proceso")
-        .update(updatedData)
-        .eq("id", id);
+        .update(newData)
+        .eq("id", newData.id);
 
-      if (error) return console.error("Error al actualizar:", error.message);
+      if (updateError) throw updateError;
 
+      // 5. Actualizar Lotes
+      const { error: loteUpdateError } = await supabase
+        .from("Lotes")
+        .update({
+          cant_cajas_despachodieta: nuevasCajas,
+        })
+        .eq("base_numero_lote", oldData.base_numero_lote);
+
+      if (loteUpdateError) throw loteUpdateError;
+
+      // 6. Actualizar estado local
       setRegistros((prev) =>
-        prev.map((n) => (n.id === id ? { ...n, ...newData } : n))
+        prev.map((item) => (item.id === newData.id ? newData : item))
       );
-    } catch (err) {
-      console.error("Error inesperado:", err);
+    } catch (error) {
+      toast.current.show({
+        severity: "error",
+        summary: "Error en edición",
+        detail: error.message || "Error al actualizar el registro",
+        life: 3000,
+      });
     }
   };
 
@@ -327,6 +478,7 @@ const RecepcionMateriasPrimas = () => {
   );
 
   const cols = [
+    { field: "base_numero_lote", header: "Número Lote" },
     { field: "coordinador_planta", header: "Coordinador de Planta" },
     { field: "tipo_dieta", header: "Tipo de Dieta" },
     { field: "cantidad_tarimas", header: "Cantidad de Tarimas" },
@@ -474,7 +626,7 @@ const RecepcionMateriasPrimas = () => {
             right={rightToolbarTemplate}
           ></Toolbar>
           <DataTable
-          showGridlines
+            showGridlines
             editMode="row"
             onRowEditComplete={onRowEditComplete}
             ref={dt}
@@ -490,6 +642,12 @@ const RecepcionMateriasPrimas = () => {
             currentPageReportTemplate="Mostrando del {first} al {last} de {totalRecords} Registros"
           >
             <Column selectionMode="multiple" exportable={false}></Column>
+            <Column
+              field="numero_lote"
+              header="Número Lote"
+              sortable
+              style={{ minWidth: "10rem" }}
+            ></Column>
             <Column
               field="coordinador_planta"
               header="Coordinador de Planta"
@@ -523,14 +681,8 @@ const RecepcionMateriasPrimas = () => {
               header="Responsable"
               editor={(options) => textEditor(options)}
             ></Column>
-            <Column
-              field="fecha_registro"
-              header="Fecha de Registro"
-            ></Column>
-            <Column
-              field="hora_registro"
-              header="Hora de Registro"
-            ></Column>
+            <Column field="fecha_registro" header="Fecha de Registro"></Column>
+            <Column field="hora_registro" header="Hora de Registro"></Column>
             <Column
               field="observaciones"
               header="Observaciones"
@@ -556,6 +708,42 @@ const RecepcionMateriasPrimas = () => {
         onHide={hideDialog}
       >
         <div className="field">
+          <label htmlFor="base_numero_lote" className="font-bold">
+            Número de lote{" "}
+            {submitted && !registro.base_numero_lote && (
+              <small className="p-error">Requerido.</small>
+            )}
+          </label>
+
+          <Dropdown
+            value={registro.base_numero_lote}
+            onChange={async (e) => {
+              const loteSeleccionado = lotes.find(
+                (l) => l.base_numero_lote === e.value
+              );
+
+              if (loteSeleccionado) {
+                const { data: loteActual, error } = await supabase
+                  .from("Lotes")
+                  .select("cant_cajas_despachodieta")
+                  .eq("base_numero_lote", e.value)
+                  .single();
+
+                if (!error && loteActual) {
+                  setRegistro({
+                    ...registro,
+                    base_numero_lote: e.value, // Usar e.value en lugar del objeto completo
+                    cant_cajas_despachodieta:
+                      loteActual.cant_cajas_despachodieta || 0,
+                  });
+                }
+              }
+            }}
+            options={lotes.map((l) => l.base_numero_lote)} // Pasar solo los valores
+            placeholder="Selecciona un Número de lote"
+            className="w-full md:w-14rem"
+          />
+          <br />
           <label htmlFor="coordinador_planta" className="font-bold">
             Coordinador Planta{" "}
             {submitted && !registro.coordinador_planta && (
@@ -602,9 +790,14 @@ const RecepcionMateriasPrimas = () => {
           <br />
 
           <label htmlFor="total_cajas" className="font-bold">
-            Total Cajas{" "}
+            Cajas Totales (0 - {registro.cant_cajas_despachodieta}){" "}
             {submitted && !registro.total_cajas && (
               <small className="p-error">Requerido.</small>
+            )}
+            {erroresValidacion.total_cajas && (
+              <small className="p-error">
+                {`Cantidad Total Cajas debe de ser entre 0 y ${registro.cant_cajas_despachodieta}`}
+              </small>
             )}
           </label>
           <InputText
@@ -631,6 +824,9 @@ const RecepcionMateriasPrimas = () => {
 
           <label htmlFor="observaciones" className="font-bold">
             Observaciones{" "}
+            {observacionesObligatorio && (
+              <small className="p-error">Requerido por fuera de rango.</small>
+            )}
           </label>
           <InputText
             id="observaciones"
