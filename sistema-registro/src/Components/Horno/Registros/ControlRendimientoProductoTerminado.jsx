@@ -185,6 +185,7 @@ const ControlRendimientoProductoTerminado = () => {
   useEffect(() => {
     fetchRegistros(lazyParams.first, lazyParams.rows);
     fetchLotes();
+    fetchSKU();
   }, [
     fetchRegistros,
     lazyParams.first,
