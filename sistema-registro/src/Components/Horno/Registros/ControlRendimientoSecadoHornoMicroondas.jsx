@@ -1,4 +1,10 @@
-import React, { useEffect, useState, useRef } from "react";
+import React, {
+  useEffect,
+  useState,
+  useRef,
+  useCallback,
+  useMemo,
+} from "react";
 import { useNavigate } from "react-router-dom";
 import "./ControlRendimientoSecadoHornoMicroondas.css"; // Importa el CSS
 import supabase from "../../../supabaseClient";
@@ -45,7 +51,7 @@ function ControlRendimientoSecadoHornoMultilevel() {
   const toast = useRef(null);
   const dt = useRef(null);
   const [selectedRegistros, setSelectedRegistros] = useState([]);
-  const [globalFilter, setGlobalFilter] = useState(null);
+  const [globalFilter, setGlobalFilter] = useState("");
   const [submitted, setSubmitted] = useState(false);
   const [registroDialog, setRegistroDialog] = useState(false);
   const navigate = useNavigate();
@@ -60,39 +66,124 @@ function ControlRendimientoSecadoHornoMultilevel() {
     //no tiene rangos
   });
 
-  const convertirFecha = (fecha) =>
-    fecha ? fecha.split("-").reverse().join("/") : "";
+  // Nuevos estados para lazy loading
+  const [loading, setLoading] = useState(false);
+  const [totalRecords, setTotalRecords] = useState(0);
+  const [lazyParams, setLazyParams] = useState({
+    first: 0,
+    rows: 10,
+    page: 1,
+    sortField: null,
+    sortOrder: null,
+    filters: {},
+    globalFilter: null,
+  });
 
-  const fetchRegistros = async () => {
-    try {
-      const { data, error } = await supabase
-        .from("Control_Rendimiento_Secado_Horno_Microondas")
-        .select();
-      if (data) {
-        setRegistros(data);
+  //Inicio de Sorting y Filtro global por lazy load
+  // Manejar sorting
+  const onSort = useCallback((event) => {
+    setLazyParams((prev) => ({
+      ...prev,
+      sortField: event.sortField,
+      sortOrder: event.sortOrder,
+    }));
+  }, []);
+
+  // Manejar filtro global
+  const onFilter = useCallback((e) => {
+    const value = e.target.value;
+    setGlobalFilter(value);
+    setLazyParams((prev) => ({
+      ...prev,
+      globalFilter: value,
+      first: 0,
+    }));
+  }, []);
+  //FIN de Sorting y Filtro global por lazy load
+
+  const fetchRegistros = useCallback(
+    async (start = 0, limit = 10) => {
+      setLoading(true);
+      try {
+        let query = supabase
+          .from("Control_Rendimiento_Secado_Horno_Microondas")
+          .select("*", { count: "exact" })
+          .range(start, start + limit - 1);
+        // Ordenar por defecto por fecha descendente (más nuevos primero)
+        // .order("fec_registro", { ascending: false });
+
+        // Aplicar sorting
+        if (lazyParams.sortField) {
+          query = query.order(lazyParams.sortField, {
+            ascending: lazyParams.sortOrder === 1,
+          });
+        }
+
+        // Aplicar filtro global
+        if (lazyParams.globalFilter) {
+          query = query.or(
+            `numero_lote.ilike.%${lazyParams.globalFilter}%,fec_registro.ilike.%${lazyParams.globalFilter}%`
+          );
+        }
+
+        const { data, error, count } = await query;
+
+        if (error) throw error;
+        setRegistros(data || []);
+        setTotalRecords(count || 0);
+      } catch (err) {
+        console.error(
+          "Error en la conexión a la base de datos Secado Horno Multilevel",
+          err
+        );
+      } finally {
+        setLoading(false);
       }
-    } catch {
-      console.log("Error en la conexión a la base de datos");
-    }
-  };
-  const fetchLotes = async () => {
+    },
+    [lazyParams.sortField, lazyParams.sortOrder, lazyParams.globalFilter]
+  );
+  const fetchLotes = useCallback(async () => {
     try {
       const { data, error } = await supabase
         .from("Lotes")
         .select()
-        .ilike('etapa_actual', '%Horno%', '%ProductoTerminado%'); // Busca "Horno" en cualquier posición del string
-        
+        .ilike("etapa_actual", "%Horno%", "%ProductoTerminado%")
+        .order("fecha_registro", { ascending: false }); // Busca "Horno" en cualquier posición del string
+
       if (error) throw error;
-      setLotes(data || []);s
+      setLotes(data || []);
     } catch (err) {
       console.log("Error en la conexión a la base de datos Lotes", err);
     }
-  };
+  }, []);
 
   useEffect(() => {
-    fetchRegistros();
+    fetchRegistros(lazyParams.first, lazyParams.rows);
     fetchLotes();
-  }, []);
+  }, [
+    fetchRegistros,
+    lazyParams.first,
+    lazyParams.rows,
+    lazyParams.sortField,
+    lazyParams.sortOrder,
+    lazyParams.globalFilter,
+  ]);
+
+  // Manejar cambio de página y lazy loading
+  const onPage = useCallback(
+    (event) => {
+      setLazyParams({
+        ...lazyParams,
+        first: event.first,
+        rows: event.rows,
+        page: event.page + 1,
+      });
+    },
+    [lazyParams]
+  );
+
+  const convertirFecha = (fecha) =>
+    fecha ? fecha.split("-").reverse().join("/") : "";
 
   const formatDateTime = (date, format = "DD-MM-YYYY hh:mm A") => {
     const fmt = new Intl.DateTimeFormat("en-US", {
@@ -115,8 +206,8 @@ function ControlRendimientoSecadoHornoMultilevel() {
       .replace("A", fmt.dayPeriod || "AM");
   };
 
-  const saveRegistro = async () => {
-    console.log(registro.cant_cajas_horno)
+  const saveRegistro = useCallback(async () => {
+    console.log(registro.cant_cajas_horno);
     setSubmitted(true);
 
     function isInvalid(value, min, max) {
@@ -166,22 +257,22 @@ function ControlRendimientoSecadoHornoMultilevel() {
       const currentDate = formatDateTime(new Date(), "DD/MM/YYYY");
       const currentTime = formatDateTime(new Date(), "hh:mm A");
 
-     // Verificar si el lote seleccionado existe
-     const { data: loteExistente, error: loteError } = await supabase
-     .from("Lotes")
-     .select("base_numero_lote")
-     .eq("base_numero_lote", registro.base_numero_lote)
-     .single();
+      // Verificar si el lote seleccionado existe
+      const { data: loteExistente, error: loteError } = await supabase
+        .from("Lotes")
+        .select("base_numero_lote")
+        .eq("base_numero_lote", registro.base_numero_lote)
+        .single();
 
-   if (loteError || !loteExistente) {
-     toast.current.show({
-       severity: "error",
-       summary: "Error",
-       detail: `El lote ${registro.base_numero_lote} no existe.`,
-       life: 3000,
-     });
-     return;
-   }
+      if (loteError || !loteExistente) {
+        toast.current.show({
+          severity: "error",
+          summary: "Error",
+          detail: `El lote ${registro.base_numero_lote} no existe.`,
+          life: 3000,
+        });
+        return;
+      }
       const { data, error } = await supabase
         .from("Control_Rendimiento_Secado_Horno_Microondas")
         .insert([
@@ -214,38 +305,38 @@ function ControlRendimientoSecadoHornoMultilevel() {
       }
       // Actualizar la tabla Lotes con la nueva etapa_actual
       const nuevasCajas = registro.cant_cajas_horno - registro.cajas_totales;
-  
-       // Actualizar Lotes
-    let nuevasEtapas = [...registro.etapas_actualizar];
-    
-    if (registro.ingresoysalida === "Salida") {
-      // Agregar Producto Terminado si no existe
-      if (!nuevasEtapas.includes("Producto Terminado")) {
-        nuevasEtapas.push("Producto Terminado");
-      }
-    }
 
-    const { error: updateError } = await supabase
-      .from("Lotes")
-      .update({
-        cant_cajas_horno: nuevasCajas,
-        etapa_actual: nuevasEtapas.join(", "), // Unir todas las etapas
+      // Actualizar Lotes
+      let nuevasEtapas = [...registro.etapas_actualizar];
+
+      if (registro.ingresoysalida === "Salida") {
+        // Agregar Producto Terminado si no existe
+        if (!nuevasEtapas.includes("Producto Terminado")) {
+          nuevasEtapas.push("Producto Terminado");
+        }
+      }
+
+      const { error: updateError } = await supabase
+        .from("Lotes")
+        .update({
+          cant_cajas_horno: nuevasCajas,
+          etapa_actual: nuevasEtapas.join(", "), // Unir todas las etapas
           fecha_horneado: currentDate,
         })
         .eq("base_numero_lote", registro.base_numero_lote);
-  
+
       if (updateError) {
         console.error("Error actualizando lote:", updateError);
         throw new Error("Error al actualizar información del lote");
       }
-  
+
       toast.current.show({
         severity: "success",
         summary: "Exitoso",
         detail: "Registro creado correctamente",
         life: 3000,
       });
-  
+
       setRegistro(emptyRegister);
       setRegistroDialog(false);
       setSubmitted(false);
@@ -258,7 +349,7 @@ function ControlRendimientoSecadoHornoMultilevel() {
         life: 3000,
       });
     }
-  };
+  }, [registro, lotes, convertirFecha]);
 
   const dateEditor = (options) => {
     const convertToInputFormat = (date) => {
@@ -332,53 +423,52 @@ function ControlRendimientoSecadoHornoMultilevel() {
     try {
       // 1. Calcular diferencia de cajas
       const diferencia = newData.cajas_totales - oldData.cajas_totales;
-      
+
       // 2. Obtener lote actual
       const { data: lote, error: loteError } = await supabase
-        .from('Lotes')
-        .select('cant_cajas_horno')
-        .eq('base_numero_lote', oldData.base_numero_lote)
+        .from("Lotes")
+        .select("cant_cajas_horno")
+        .eq("base_numero_lote", oldData.base_numero_lote)
         .single();
-  
+
       if (loteError) throw loteError;
-  
+
       // 3. Calcular nuevo valor
       const nuevasCajas = lote.cant_cajas_horno - diferencia;
-      
+
       if (nuevasCajas < 0) {
-        throw new Error('Cantidad de cajas no puede ser negativa');
+        throw new Error("Cantidad de cajas no puede ser negativa");
       }
-  
+
       // 4. Actualizar Control_Rendimiento_DietaySiembra
       const { error: updateError } = await supabase
-        .from('Control_Rendimiento_Secado_Horno_Multilevel')
+        .from("Control_Rendimiento_Secado_Horno_Multilevel")
         .update(newData)
-        .eq('id', newData.id);
-  
+        .eq("id", newData.id);
+
       if (updateError) throw updateError;
-  
+
       // 5. Actualizar Lotes
       const { error: loteUpdateError } = await supabase
-        .from('Lotes')
+        .from("Lotes")
         .update({
           cant_cajas_horno: nuevasCajas,
-          etapa_actual: "HornoMic"
+          etapa_actual: "HornoMic",
         })
-        .eq('base_numero_lote', oldData.base_numero_lote);
-  
+        .eq("base_numero_lote", oldData.base_numero_lote);
+
       if (loteUpdateError) throw loteUpdateError;
-  
+
       // 6. Actualizar estado local
-      setRegistros(prev => prev.map(item => 
-        item.id === newData.id ? newData : item
-      ));
-  
+      setRegistros((prev) =>
+        prev.map((item) => (item.id === newData.id ? newData : item))
+      );
     } catch (error) {
       toast.current.show({
-        severity: 'error',
-        summary: 'Error en edición',
-        detail: error.message || 'Error al actualizar el registro',
-        life: 3000
+        severity: "error",
+        summary: "Error en edición",
+        detail: error.message || "Error al actualizar el registro",
+        life: 3000,
       });
     }
   };
@@ -426,8 +516,9 @@ function ControlRendimientoSecadoHornoMultilevel() {
     <div className="flex flex-wrap gap-2 align-items-center justify-content-between">
       <InputText
         type="search"
-        onInput={(e) => setGlobalFilter(e.target.value)}
-        placeholder="Buscador Global..."
+        value={globalFilter}
+        onInput={onFilter}
+        placeholder="Buscar por Lote u Fecha de Registro"
       />
     </div>
   );
@@ -615,16 +706,24 @@ function ControlRendimientoSecadoHornoMultilevel() {
             right={rightToolbarTemplate}
           ></Toolbar>
           <DataTable
+            ref={dt}
+            onSort={onSort}
+            sortField={lazyParams.sortField}
+            sortOrder={lazyParams.sortOrder}
+            lazy
+            first={lazyParams.first}
+            rows={lazyParams.rows}
+            totalRecords={totalRecords}
+            onPage={onPage}
+            loading={loading}
             editMode="row"
             onRowEditComplete={onRowEditComplete}
-            ref={dt}
             value={registros}
             selection={selectedRegistros}
             onSelectionChange={(e) => setSelectedRegistros(e.value)}
             globalFilter={globalFilter}
             header={header}
             paginator
-            rows={10}
             rowsPerPageOptions={[5, 10, 25]}
             paginatorTemplate="FirstPageLink PrevPageLink PageLinks NextPageLink LastPageLink CurrentPageReport RowsPerPageDropdown"
             currentPageReportTemplate="Mostrando del {first} al {last} de {totalRecords} Registros"
@@ -749,7 +848,7 @@ function ControlRendimientoSecadoHornoMultilevel() {
         onHide={hideDialog}
       >
         <div className="field">
-        <label htmlFor="base_numero_lote" className="font-bold">
+          <label htmlFor="base_numero_lote" className="font-bold">
             Número de lote{" "}
             {submitted && !registro.base_numero_lote && (
               <small className="p-error">Requerido.</small>

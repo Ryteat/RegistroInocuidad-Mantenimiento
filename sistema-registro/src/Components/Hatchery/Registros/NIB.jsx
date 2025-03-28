@@ -1,4 +1,10 @@
-import React, { useEffect, useState, useRef } from "react";
+import React, {
+  useEffect,
+  useState,
+  useRef,
+  useCallback,
+  useMemo,
+} from "react";
 import { useNavigate } from "react-router-dom";
 
 //Imports de estilos
@@ -28,11 +34,11 @@ import { Dropdown } from "primereact/dropdown";
 import * as XLSX from "xlsx";
 import jsPDF from "jspdf";
 import "jspdf-autotable";
+import { Document, Paragraph, TextRun, HeadingLevel, Packer } from "docx";
 
 function NIB() {
   //Variable de registro vacio
   let emptyRegister = {
-    id: null,
     base_numero_lote: "",
     numero_lote: "",
     embudo: "",
@@ -46,85 +52,449 @@ function NIB() {
     fec_colecta: "",
     hor_colecta: "",
     observaciones: "",
+    fec_registro: "",
+    hor_registro: "",
   };
 
-  const embudos = [
-    { name: "1", value: "1" },
-    { name: "2", value: "2" },
-    { name: "3", value: "3" },
-    { name: "4", value: "4" },
-    { name: "5", value: "5" },
-    { name: "6", value: "6" },
-    { name: "7", value: "7" },
-    { name: "8", value: "8" },
-    { name: "9", value: "9" },
-    { name: "10", value: "10" },
+  //Variables de los embudos actuales del 1 al 10
+  const embudos = Array.from({ length: 10 }, (_, i) => ({
+    name: `${i + 1}`,
+    value: `${i + 1}`,
+  }));
+
+  //Columnas que va a tener la tabla y se utilza para imprimir el PDF y el Excel
+  const cols = [
+    { header: "Número Lote", field: "numero_lote" },
+    { header: "Fecha y Hora Colecta", field: "registrado" },
+    { header: "# Embudo", field: "embudo" },
+    { header: "g Colectados", field: "gm_colectados" },
+    { header: "Cajas Inoculadas / Destino", field: "cajas_inoculadas_destino" },
+    { header: "g Neonato x Caja", field: "gm_neonato_caja" },
+    { header: "Cantidad dieta x caja", field: "cantidad_dieta_caja" },
+    { header: "Temperatura ambiental (°C)", field: "temp_ambiental" },
+    { header: "Humedad ambiental (%)", field: "hum_ambiental" },
+    { header: "Operario", field: "operario" },
+    { header: "Observaciones", field: "observaciones" },
+    { header: "Fecha Registro", field: "fec_registro" },
+    { header: "Hora Registro", field: "hor_registro" },
   ];
+
+  const toast = useRef(null);
+  const dt = useRef(null);
+  const navigate = useNavigate();
 
   const [registros, setRegistros] = useState([]);
   const [registro, setRegistro] = useState(emptyRegister);
-  const toast = useRef(null);
-  const dt = useRef(null);
   const [selectedRegistros, setSelectedRegistros] = useState([]);
-  const [globalFilter, setGlobalFilter] = useState(null);
+  const [lotes, setLotes] = useState([]);
+
+  const [globalFilter, setGlobalFilter] = useState("");
+
   const [submitted, setSubmitted] = useState(false);
   const [registroDialog, setRegistroDialog] = useState(false);
-  const navigate = useNavigate();
-  //Errores de validación
+
   const [observacionesObligatorio, setObservacionesObligatorio] =
     useState(false);
-
   const [erroresValidacion, setErroresValidacion] = useState({
     embudo: false,
     gm_colectados: false,
     cajas_inoculadas_destino: false,
   });
 
-  //Lote Variables
-  const [lotes, setLotes] = useState([]); // Estado para almacenar los lotes disponibles
-  // const [lote_id, setLote_id] = useState(false); // Estado para almacenar si es un nuevo lote
+  // Nuevos estados para lazy loading
+  const [loading, setLoading] = useState(false);
+  const [totalRecords, setTotalRecords] = useState(0);
+  const [lazyParams, setLazyParams] = useState({
+    first: 0,
+    rows: 10,
+    page: 1,
+    sortField: null,
+    sortOrder: null,
+    filters: {},
+    globalFilter: null,
+  });
 
-  //Inicio de FETCH REGISTROS
-  const fetchNeonatos = async () => {
-    try {
-      const { data, error } = await supabase
-        .from("Neonatos_Inoculados")
-        .select();
-      if (error) throw error; // Si hay un error, lanzamos una excepción
-      setRegistros(data || []); // Guardamos los datos obtenidos en el estado
-    } catch (err) {
-      console.log("Error en la conexión a la base de datos NIB", err);
+  //Inicio de IMPRIMIR TICKET
+  // Dentro de tu componente NIB
+  const [impresionDialog, setImpresionDialog] = useState(false);
+  const [selectedLote, setSelectedLote] = useState(""); // Nuevo estado solo para UI
+
+  const datosImpresionRef = useRef({
+    fecha_colecta: "",
+    lote: "",
+    fecha_siembra: "",
+    cajas: "",
+    destino: "",
+  });
+
+  // Memoizar lotes
+  const opcionesLotes = useMemo(
+    () =>
+      lotes.map((lote) => ({
+        label: lote.base_numero_lote,
+        value: lote.base_numero_lote,
+      })),
+    [lotes]
+  );
+
+  // Handler de cambios optimizado
+  const handleChange = useCallback((field, value) => {
+    datosImpresionRef.current[field] = value;
+    if (field === "lote") {
+      setSelectedLote(value); // Actualiza el estado UI cuando cambia el lote
     }
-  };
+  }, []);
 
-  const fetchLotes = async () => {
+  // Resetear al cerrar
+  const handleCloseDialog = useCallback(() => {
+    setImpresionDialog(false);
+    setSelectedLote(""); // Limpiar selección
+    // Opcional: Resetear otros campos
+    datosImpresionRef.current = {
+      fecha_colecta: "",
+      lote: "",
+      fecha_siembra: "",
+      cajas: "",
+      destino: "",
+    };
+  }, []);
+
+  // Generar PDF
+  const generarWord = useCallback(async () => {
+    const datos = datosImpresionRef.current;
+
+    if (
+      !datos.lote ||
+      !datos.fecha_colecta ||
+      !datos.fecha_siembra ||
+      !datos.cajas ||
+      !datos.destino
+    ) {
+      alert("Complete los campos requeridos");
+      return;
+    }
+
+    // Crear el documento Word
+    const doc = new Document({
+      sections: [
+        {
+          properties: {},
+          children: [
+            new Paragraph({
+              children: [
+                new TextRun({
+                  text: "N.I.B",
+                  bold: true,
+                  size: 36, // Tamaño 24 para el título
+                }),
+              ],
+              alignment: "center",
+              spacing: { after: 200 }, // Mayor espacio después del título
+            }),
+            new Paragraph({
+              children: [
+                new TextRun({
+                  text: `Fecha Colecta: ${
+                    convertirFecha(datos.fecha_colecta) || "N/A"
+                  }`,
+                  size: 24, // Tamaño 12 para el contenido
+                }),
+              ],
+              alignment: "center",
+              spacing: { after: 100 },
+            }),
+            new Paragraph({
+              children: [
+                new TextRun({
+                  text: `Lote: ${datos.lote || "N/A"}`,
+                  size: 24,
+                }),
+              ],
+              alignment: "center",
+              spacing: { after: 100 },
+            }),
+            new Paragraph({
+              children: [
+                new TextRun({
+                  text: `Fecha Siembra: ${
+                    convertirFecha(datos.fecha_siembra) || "N/A"
+                  }`,
+                  size: 24,
+                }),
+              ],
+              alignment: "center",
+              spacing: { after: 100 },
+            }),
+            new Paragraph({
+              children: [
+                new TextRun({
+                  text: `Cajas: ${datos.cajas || "N/A"}`,
+                  size: 24,
+                }),
+              ],
+              alignment: "center",
+              spacing: { after: 100 },
+            }),
+            new Paragraph({
+              children: [
+                new TextRun({
+                  text: `Destino: ${datos.destino || "N/A"}`,
+                  size: 24,
+                }),
+              ],
+              alignment: "center",
+              spacing: { after: 100 },
+            }),
+          ],
+        },
+      ],
+    });
+
+    try {
+      // Generar el blob y descargar
+      const blob = await Packer.toBlob(doc);
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = `NIB_${datos.lote}.docx`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+
+      setImpresionDialog(false);
+    } catch (error) {
+      console.error("Error al generar Word:", error);
+      alert("Ocurrió un error al generar el documento");
+    }
+  }, []);
+
+  const DialogoImpresion = useMemo(
+    () => (
+      <Dialog
+        visible={impresionDialog}
+        style={{ width: "450px" }}
+        header="Generar Reporte NIB"
+        modal
+        onHide={() => setImpresionDialog(false)}
+        footer={
+          <div className="flex justify-content-end gap-2">
+            <Button
+              label="Cancelar"
+              icon="pi pi-times"
+              outlined
+              onClick={() => setImpresionDialog(false)}
+            />
+            <Button
+              label="Imprimir"
+              icon="pi pi-print"
+              onClick={generarWord}
+              severity="info"
+            />
+          </div>
+        }
+      >
+        <div className="grid p-fluid">
+          <div className="col-12 md:col-6">
+            <div className="field">
+              <label>Fecha Colecta</label>
+              <InputText
+                type="date"
+                onChange={(e) => handleChange("fecha_colecta", e.target.value)}
+              />
+            </div>
+          </div>
+
+          <div className="col-12 md:col-6">
+            <div className="field">
+              <label>Lote</label>
+              <Dropdown
+                value={selectedLote}
+                options={opcionesLotes}
+                onChange={(e) => {
+                  handleChange("lote", e.value);
+                  setSelectedLote(e.value);
+                }}
+                filter
+                virtualScrollerOptions={{ itemSize: 38 }}
+                placeholder="Seleccione un lote"
+              />
+            </div>
+          </div>
+
+          <div className="col-12 md:col-6">
+            <div className="field">
+              <label>Fecha Siembra</label>
+              <InputText
+                type="date"
+                onChange={(e) => handleChange("fecha_siembra", e.target.value)}
+              />
+            </div>
+          </div>
+
+          <div className="col-12 md:col-6">
+            <div className="field">
+              <label>Cajas</label>
+              <InputText
+                type="number"
+                onChange={(e) => handleChange("cajas", e.target.value)}
+              />
+            </div>
+          </div>
+
+          <div className="col-12 md:col-6">
+            <div className="field">
+              <label>Destino</label>
+              <InputText
+                onChange={(e) => handleChange("destino", e.target.value)}
+              />
+            </div>
+          </div>
+        </div>
+      </Dialog>
+    ),
+    [
+      impresionDialog,
+      opcionesLotes,
+      generarWord,
+      selectedLote,
+      handleCloseDialog,
+    ]
+  );
+  //FIN de IMPRIMIR TICKET
+
+  //Inicio de Sorting y Filtro global por lazy load
+  // Manejar sorting
+  const onSort = useCallback((event) => {
+    setLazyParams((prev) => ({
+      ...prev,
+      sortField: event.sortField,
+      sortOrder: event.sortOrder,
+    }));
+  }, []);
+
+  // Manejar filtro global
+  const onFilter = useCallback((e) => {
+    const value = e.target.value;
+    setGlobalFilter(value);
+    setLazyParams((prev) => ({
+      ...prev,
+      globalFilter: value,
+      first: 0,
+    }));
+  }, []);
+  //FIN de Sorting y Filtro global por lazy load
+
+  //Inicio de FETCHs REGISTROS
+  // Memoizar funciones de fetching
+  const fetchNeonatos = useCallback(
+    async (start = 0, limit = 10) => {
+      setLoading(true);
+      try {
+        let query = supabase
+          .from("Neonatos_Inoculados")
+          .select("*", { count: "exact" })
+          .range(start, start + limit - 1)
+          // Ordenar por defecto por fecha descendente (más nuevos primero)
+          // .order("fec_registro", { ascending: false });
+
+        // Aplicar sorting
+        if (lazyParams.sortField) {
+          query = query.order(lazyParams.sortField, {
+            ascending: lazyParams.sortOrder === 1,
+          });
+        }
+
+        // Aplicar filtro global
+        if (lazyParams.globalFilter) {
+          query = query.or(
+            `numero_lote.ilike.%${lazyParams.globalFilter}%,operario.ilike.%${lazyParams.globalFilter}%,fec_registro.ilike.%${lazyParams.globalFilter}%`
+          );
+        }
+
+        const { data, error, count } = await query;
+
+        if (error) throw error;
+        setRegistros(data || []);
+        setTotalRecords(count || 0);
+      } catch (err) {
+        console.error("Error en la conexión a la base de datos NIB", err);
+      } finally {
+        setLoading(false);
+      }
+    },
+    [lazyParams.sortField, lazyParams.sortOrder, lazyParams.globalFilter]
+  );
+
+  const fetchLotes = useCallback(async () => {
     try {
       const { data, error } = await supabase
         .from("Lotes")
-        .select() // Si solo necesitas el campo base_numero_lote, podrías especificarlo: .select("base_numero_lote")
-        .in("etapa_actual", ["Hatchery"]); // Filtra registros con etapa_actual igual a 'hatchery' o 'dieta'
+        .select()
+        .in("etapa_actual", ["Hatchery"])
+        .order("fecha_registro", { ascending: false });
       if (error) throw error;
-      setLotes(data || []); // Actualiza el estado con los datos obtenidos
+      setLotes(data || []);
     } catch (err) {
-      console.log("Error en la conexión a la base de datos Lotes", err);
+      console.error("Error en la conexión a la base de datos Lotes", err);
     }
-  };
-  //Fin de FETCH REGISTROS
+  }, []);
 
-  // Este useEffect se ejecuta cuando el componente se monta, para obtener los datos una vez
   useEffect(() => {
-    fetchNeonatos();
+    fetchNeonatos(lazyParams.first, lazyParams.rows);
     fetchLotes();
-  }, []); // Agrega globalFilter como dependencia
-  // El array vacío asegura que solo se ejecute una vez cuando el componente se monta
+  }, [
+    fetchNeonatos,
+    lazyParams.first,
+    lazyParams.rows,
+    lazyParams.sortField,
+    lazyParams.sortOrder,
+    lazyParams.globalFilter,
+  ]);
 
-  useEffect(() => {
-    //Si se actualiza neonatos se ejecuta el useEffect osea se imprime en consola
-  }, [registros]);
-
+  // Manejar cambio de página y lazy loading
+  const onPage = useCallback(
+    (event) => {
+      setLazyParams({
+        ...lazyParams,
+        first: event.first,
+        rows: event.rows,
+        page: event.page + 1,
+      });
+    },
+    [lazyParams]
+  );
   //Fin de FETCH REGISTROS
 
-  const saveNeonatoInoculado = async () => {
+  //Inicio de Formatear la FECHA DE REGISTRO de formato YYYY-MM-DD a DD/MM/YYYY
+  const convertirFecha = (fecha) =>
+    fecha ? fecha.split("-").reverse().join("/") : "";
+
+  // Formatear la fecha y hora para obtener actual
+  const formatDateTime = (date, format = "DD-MM-YYYY hh:mm A") => {
+    const fmt = new Intl.DateTimeFormat("en-US", {
+      day: "2-digit",
+      month: "2-digit",
+      year: "numeric",
+      hour: "2-digit",
+      minute: "2-digit",
+      hour12: true,
+    })
+      .formatToParts(date)
+      .reduce((acc, { type, value }) => ({ ...acc, [type]: value }), {});
+
+    return format
+      .replace("DD", fmt.day)
+      .replace("MM", fmt.month)
+      .replace("YYYY", fmt.year)
+      .replace("hh", fmt.hour.padStart(2, "0"))
+      .replace("mm", fmt.minute)
+      .replace("A", fmt.dayPeriod || "AM");
+  };
+  //Fin de Formatear la FECHA DE REGISTRO de formato YYYY-MM-DD a DD/MM/YYYY
+
+  //Inicio de Guardar el registro de Neonatos Inoculados
+  const saveNeonatoInoculado = useCallback(async () => {
     setSubmitted(true);
 
     // Validar los campos
@@ -281,11 +651,11 @@ function NIB() {
         );
       }
       const { error: updateError } = await supabase
-            .from("Lotes")
-            .update({
-              fecha_inoculacion: currentDate,
-            })
-            .eq("base_numero_lote", registro.base_numero_lote);
+        .from("Lotes")
+        .update({
+          fecha_inoculacion: currentDate,
+        })
+        .eq("base_numero_lote", registro.base_numero_lote);
 
       toast.current.show({
         severity: "success",
@@ -308,37 +678,10 @@ function NIB() {
         life: 3000,
       });
     }
-  };
+  }, [registro, lotes, convertirFecha]);
+  //FIN de Guardar el registro de Neonatos Inoculados
 
-  //Inicio Formatear la FECHA DE REGISTRO
-
-  const convertirFecha = (fecha) =>
-    fecha ? fecha.split("-").reverse().join("/") : "";
-
-  const formatDateTime = (date, format = "DD-MM-YYYY hh:mm A") => {
-    const fmt = new Intl.DateTimeFormat("en-US", {
-      day: "2-digit",
-      month: "2-digit",
-      year: "numeric",
-      hour: "2-digit",
-      minute: "2-digit",
-      hour12: true,
-    })
-      .formatToParts(date)
-      .reduce((acc, { type, value }) => ({ ...acc, [type]: value }), {});
-
-    return format
-      .replace("DD", fmt.day)
-      .replace("MM", fmt.month)
-      .replace("YYYY", fmt.year)
-      .replace("hh", fmt.hour.padStart(2, "0"))
-      .replace("mm", fmt.minute)
-      .replace("A", fmt.dayPeriod || "AM");
-  };
-  //Fin Formatear la FECHA DE REGISTRO
-
-  // //Inicio de EDITAR TABLA
-
+  //Inicio de EDITAR TABLA
   const dateEditor = (options) => {
     const convertToInputFormat = (date) => {
       if (!date) return "";
@@ -433,104 +776,91 @@ function NIB() {
   };
 
   const onRowEditComplete = async ({ newData }) => {
-    const { id, ...updatedData } = newData;
+    const { id, base_numero_lote, ...updatedData } = newData;
+    
     try {
+      // Verificar la etapa del lote
+      const { data: lote, error: loteError } = await supabase
+        .from('Lotes')
+        .select('etapa_actual')
+        .eq('base_numero_lote', base_numero_lote)
+        .single();
+  
+      if (loteError || !lote) {
+        toast.current.show({
+          severity: 'error',
+          summary: 'Error',
+          detail: 'No se encontró el lote asociado',
+          life: 3000
+        });
+        return;
+      }
+  
+      if (lote.etapa_actual !== 'Hatchery') {
+        toast.current.show({
+          severity: 'error',
+          summary: 'Edición bloqueada',
+          detail: 'Solo se pueden editar registros de lotes en etapa Hatchery',
+          life: 3000
+        });
+        return;
+      }
+  
+      // Si pasa la validación, realizar la actualización
       const { error } = await supabase
         .from("Neonatos_Inoculados")
         .update(updatedData)
         .eq("id", id);
-
-      if (error) return console.error("Error al actualizar:", error.message);
-
+  
+      if (error) {
+        console.error("Error al actualizar:", error.message);
+        toast.current.show({
+          severity: 'error',
+          summary: 'Error',
+          detail: 'Falló la actualización del registro',
+          life: 3000
+        });
+        return;
+      }
+  
       setRegistros((prev) =>
         prev.map((n) => (n.id === id ? { ...n, ...newData } : n))
       );
+  
+      toast.current.show({
+        severity: 'success',
+        summary: 'Éxito',
+        detail: 'Registro actualizado correctamente',
+        life: 3000
+      });
+  
     } catch (err) {
       console.error("Error inesperado:", err);
+      toast.current.show({
+        severity: 'error',
+        summary: 'Error',
+        detail: 'Ocurrió un error inesperado',
+        life: 3000
+      });
     }
   };
+  //FIN de EDITAR TABLA
 
-  const onInputChange = (e, name) => {
-    let val = e.target.value;
-    let _registro = { ...registro };
-    _registro[name] = val;
-    setRegistro(_registro);
-  };
+  //Inicio de Validaciones de los campos
+  const onInputChange = useCallback((e, name) => {
+    setRegistro((prev) => ({ ...prev, [name]: e.target.value }));
+  }, []);
+  // const onInputChange = (e, name) => {
+  //   let val = e.target.value;
+  //   let _registro = { ...registro };
+  //   _registro[name] = val;
+  //   setRegistro(_registro);
+  // };
+  //FIN de Validaciones de los campos
 
-  const leftToolbarTemplate = () => {
-    return (
-      <div className="flex flex-wrap gap-2">
-        <Button
-          label="Nuevo"
-          icon="pi pi-plus"
-          severity="success"
-          onClick={openNew}
-        />
-      </div>
-    );
-  };
-
-  const rightToolbarTemplate = () => {
-    return (
-      <div className="exportar-container flex flex-wrap gap-2">
-        <Button
-          label="Exportar a Excel"
-          icon="pi pi-upload"
-          className="p-button-help"
-          onClick={exportXlsx}
-        />
-        <Button
-          label="Exportar a PDF"
-          icon="pi pi-file-pdf"
-          className="p-button-danger"
-          onClick={exportPdf}
-        />
-      </div>
-    );
-  };
-
-  const header = (
-    <div className="flex flex-wrap gap-2 align-items-center justify-content-between">
-      <InputText
-        type="search"
-        onInput={(e) => setGlobalFilter(e.target.value)}
-        placeholder="Buscador Global..."
-      />
-    </div>
-  );
-
-  const openNew = () => {
-    setRegistro(emptyRegister);
-    setSubmitted(false);
-    setRegistroDialog(true);
-  };
-
-  const hideDialog = () => {
-    setSubmitted(false);
-    setRegistroDialog(false);
-  };
-
-  const registroDialogFooter = (
-    <React.Fragment>
-      <Button
-        label="Cancelar"
-        icon="pi pi-times"
-        outlined
-        onClick={hideDialog}
-      />
-      <Button
-        label="Guardar"
-        icon="pi pi-check"
-        onClick={saveNeonatoInoculado}
-      />
-    </React.Fragment>
-  );
-
-  //FIN DE EDITAR TABLA
 
   //Inicio de EXPORTAR TABLA
-
-  const exportPdf = () => {
+  const exportPdf = useCallback(() => {
     if (selectedRegistros.length === 0) {
       toast.current.show({
         severity: "warn",
@@ -593,9 +923,9 @@ function NIB() {
     }
 
     doc.save("Neonatos Inoculados.pdf");
-  };
+  }, [selectedRegistros]); // Añadir selectedRegistros como dependencia
 
-  const exportXlsx = () => {
+  const exportXlsx = useCallback(() => {
     if (selectedRegistros.length === 0) {
       toast.current.show({
         severity: "warn",
@@ -628,23 +958,7 @@ function NIB() {
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, "Registros");
     XLSX.writeFile(wb, "Neonatos Inoculados.xlsx");
-  };
-
-  // Columnas de la tabla para exportar
-  const cols = [
-    { header: "Número Lote", field: "numero_lote" },
-    { header: "Fecha y Hora Colecta", field: "registrado" },
-    { header: "# Embudo", field: "embudo" },
-    { header: "g Colectados", field: "gm_colectados" },
-    { header: "Cajas Inoculadas / Destino", field: "cajas_inoculadas_destino" },
-    { header: "g Neonato x Caja", field: "gm_neonato_caja" },
-    { header: "Cantidad dieta x caja", field: "cantidad_dieta_caja" },
-    { header: "Temperatura ambiental (°C)", field: "temp_ambiental" },
-    { header: "Humedad ambiental (%)", field: "hum_ambiental" },
-    { header: "Operario", field: "operario" },
-    { header: "Observaciones", field: "observaciones" },
-    { field: "registrado", header: "Registrado" },
-  ];
+  }, [selectedRegistros]); // Añadir selectedRegistros como dependencia
 
   // Mapeo de columnas para jsPDF-Autotable
   const exportColumns = cols.map((col) => ({
@@ -653,6 +967,114 @@ function NIB() {
   }));
 
   // Fin de EXPORTAR TABLA
+
+  //Inicio de Botones de la tabla
+  // Memoizar plantillas de toolbar
+  const leftToolbarTemplate = useMemo(
+    () => () =>
+      (
+        <div className="flex flex-wrap gap-2">
+          <Button
+            label="Nuevo"
+            icon="pi pi-plus"
+            severity="success"
+            onClick={openNew}
+          />
+          <Button
+            label="Imprimir NIB"
+            icon="pi pi-print"
+            severity="secondary"
+            onClick={() => setImpresionDialog(true)}
+          />
+        </div>
+      ),
+    []
+  );
+
+  const rightToolbarTemplate = useMemo(
+    () => () =>
+      (
+        <div className="exportar-container flex flex-wrap gap-2">
+          <Button
+            label="Exportar a Excel"
+            icon="pi pi-upload"
+            className="p-button-help"
+            onClick={exportXlsx}
+          />
+          <Button
+            label="Exportar a PDF"
+            icon="pi pi-file-pdf"
+            className="p-button-danger"
+            onClick={exportPdf}
+          />
+        </div>
+      ),
+    [exportPdf, exportXlsx] // Añadir las funciones como dependencias
+  );
+
+  const header = (
+    <div className="flex flex-wrap gap-2 align-items-center justify-content-between">
+      <InputText
+        type="search"
+        value={globalFilter}
+        onInput={onFilter}
+        placeholder="Buscar por Lote, Operario u Fecha de Registro"
+      />
+    </div>
+  );
+
+  const openNew = () => {
+    setRegistro(emptyRegister);
+    setSubmitted(false);
+    setRegistroDialog(true);
+  };
+
+  const hideDialog = () => {
+    setSubmitted(false);
+    setRegistroDialog(false);
+  };
+
+  const registroDialogFooter = (
+    <React.Fragment>
+      <Button
+        label="Cancelar"
+        icon="pi pi-times"
+        outlined
+        onClick={hideDialog}
+      />
+      <Button
+        label="Guardar"
+        icon="pi pi-check"
+        onClick={saveNeonatoInoculado}
+      />
+    </React.Fragment>
+  );
+  //FIN de Botones de la tabla
+
+  // Memoizar columnas de la tabla
+  const columns = useMemo(
+    () => [
+      <Column key="selection" selectionMode="multiple" exportable={false} />,
+      ...cols.map((col) => (
+        <Column
+          key={col.field}
+          field={col.field}
+          header={col.header}
+          sortable
+          style={{ minWidth: col.minWidth || "10rem" }}
+        />
+      )),
+      <Column
+        key="tools"
+        header="Herramientas"
+        rowEditor={allowEdit}
+        headerStyle={{ width: "10%", minWidth: "5rem" }}
+        bodyStyle={{ textAlign: "center" }}
+      />,
+    ],
+    []
+  );
+  //FIN de EXPORTAR TABLA
 
   return (
     <>
@@ -685,6 +1107,16 @@ function NIB() {
             right={rightToolbarTemplate}
           ></Toolbar>
           <DataTable
+            selectionMode="multiple"
+            onSort={onSort}
+            sortField={lazyParams.sortField}
+            sortOrder={lazyParams.sortOrder}
+            lazy
+            first={lazyParams.first}
+            rows={lazyParams.rows}
+            totalRecords={totalRecords}
+            onPage={onPage}
+            loading={loading}
             editMode="row"
             onRowEditComplete={onRowEditComplete}
             ref={dt}
@@ -697,7 +1129,7 @@ function NIB() {
             style={{ width: "100%" }}
             dataKey="id"
             paginator
-            rows={10}
+            // rows={10}
             rowsPerPageOptions={[5, 10, 25]}
             paginatorTemplate="FirstPageLink PrevPageLink PageLinks NextPageLink LastPageLink CurrentPageReport RowsPerPageDropdown"
             currentPageReportTemplate="Showing {first} to {last} of {totalRecords} Usuarios"
@@ -809,6 +1241,7 @@ function NIB() {
               headerStyle={{ width: "10%", minWidth: "5rem" }}
               bodyStyle={{ textAlign: "center" }}
             ></Column>
+            {/* {columns} */}
           </DataTable>
         </div>
       </div>
@@ -1003,6 +1436,8 @@ function NIB() {
           />
         </div>
       </Dialog>
+
+      {DialogoImpresion}
     </>
   );
 }

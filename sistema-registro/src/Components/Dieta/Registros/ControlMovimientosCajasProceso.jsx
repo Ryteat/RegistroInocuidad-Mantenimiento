@@ -1,4 +1,10 @@
-import React, { useEffect, useState, useRef } from "react";
+import React, {
+  useEffect,
+  useState,
+  useRef,
+  useCallback,
+  useMemo,
+} from "react";
 import { useNavigate } from "react-router-dom";
 import "./ControlMovimientosCajasProceso.css"; // Importa el CSS
 import supabase from "../../../supabaseClient";
@@ -36,7 +42,7 @@ const RecepcionMateriasPrimas = () => {
   const toast = useRef(null);
   const dt = useRef(null);
   const [selectedRegistros, setSelectedRegistros] = useState([]);
-  const [globalFilter, setGlobalFilter] = useState(null);
+  const [globalFilter, setGlobalFilter] = useState("");
   const [submitted, setSubmitted] = useState(false);
   const [registroDialog, setRegistroDialog] = useState(false);
   const navigate = useNavigate();
@@ -48,40 +54,125 @@ const RecepcionMateriasPrimas = () => {
     total_cajas: false,
   });
 
+  // Nuevos estados para lazy loading
+  const [loading, setLoading] = useState(false);
+  const [totalRecords, setTotalRecords] = useState(0);
+  const [lazyParams, setLazyParams] = useState({
+    first: 0,
+    rows: 10,
+    page: 1,
+    sortField: null,
+    sortOrder: null,
+    filters: {},
+    globalFilter: null,
+  });
+
+  //Inicio de Sorting y Filtro global por lazy load
+  // Manejar sorting
+  const onSort = useCallback((event) => {
+    setLazyParams((prev) => ({
+      ...prev,
+      sortField: event.sortField,
+      sortOrder: event.sortOrder,
+    }));
+  }, []);
+
+  // Manejar filtro global
+  const onFilter = useCallback((e) => {
+    const value = e.target.value;
+    setGlobalFilter(value);
+    setLazyParams((prev) => ({
+      ...prev,
+      globalFilter: value,
+      first: 0,
+    }));
+  }, []);
+  //FIN de Sorting y Filtro global por lazy load
+
   const tipoDieta = ["Producción", "Reproducción"];
 
-  const convertirFecha = (fecha) =>
-    fecha ? fecha.split("-").reverse().join("/") : "";
+  const fetchRegistros = useCallback(
+    async (start = 0, limit = 10) => {
+      setLoading(true);
+      try {
+        let query = supabase
+          .from("Control_Movimiento_Cajas_Proceso")
+          .select("*", { count: "exact" })
+          .range(start, start + limit - 1);
+        // Ordenar por defecto por fecha descendente (más nuevos primero)
+        // .order("fec_registro", { ascending: false });
 
-  const fetchRegistros = async () => {
-    try {
-      const { data, error } = await supabase
-        .from("Control_Movimiento_Cajas_Proceso")
-        .select();
-      if (data) {
-        setRegistros(data);
+        // Aplicar sorting
+        if (lazyParams.sortField) {
+          query = query.order(lazyParams.sortField, {
+            ascending: lazyParams.sortOrder === 1,
+          });
+        }
+
+        // Aplicar filtro global
+        if (lazyParams.globalFilter) {
+          query = query.or(
+            `numero_lote.ilike.%${lazyParams.globalFilter}%,fecha_registro.ilike.%${lazyParams.globalFilter}%`
+          );
+        }
+
+        const { data, error, count } = await query;
+
+        if (error) throw error;
+        setRegistros(data || []);
+        setTotalRecords(count || 0);
+      } catch (err) {
+        console.error(
+          "Error en la conexión a la base de datos Movimiento Cajas en Proceso",
+          err
+        );
+      } finally {
+        setLoading(false);
       }
-    } catch {
-      console.log("Error en la conexión a la base de datos");
-    }
-  };
-  const fetchLotes = async () => {
+    },
+    [lazyParams.sortField, lazyParams.sortOrder, lazyParams.globalFilter]
+  );
+  const fetchLotes = useCallback(async () => {
     try {
       const { data, error } = await supabase
         .from("Lotes")
         .select() // Si solo necesitas el campo base_numero_lote, podrías especificarlo: .select("base_numero_lote")
-        .in("etapa_actual", ["Dieta"]); // Filtra registros con etapa_actual igual a 'hatchery' o 'dieta'
+        .in("etapa_actual", ["Dieta"]) // Filtra registros con etapa_actual igual a 'hatchery' o 'dieta'
+        .order("fecha_registro", { ascending: false });
       if (error) throw error;
       setLotes(data || []); // Actualiza el estado con los datos obtenidos
     } catch (err) {
       console.log("Error en la conexión a la base de datos Lotes", err);
     }
-  };
+  }, []);
 
   useEffect(() => {
-    fetchRegistros();
+    fetchRegistros(lazyParams.first, lazyParams.rows);
     fetchLotes();
-  }, []);
+  }, [
+    fetchRegistros,
+    lazyParams.first,
+    lazyParams.rows,
+    lazyParams.sortField,
+    lazyParams.sortOrder,
+    lazyParams.globalFilter,
+  ]);
+
+  // Manejar cambio de página y lazy loading
+  const onPage = useCallback(
+    (event) => {
+      setLazyParams({
+        ...lazyParams,
+        first: event.first,
+        rows: event.rows,
+        page: event.page + 1,
+      });
+    },
+    [lazyParams]
+  );
+
+  const convertirFecha = (fecha) =>
+    fecha ? fecha.split("-").reverse().join("/") : "";
 
   const formatDateTime = (date, format = "DD-MM-YYYY hh:mm A") => {
     const fmt = new Intl.DateTimeFormat("en-US", {
@@ -104,7 +195,7 @@ const RecepcionMateriasPrimas = () => {
       .replace("A", fmt.dayPeriod || "AM");
   };
 
-  const saveRegistro = async () => {
+  const saveRegistro = useCallback(async () => {
     setSubmitted(true);
     function isInvalid(value, min, max) {
       return value < min || value > max;
@@ -229,14 +320,14 @@ const RecepcionMateriasPrimas = () => {
             etapa_actual: "DespachoDieta",
           })
           .eq("base_numero_lote", registro.base_numero_lote);
-      
-      if (updateError) {
-        console.error("Error al actualizar Lotes:", updateError);
-        throw new Error(
-          updateError.message || "Error desconocido al actualizar Lotes"
-        );
+
+        if (updateError) {
+          console.error("Error al actualizar Lotes:", updateError);
+          throw new Error(
+            updateError.message || "Error desconocido al actualizar Lotes"
+          );
+        }
       }
-    }
       toast.current.show({
         severity: "success",
         summary: "Exitoso",
@@ -256,7 +347,7 @@ const RecepcionMateriasPrimas = () => {
         life: 3000,
       });
     }
-  };
+  }, [registro, lotes, convertirFecha]);
 
   const dateEditor = (options) => {
     const convertToInputFormat = (date) => {
@@ -445,14 +536,15 @@ const RecepcionMateriasPrimas = () => {
   };
 
   const header = (
-    <div className="flex flex-wrap gap-2 align-items-center justify-content-between">
-      <InputText
-        type="search"
-        onInput={(e) => setGlobalFilter(e.target.value)}
-        placeholder="Buscador Global..."
-      />
-    </div>
-  );
+       <div className="flex flex-wrap gap-2 align-items-center justify-content-between">
+         <InputText
+           type="search"
+           value={globalFilter}
+           onInput={onFilter}
+           placeholder="Buscar por Lote u Fecha de Registro"
+         />
+       </div>
+     );
 
   const openNew = () => {
     setRegistro(emptyRegister);
@@ -626,6 +718,15 @@ const RecepcionMateriasPrimas = () => {
             right={rightToolbarTemplate}
           ></Toolbar>
           <DataTable
+           onSort={onSort}
+           sortField={lazyParams.sortField}
+           sortOrder={lazyParams.sortOrder}
+           lazy
+           first={lazyParams.first}
+           rows={lazyParams.rows}
+           totalRecords={totalRecords}
+           onPage={onPage}
+           loading={loading}
             showGridlines
             editMode="row"
             onRowEditComplete={onRowEditComplete}
@@ -636,7 +737,6 @@ const RecepcionMateriasPrimas = () => {
             globalFilter={globalFilter}
             header={header}
             paginator
-            rows={10}
             rowsPerPageOptions={[5, 10, 25]}
             paginatorTemplate="FirstPageLink PrevPageLink PageLinks NextPageLink LastPageLink CurrentPageReport RowsPerPageDropdown"
             currentPageReportTemplate="Mostrando del {first} al {last} de {totalRecords} Registros"

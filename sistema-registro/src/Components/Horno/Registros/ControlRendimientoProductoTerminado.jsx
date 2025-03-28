@@ -1,4 +1,10 @@
-import React, { useEffect, useState, useRef } from "react";
+import React, {
+  useEffect,
+  useState,
+  useRef,
+  useCallback,
+  useMemo,
+} from "react";
 import { useNavigate } from "react-router-dom";
 import "./ControlRendimientoProductoTerminado.css"; // Importa el CSS
 import supabase from "../../../supabaseClient";
@@ -66,47 +72,109 @@ const ControlRendimientoProductoTerminado = () => {
   const toast = useRef(null);
   const dt = useRef(null);
   const [selectedRegistros, setSelectedRegistros] = useState([]);
-  const [globalFilter, setGlobalFilter] = useState(null);
+  const [globalFilter, setGlobalFilter] = useState("");
   const [submitted, setSubmitted] = useState(false);
   const [registroDialog, setRegistroDialog] = useState(false);
   const navigate = useNavigate();
   const [lotes, setLotes] = useState([]);
   const [skus, setSKUs] = useState([]);
-  const convertirFecha = (fecha) =>
-    fecha ? fecha.split("-").reverse().join("/") : "";
 
-  const fetchRegistros = async () => {
-    try {
-      const { data, error } = await supabase
-        .from("Control_Rendimiento_Producto_Terminado")
-        .select();
-      if (data) {
-        setRegistros(data);
+  // Nuevos estados para lazy loading
+  const [loading, setLoading] = useState(false);
+  const [totalRecords, setTotalRecords] = useState(0);
+  const [lazyParams, setLazyParams] = useState({
+    first: 0,
+    rows: 10,
+    page: 1,
+    sortField: null,
+    sortOrder: null,
+    filters: {},
+    globalFilter: null,
+  });
+
+  //Inicio de Sorting y Filtro global por lazy load
+  // Manejar sorting
+  const onSort = useCallback((event) => {
+    setLazyParams((prev) => ({
+      ...prev,
+      sortField: event.sortField,
+      sortOrder: event.sortOrder,
+    }));
+  }, []);
+
+  // Manejar filtro global
+  const onFilter = useCallback((e) => {
+    const value = e.target.value;
+    setGlobalFilter(value);
+    setLazyParams((prev) => ({
+      ...prev,
+      globalFilter: value,
+      first: 0,
+    }));
+  }, []);
+  //FIN de Sorting y Filtro global por lazy load
+
+  const fetchRegistros = useCallback(
+    async (start = 0, limit = 10) => {
+      setLoading(true);
+      try {
+        let query = supabase
+          .from("Control_Rendimiento_Producto_Terminado")
+          .select("*", { count: "exact" })
+          .range(start, start + limit - 1);
+        // Ordenar por defecto por fecha descendente (más nuevos primero)
+        // .order("fec_registro", { ascending: false });
+
+        // Aplicar sorting
+        if (lazyParams.sortField) {
+          query = query.order(lazyParams.sortField, {
+            ascending: lazyParams.sortOrder === 1,
+          });
+        }
+
+        // Aplicar filtro global
+        if (lazyParams.globalFilter) {
+          query = query.or(
+            `numero_sku.ilike.%${lazyParams.globalFilter}%,fecha_registro.ilike.%${lazyParams.globalFilter}%`
+          );
+        }
+
+        const { data, error, count } = await query;
+
+        if (error) throw error;
+        setRegistros(data || []);
+        setTotalRecords(count || 0);
+      } catch (err) {
+        console.error(
+          "Error en la conexión a la base de datos Secado Horno Multilevel",
+          err
+        );
+      } finally {
+        setLoading(false);
       }
-    } catch {
-      console.log("Error en la conexión a la base de datos");
-    }
-  };
-  const fetchLotes = async () => {
+    },
+    [lazyParams.sortField, lazyParams.sortOrder, lazyParams.globalFilter]
+  );
+  const fetchLotes = useCallback(async () => {
     try {
       const { data, error } = await supabase
         .from("Lotes")
         .select()
-        .or(
-          "etapa_actual.ilike.%Horno%,etapa_actual.ilike.%ProductoTerminado%"
-        );
+        .or("etapa_actual.ilike.%Horno%,etapa_actual.ilike.%ProductoTerminado%")
+        .order("fecha_registro", { ascending: false });
 
       if (error) throw error;
       setLotes(data || []); // Eliminar la 's' extraña aquí
     } catch (err) {
       console.log("Error en la conexión a la base de datos Lotes", err);
     }
-  };
+  }, []);
   const fetchSKU = async () => {
     try {
       const { data, error } = await supabase
         .from("SKU")
-        .select("base_codigo_sku");
+        .select("base_codigo_sku")
+        .order("fecha_registro", { ascending: false });
 
       if (error) throw error;
       setSKUs(data || []);
@@ -115,10 +183,32 @@ const ControlRendimientoProductoTerminado = () => {
     }
   };
   useEffect(() => {
-    fetchRegistros();
+    fetchRegistros(lazyParams.first, lazyParams.rows);
     fetchLotes();
-    fetchSKU();
-  }, []);
+  }, [
+    fetchRegistros,
+    lazyParams.first,
+    lazyParams.rows,
+    lazyParams.sortField,
+    lazyParams.sortOrder,
+    lazyParams.globalFilter,
+  ]);
+
+  // Manejar cambio de página y lazy loading
+  const onPage = useCallback(
+    (event) => {
+      setLazyParams({
+        ...lazyParams,
+        first: event.first,
+        rows: event.rows,
+        page: event.page + 1,
+      });
+    },
+    [lazyParams]
+  );
+
+  const convertirFecha = (fecha) =>
+    fecha ? fecha.split("-").reverse().join("/") : "";
 
   const formatDateTime = (date, format = "DD-MM-YYYY hh:mm A") => {
     const fmt = new Intl.DateTimeFormat("en-US", {
@@ -159,7 +249,7 @@ const ControlRendimientoProductoTerminado = () => {
 
     return `PR${diaJulianoFormateado}${año2Digitos}`;
   }
-  const saveRegistro = async () => {
+  const saveRegistro = useCallback(async () => {
     setSubmitted(true);
     if (
       !registro.fecha_produccion ||
@@ -253,28 +343,27 @@ const ControlRendimientoProductoTerminado = () => {
       }
 
       // 2. Insertar relaciones en sku_lotes
-    const lotesIdssku_lotes = registro.lote.map((l) => l.base_numero_lote);
-    const relacionesInsert = lotesIdssku_lotes.map((loteId) => ({
-      sku_base: baseCodigoSKUToInsert,
-      base_numero_lote: loteId,
-    }));
+      const lotesIdssku_lotes = registro.lote.map((l) => l.base_numero_lote);
+      const relacionesInsert = lotesIdssku_lotes.map((loteId) => ({
+        sku_base: baseCodigoSKUToInsert,
+        base_numero_lote: loteId,
+      }));
 
-    const { error: relacionesError } = await supabase
-      .from("sku_lotes")
-      .insert(relacionesInsert);
+      const { error: relacionesError } = await supabase
+        .from("sku_lotes")
+        .insert(relacionesInsert);
 
-    if (relacionesError) {
-      throw new Error("Error al guardar relaciones SKU-Lotes: " + relacionesError.message);
-    }
-
+      if (relacionesError) {
+        throw new Error(
+          "Error al guardar relaciones SKU-Lotes: " + relacionesError.message
+        );
+      }
 
       // 2. Convertir lotes a string
       const lotesString = registro.lote
         .map((l) => l.base_numero_lote)
         .join(", ");
 
-
-        
       // 3. Insertar registro (sin incluir SKU)
       const { data, error } = await supabase
         .from("Control_Rendimiento_Producto_Terminado")
@@ -324,17 +413,20 @@ const ControlRendimientoProductoTerminado = () => {
         );
       }
       // Actualizar estado de los lotes seleccionados
-    const lotesIds = registro.lote.map((l) => l.base_numero_lote);
-    const { error: updateError } = await supabase
-      .from("Lotes")
-      .update({ etapa_actual: "ProductoTerminado",
-        fecha_empaque: currentDate }
-)
-      .in("base_numero_lote", lotesIds);
+      const lotesIds = registro.lote.map((l) => l.base_numero_lote);
+      const { error: updateError } = await supabase
+        .from("Lotes")
+        .update({
+          etapa_actual: "ProductoTerminado",
+          fecha_empaque: currentDate,
+        })
+        .in("base_numero_lote", lotesIds);
 
-    if (updateError) {
-      throw new Error("Error al actualizar estado de los lotes: " + updateError.message);
-    }
+      if (updateError) {
+        throw new Error(
+          "Error al actualizar estado de los lotes: " + updateError.message
+        );
+      }
 
       toast.current.show({
         severity: "success",
@@ -361,7 +453,7 @@ const ControlRendimientoProductoTerminado = () => {
         life: 3000,
       });
     }
-  };
+  }, [registro, lotes, convertirFecha]);
 
   const dateEditor = (options) => {
     const convertToInputFormat = (date) => {
@@ -517,8 +609,9 @@ const ControlRendimientoProductoTerminado = () => {
     <div className="flex flex-wrap gap-2 align-items-center justify-content-between">
       <InputText
         type="search"
-        onInput={(e) => setGlobalFilter(e.target.value)}
-        placeholder="Buscador Global..."
+        value={globalFilter}
+        onInput={onFilter}
+        placeholder="Buscar por SKU u Fecha de Registro"
       />
     </div>
   );
@@ -720,6 +813,15 @@ const ControlRendimientoProductoTerminado = () => {
             right={rightToolbarTemplate}
           ></Toolbar>
           <DataTable
+            onSort={onSort}
+            sortField={lazyParams.sortField}
+            sortOrder={lazyParams.sortOrder}
+            lazy
+            first={lazyParams.first}
+            rows={lazyParams.rows}
+            totalRecords={totalRecords}
+            onPage={onPage}
+            loading={loading}
             showGridlines
             editMode="row"
             onRowEditComplete={onRowEditComplete}
@@ -730,7 +832,6 @@ const ControlRendimientoProductoTerminado = () => {
             globalFilter={globalFilter}
             header={header}
             paginator
-            rows={10}
             rowsPerPageOptions={[5, 10, 25]}
             paginatorTemplate="FirstPageLink PrevPageLink PageLinks NextPageLink LastPageLink CurrentPageReport RowsPerPageDropdown"
             currentPageReportTemplate="Mostrando del {first} al {last} de {totalRecords} Registros"

@@ -1,4 +1,10 @@
-import React, { useEffect, useState, useRef } from "react";
+import React, {
+  useEffect,
+  useState,
+  useRef,
+  useCallback,
+  useMemo,
+} from "react";
 import { useNavigate } from "react-router-dom";
 
 // Imports de estilos
@@ -49,7 +55,7 @@ function ControlIngresoySalidaRacks() {
   const toast = useRef(null);
   const dt = useRef(null);
   const [selectedRegistros, setSelectedRegistros] = useState([]);
-  const [globalFilter, setGlobalFilter] = useState(null);
+  const [globalFilter, setGlobalFilter] = useState("");
   const [submitted, setSubmitted] = useState(false);
   const [registroDialog, setRegistroDialog] = useState(false);
   const [outOfRange, setOutOfRange] = useState(false); // Estado para controlar si algún valor está fuera de rango
@@ -64,39 +70,122 @@ function ControlIngresoySalidaRacks() {
 
   const IngresoySalida = ["Ingreso", "Salida"];
 
-  const convertirFecha = (fecha) =>
-    fecha ? fecha.split("-").reverse().join("/") : "";
+  // Nuevos estados para lazy loading
+  const [loading, setLoading] = useState(false);
+  const [totalRecords, setTotalRecords] = useState(0);
+  const [lazyParams, setLazyParams] = useState({
+    first: 0,
+    rows: 10,
+    page: 1,
+    sortField: null,
+    sortOrder: null,
+    filters: {},
+    globalFilter: null,
+  });
 
-  const fetchRegistros = async () => {
-    try {
-      const { data, error } = await supabase
-        .from("Control_Ingreso_Salida_Racks")
-        .select();
-      if (data) {
-        setRegistros(data);
+  //Inicio de Sorting y Filtro global por lazy load
+  // Manejar sorting
+  const onSort = useCallback((event) => {
+    setLazyParams((prev) => ({
+      ...prev,
+      sortField: event.sortField,
+      sortOrder: event.sortOrder,
+    }));
+  }, []);
+
+  // Manejar filtro global
+  const onFilter = useCallback((e) => {
+    const value = e.target.value;
+    setGlobalFilter(value);
+    setLazyParams((prev) => ({
+      ...prev,
+      globalFilter: value,
+      first: 0,
+    }));
+  }, []);
+  //FIN de Sorting y Filtro global por lazy load
+
+  const fetchRegistros = useCallback(
+    async (start = 0, limit = 10) => {
+      setLoading(true);
+      try {
+        let query = supabase
+          .from("Control_Ingreso_Salida_Racks")
+          .select("*", { count: "exact" })
+          .range(start, start + limit - 1);
+        // Ordenar por defecto por fecha descendente (más nuevos primero)
+        // .order("fec_registro", { ascending: false });
+
+        // Aplicar sorting
+        if (lazyParams.sortField) {
+          query = query.order(lazyParams.sortField, {
+            ascending: lazyParams.sortOrder === 1,
+          });
+        }
+
+        // Aplicar filtro global
+        if (lazyParams.globalFilter) {
+          query = query.or(
+            `base_numero_lote.ilike.%${lazyParams.globalFilter}%,fec_registro.ilike.%${lazyParams.globalFilter}%`
+          );
+        }
+
+        const { data, error, count } = await query;
+
+        if (error) throw error;
+        setRegistros(data || []);
+        setTotalRecords(count || 0);
+      } catch (err) {
+        console.error(
+          "Error en la conexión a la base de datos Ingreso Salida Racks",
+          err
+        );
+      } finally {
+        setLoading(false);
       }
-    } catch {
-      console.log("Error en la conexión a la base de datos");
-    }
-  };
-  const fetchLotes = async () => {
+    },
+    [lazyParams.sortField, lazyParams.sortOrder, lazyParams.globalFilter]
+  );
+  const fetchLotes = useCallback(async () => {
     try {
       const { data, error } = await supabase
         .from("Lotes")
         .select()
-        .in("etapa_actual", ["DespachoDieta", "Engorde"]); //Si solo hacen un registro de ingreso por lote, el de engorde sobra
+        .in("etapa_actual", ["DespachoDieta", "Engorde"]) //Si solo hacen un registro de ingreso por lote, el de engorde sobra
+        .order("fecha_registro", { ascending: false });
       if (error) throw error;
       setLotes(data || []); // Actualiza el estado con los datos obtenidos
     } catch (err) {
       console.log("Error en la conexión a la base de datos Lotes", err);
     }
-  };
-
-  useEffect(() => {
-    fetchRegistros();
-    fetchLotes();
   }, []);
 
+  useEffect(() => {
+    fetchRegistros(lazyParams.first, lazyParams.rows);
+    fetchLotes();
+  }, [
+    fetchRegistros,
+    lazyParams.first,
+    lazyParams.rows,
+    lazyParams.sortField,
+    lazyParams.sortOrder,
+    lazyParams.globalFilter,
+  ]);
+
+  // Manejar cambio de página y lazy loading
+  const onPage = useCallback(
+    (event) => {
+      setLazyParams({
+        ...lazyParams,
+        first: event.first,
+        rows: event.rows,
+        page: event.page + 1,
+      });
+    },
+    [lazyParams]
+  );
+  const convertirFecha = (fecha) =>
+    fecha ? fecha.split("-").reverse().join("/") : "";
   const formatDateTime = (date, format = "DD-MM-YYYY hh:mm A") => {
     const fmt = new Intl.DateTimeFormat("en-US", {
       day: "2-digit",
@@ -118,20 +207,20 @@ function ControlIngresoySalidaRacks() {
       .replace("A", fmt.dayPeriod || "AM");
   };
 
-  const saveRegistro = async () => {
+  const saveRegistro = useCallback(async () => {
     setSubmitted(true);
     function isInvalid(value, min, max) {
       return value < min || value > max;
     }
 
-    const isTotalCajasInvalido = 
-  registro.ingresoysalida === "Salida" 
-    ? isInvalid(registro.total_cajas, 0, registro.cant_cajas_lote)
-    : registro.total_cajas <= 0; // Para Ingreso solo verificamos que sea positivo
+    const isTotalCajasInvalido =
+      registro.ingresoysalida === "Salida"
+        ? isInvalid(registro.total_cajas, 0, registro.cant_cajas_lote)
+        : registro.total_cajas <= 0; // Para Ingreso solo verificamos que sea positivo
 
-setErroresValidacion({
-  total_cajas: isTotalCajasInvalido,
-});
+    setErroresValidacion({
+      total_cajas: isTotalCajasInvalido,
+    });
     // Validación de campos obligatorios
     if (
       !registro.base_numero_lote ||
@@ -202,64 +291,70 @@ setErroresValidacion({
       const currentTime = formatDateTime(new Date(), "hh:mm A");
 
       // 1. Buscar el lote en el estado local (evitamos consulta a Supabase)
-const loteExistente = lotes.find(l => l.base_numero_lote === registro.base_numero_lote);
+      const loteExistente = lotes.find(
+        (l) => l.base_numero_lote === registro.base_numero_lote
+      );
 
-if (!loteExistente) {
-  toast.current.show({
-    severity: 'error',
-    summary: 'Error',
-    detail: `El lote ${registro.base_numero_lote} no existe.`,
-    life: 3000,
-  });
-  return;
-}
+      if (!loteExistente) {
+        toast.current.show({
+          severity: "error",
+          summary: "Error",
+          detail: `El lote ${registro.base_numero_lote} no existe.`,
+          life: 3000,
+        });
+        return;
+      }
 
-// 2. Validaciones específicas por tipo de operación
-if (registro.ingresoysalida === 'Ingreso') {
-  if (totalCajasNum <= 0) {
-    toast.current.show({
-      severity: 'error',
-      summary: 'Error',
-      detail: 'La cantidad de cajas para ingreso debe ser mayor a 0',
-      life: 3000,
-    });
-    return;
-  }
-  
-  // Actualización para ingresos (sumar a la cantidad existente)
-  const { error: updateError } = await supabase
-    .from('Lotes')
-    .update({
-      cant_cajas_racks_ingreso: (loteExistente.cant_cajas_racks_ingreso || 0) + totalCajasNum, //Si solo hacen un registro de ingreso por lote entonces solo se deja totalCajasNum
-      fecha_engorde: currentDate,
-      etapa_actual: 'Engorde'
-    })
-    .eq('base_numero_lote', registro.base_numero_lote);
+      // 2. Validaciones específicas por tipo de operación
+      if (registro.ingresoysalida === "Ingreso") {
+        if (totalCajasNum <= 0) {
+          toast.current.show({
+            severity: "error",
+            summary: "Error",
+            detail: "La cantidad de cajas para ingreso debe ser mayor a 0",
+            life: 3000,
+          });
+          return;
+        }
 
-  if (updateError) throw updateError;
+        // Actualización para ingresos (sumar a la cantidad existente)
+        const { error: updateError } = await supabase
+          .from("Lotes")
+          .update({
+            cant_cajas_racks_ingreso:
+              (loteExistente.cant_cajas_racks_ingreso || 0) + totalCajasNum, //Si solo hacen un registro de ingreso por lote entonces solo se deja totalCajasNum
+            fecha_engorde: currentDate,
+            etapa_actual: "Engorde",
+          })
+          .eq("base_numero_lote", registro.base_numero_lote);
 
-} else if (registro.ingresoysalida === 'Salida') {
-  if (totalCajasNum <= 0 || totalCajasNum > loteExistente.cant_cajas_racks_salida) {
-    toast.current.show({
-      severity: 'error',
-      summary: 'Error',
-      detail: `Cantidad inválida. Disponibles: ${loteExistente.cant_cajas_racks_salida}`,
-      life: 3000,
-    });
-    return;
-  }
+        if (updateError) throw updateError;
+      } else if (registro.ingresoysalida === "Salida") {
+        if (
+          totalCajasNum <= 0 ||
+          totalCajasNum > loteExistente.cant_cajas_racks_salida
+        ) {
+          toast.current.show({
+            severity: "error",
+            summary: "Error",
+            detail: `Cantidad inválida. Disponibles: ${loteExistente.cant_cajas_racks_salida}`,
+            life: 3000,
+          });
+          return;
+        }
 
-  // Actualización para salidas (restar de la cantidad existente)
-  const { error: updateError } = await supabase
-    .from('Lotes')
-    .update({
-      cant_cajas_racks_salida: loteExistente.cant_cajas_racks_salida - totalCajasNum,
-      etapa_actual: registro.etapas_actualizar.join(', ')
-    })
-    .eq('base_numero_lote', registro.base_numero_lote);
+        // Actualización para salidas (restar de la cantidad existente)
+        const { error: updateError } = await supabase
+          .from("Lotes")
+          .update({
+            cant_cajas_racks_salida:
+              loteExistente.cant_cajas_racks_salida - totalCajasNum,
+            etapa_actual: registro.etapas_actualizar.join(", "),
+          })
+          .eq("base_numero_lote", registro.base_numero_lote);
 
-  if (updateError) throw updateError;
-}
+        if (updateError) throw updateError;
+      }
 
       // Verificar si hay suficientes cajas para cosechar
       // if (totalCajasNum > loteExistente.cant_cajas_racks_salida) {
@@ -369,7 +464,7 @@ if (registro.ingresoysalida === 'Ingreso') {
         life: 3000,
       });
     }
-  };
+  }, [registro, lotes, convertirFecha]);
 
   const dateEditor = (options) => {
     const convertToInputFormat = (date) => {
@@ -537,14 +632,15 @@ if (registro.ingresoysalida === 'Ingreso') {
   };
 
   const header = (
-    <div className="flex flex-wrap gap-2 align-items-center justify-content-between">
-      <InputText
-        type="search"
-        onInput={(e) => setGlobalFilter(e.target.value)}
-        placeholder="Buscador Global..."
-      />
-    </div>
-  );
+       <div className="flex flex-wrap gap-2 align-items-center justify-content-between">
+         <InputText
+           type="search"
+           value={globalFilter}
+           onInput={onFilter}
+           placeholder="Buscar por Lote u Fecha de Registro"
+         />
+       </div>
+     );
 
   const openNew = () => {
     setRegistro(emptyRegister);
@@ -717,6 +813,15 @@ if (registro.ingresoysalida === 'Ingreso') {
             right={rightToolbarTemplate}
           ></Toolbar>
           <DataTable
+            onSort={onSort}
+            sortField={lazyParams.sortField}
+            sortOrder={lazyParams.sortOrder}
+            lazy
+            first={lazyParams.first}
+            rows={lazyParams.rows}
+            totalRecords={totalRecords}
+            onPage={onPage}
+            loading={loading}
             editMode="row"
             onRowEditComplete={onRowEditComplete}
             ref={dt}
@@ -726,7 +831,6 @@ if (registro.ingresoysalida === 'Ingreso') {
             globalFilter={globalFilter}
             header={header}
             paginator
-            rows={10}
             rowsPerPageOptions={[5, 10, 25]}
             paginatorTemplate="FirstPageLink PrevPageLink PageLinks NextPageLink LastPageLink CurrentPageReport RowsPerPageDropdown"
             currentPageReportTemplate="Mostrando del {first} al {last} de {totalRecords} Registros"
@@ -746,16 +850,8 @@ if (registro.ingresoysalida === 'Ingreso') {
               editor={(options) => textEditor(options)}
               sortable
             />
-            <Column
-              field="ingresoysalida"
-              header="Ingresp/Salida"
-              sortable
-            />
-            <Column
-              field="total_cajas"
-              header="Total Cajas"
-              sortable
-            />
+            <Column field="ingresoysalida" header="Ingresp/Salida" sortable />
+            <Column field="total_cajas" header="Total Cajas" sortable />
             <Column
               field="responsable"
               header="Responsable"
