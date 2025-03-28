@@ -118,7 +118,7 @@ function NIB() {
   // Dentro de tu componente NIB
   const [impresionDialog, setImpresionDialog] = useState(false);
   const [selectedLote, setSelectedLote] = useState(""); // Nuevo estado solo para UI
-
+  const [selectedDestino, setSelectedDestino] = useState(""); // Nuevo estado solo para UI
   const datosImpresionRef = useRef({
     fecha_colecta: "",
     lote: "",
@@ -142,6 +142,8 @@ function NIB() {
     datosImpresionRef.current[field] = value;
     if (field === "lote") {
       setSelectedLote(value); // Actualiza el estado UI cuando cambia el lote
+    }else if (field === "destino") {
+      setSelectedDestino(value); // Actualiza el estado UI cuando cambia el destino
     }
   }, []);
 
@@ -149,6 +151,7 @@ function NIB() {
   const handleCloseDialog = useCallback(() => {
     setImpresionDialog(false);
     setSelectedLote(""); // Limpiar selección
+    setSelectedDestino(""); // Limpiar selección
     // Opcional: Resetear otros campos
     datosImpresionRef.current = {
       fecha_colecta: "",
@@ -170,7 +173,12 @@ function NIB() {
       !datos.cajas ||
       !datos.destino
     ) {
-      alert("Complete los campos requeridos");
+      toast.current.show({
+        severity: "warn",
+        summary: "Advertencia",
+        detail: "Debes de completar los campos para imprimir.",
+        life: 3000,
+      });
       return;
     }
 
@@ -263,6 +271,7 @@ function NIB() {
       URL.revokeObjectURL(url);
 
       setImpresionDialog(false);
+      handleCloseDialog(); // Limpiar selección
     } catch (error) {
       console.error("Error al generar Word:", error);
       alert("Ocurrió un error al generar el documento");
@@ -301,6 +310,7 @@ function NIB() {
               <InputText
                 type="date"
                 onChange={(e) => handleChange("fecha_colecta", e.target.value)}
+                required
               />
             </div>
           </div>
@@ -318,6 +328,7 @@ function NIB() {
                 filter
                 virtualScrollerOptions={{ itemSize: 38 }}
                 placeholder="Seleccione un lote"
+                required
               />
             </div>
           </div>
@@ -328,6 +339,7 @@ function NIB() {
               <InputText
                 type="date"
                 onChange={(e) => handleChange("fecha_siembra", e.target.value)}
+                required
               />
             </div>
           </div>
@@ -338,6 +350,7 @@ function NIB() {
               <InputText
                 type="number"
                 onChange={(e) => handleChange("cajas", e.target.value)}
+                required
               />
             </div>
           </div>
@@ -345,8 +358,15 @@ function NIB() {
           <div className="col-12 md:col-6">
             <div className="field">
               <label>Destino</label>
-              <InputText
-                onChange={(e) => handleChange("destino", e.target.value)}
+              <Dropdown
+                value={selectedDestino}
+                options={["Producción","Hatchery"]}
+                onChange={(e) => {
+                  handleChange("destino", e.value);
+                  setSelectedDestino(e.value);
+                }}
+                placeholder="Seleccione un Destino"
+                required
               />
             </div>
           </div>
@@ -358,6 +378,7 @@ function NIB() {
       opcionesLotes,
       generarWord,
       selectedLote,
+      selectedDestino,
       handleCloseDialog,
     ]
   );
@@ -444,7 +465,7 @@ function NIB() {
     fetchNeonatos(lazyParams.first, lazyParams.rows);
     fetchLotes();
   }, [
-    fetchNeonatos,
+    // fetchNeonatos,
     lazyParams.first,
     lazyParams.rows,
     lazyParams.sortField,
@@ -1278,6 +1299,7 @@ function NIB() {
             optionValue="base_numero_lote" // Guardar el valor de "base_numero_lote"
             placeholder="Selecciona un Número de lote"
             className="w-full md:w-14rem"
+            autoFocus
           />
           <br />
           <label htmlFor="embudo" className="font-bold">
@@ -1319,7 +1341,7 @@ function NIB() {
             value={registro.gm_colectados}
             onChange={(e) => onInputChange(e, "gm_colectados")}
             required
-            autoFocus
+            
           />
 
           <br />
@@ -1340,7 +1362,7 @@ function NIB() {
             value={registro.cajas_inoculadas_destino}
             onChange={(e) => onInputChange(e, "cajas_inoculadas_destino")}
             required
-            autoFocus
+            
           />
 
           <br />
@@ -1356,7 +1378,7 @@ function NIB() {
             value={registro.gm_neonato_caja}
             onChange={(e) => onInputChange(e, "gm_neonato_caja")}
             required
-            autoFocus
+            
           />
 
           <br />
@@ -1372,7 +1394,7 @@ function NIB() {
             value={registro.cantidad_dieta_caja}
             onChange={(e) => onInputChange(e, "cantidad_dieta_caja")}
             required
-            autoFocus
+           
           />
 
           <br />
@@ -1388,7 +1410,7 @@ function NIB() {
             value={registro.temp_ambiental}
             onChange={(e) => onInputChange(e, "temp_ambiental")}
             required
-            autoFocus
+           
           />
 
           <br />
@@ -1404,7 +1426,7 @@ function NIB() {
             value={registro.hum_ambiental}
             onChange={(e) => onInputChange(e, "hum_ambiental")}
             required
-            autoFocus
+          
           />
 
           <br />
@@ -1419,7 +1441,7 @@ function NIB() {
             value={registro.operario}
             onChange={(e) => onInputChange(e, "operario")}
             required
-            autoFocus
+          
           />
           <label htmlFor="observaciones" className="font-bold">
             Observaciones{" "}
@@ -1432,7 +1454,7 @@ function NIB() {
             value={registro.observaciones}
             onChange={(e) => onInputChange(e, "observaciones")}
             required
-            autoFocus
+            
           />
         </div>
       </Dialog>
