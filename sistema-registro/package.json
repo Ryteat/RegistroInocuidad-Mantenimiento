@@ -15,6 +15,7 @@
     "chartjs-adapter-date-fns": "^3.0.0",
     "chartjs-plugin-datalabels": "^2.2.0",
     "date-fns": "^4.1.0",
+    "docx": "^9.3.0",
     "dotenv": "^16.4.7",
     "jspdf": "^3.0.0",
     "jspdf-autotable": "^5.0.2",

@@ -41,6 +41,7 @@ function ControlCalidadEngorde() {
     humedad_cualitativa: "",
     temperatura_dieta: "",
     peso: "",
+    tamanio: "",
     color: "",
     brix: "",
     pH: "",
@@ -128,6 +129,7 @@ function ControlCalidadEngorde() {
       'humedad_cualitativa',
       'temperatura_dieta',
       'peso',
+      'tamanio',
       'color',
       'brix',
       'pH'
@@ -417,8 +419,9 @@ function ControlCalidadEngorde() {
         <Column field="humedad_dieta" header="Humedad Dieta (%)" editor={numberEditor} sortable />
         <Column field="humedad_cualitativa" header="Humedad Cualitativa (%)" editor={numberEditor} sortable />
         <Column field="temperatura_dieta" header="Temp. Dieta (°C)" editor={numberEditor} sortable />
-        <Column field="peso" header="Peso (g)" editor={numberEditor} sortable />
-        <Column field="color" header="Color" editor={(options) => (
+        <Column field="peso" header="Peso (miligramos)" editor={numberEditor} sortable />
+        <Column field="tamanio" header="Tamaño (mm)" editor={numberEditor} sortable />
+       <Column field="color" header="Color" editor={(options) => (
           <Dropdown
             value={options.value}
             options={colores}
@@ -521,11 +524,17 @@ function ControlCalidadEngorde() {
             onChange={(e) => setRegistro({...registro, temperatura_dieta: e.target.value})}
           />
 
-          <label>Peso (g) *</label>
+          <label>Peso (miligramos) *</label>
           <InputText
             type="number"
             value={registro.peso}
             onChange={(e) => setRegistro({...registro, peso: e.target.value})}
+          />
+          <label>Tamaño (mm) *</label>
+          <InputText
+            type="number"
+            value={registro.tamanio}
+            onChange={(e) => setRegistro({...registro, tamanio: e.target.value})}
           />
 
           <label>Color *</label>

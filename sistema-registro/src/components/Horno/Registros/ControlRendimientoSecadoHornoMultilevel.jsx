@@ -1,4 +1,8 @@
-import React, { useEffect, useState, useRef } from "react";
+import React, { useEffect,
+  useState,
+  useRef,
+  useCallback,
+  useMemo, } from "react";
 import { useNavigate } from "react-router-dom";
 import "./ControlRendimientoSecadoHornoMultilevel.css"; // Importa el CSS
 import supabase from "../../../supabaseClient";
@@ -38,7 +42,7 @@ function ControlRendimientoSecadoHornoMultilevel() {
   const toast = useRef(null);
   const dt = useRef(null);
   const [selectedRegistros, setSelectedRegistros] = useState([]);
-  const [globalFilter, setGlobalFilter] = useState(null);
+  const [globalFilter, setGlobalFilter] = useState("");
   const [submitted, setSubmitted] = useState(false);
   const [registroDialog, setRegistroDialog] = useState(false);
   const navigate = useNavigate();
@@ -48,45 +52,128 @@ function ControlRendimientoSecadoHornoMultilevel() {
   const [erroresValidacion, setErroresValidacion] = useState({
     cajas_totales: false,
   });
-  // Función para formatear la fecha en formato día/mes/año
-  const convertirFecha = (fecha) =>
-    fecha ? fecha.split("-").reverse().join("/") : "";
 
+
+  // Nuevos estados para lazy loading
+    const [loading, setLoading] = useState(false);
+    const [totalRecords, setTotalRecords] = useState(0);
+    const [lazyParams, setLazyParams] = useState({
+      first: 0,
+      rows: 10,
+      page: 1,
+      sortField: null,
+      sortOrder: null,
+      filters: {},
+      globalFilter: null,
+    });
+  
+    //Inicio de Sorting y Filtro global por lazy load
+    // Manejar sorting
+    const onSort = useCallback((event) => {
+      setLazyParams((prev) => ({
+        ...prev,
+        sortField: event.sortField,
+        sortOrder: event.sortOrder,
+      }));
+    }, []);
+  
+    // Manejar filtro global
+    const onFilter = useCallback((e) => {
+      const value = e.target.value;
+      setGlobalFilter(value);
+      setLazyParams((prev) => ({
+        ...prev,
+        globalFilter: value,
+        first: 0,
+      }));
+    }, []);
+    //FIN de Sorting y Filtro global por lazy load
+  
+    
   // Opciones para el campo "tipo_control"
   const tiposControl = ["Prueba", "Control"];
 
-  const fetchRegistros = async () => {
-    try {
-      const { data, error } = await supabase
-        .from("Control_Rendimiento_Secado_Horno_Multilevel")
-        .select();
-      if (data) {
-        setRegistros(data);
+  const fetchRegistros = useCallback(
+      async (start = 0, limit = 10) => {
+        setLoading(true);
+        try {
+          let query = supabase
+          .from("Control_Rendimiento_Secado_Horno_Multilevel")
+          .select("*", { count: "exact" })
+          .range(start, start + limit - 1);
+        // Ordenar por defecto por fecha descendente (más nuevos primero)
+        // .order("fec_registro", { ascending: false });
+
+        // Aplicar sorting
+        if (lazyParams.sortField) {
+          query = query.order(lazyParams.sortField, {
+            ascending: lazyParams.sortOrder === 1,
+          });
+        }
+
+        // Aplicar filtro global
+        if (lazyParams.globalFilter) {
+          query = query.or(
+            `numero_lote.ilike.%${lazyParams.globalFilter}%,fecha_registro.ilike.%${lazyParams.globalFilter}%`
+          );
+        }
+
+        const { data, error, count } = await query;
+
+        if (error) throw error;
+        setRegistros(data || []);
+        setTotalRecords(count || 0);
+      } catch (err) {
+        console.error("Error en la conexión a la base de datos Secado Horno Multilevel", err);
+      } finally {
+        setLoading(false);
       }
-    } catch {
-      console.log("Error en la conexión a la base de datos");
-    }
-  };
-  const fetchLotes = async () => {
+    },
+    [lazyParams.sortField, lazyParams.sortOrder, lazyParams.globalFilter]
+  );
+  const fetchLotes = useCallback(async () => {
     try {
       const { data, error } = await supabase
         .from("Lotes")
         .select()
         .or(
           "etapa_actual.ilike.%Horno%,etapa_actual.ilike.%ProductoTerminado%"
-        ); // Busca "Horno" en cualquier posición del string
+        ).order("fecha_registro", { ascending: false }); // Busca "Horno" en cualquier posición del string
 
       if (error) throw error;
       setLotes(data || []);
     } catch (err) {
       console.log("Error en la conexión a la base de datos Lotes", err);
     }
-  };
-
-  useEffect(() => {
-    fetchRegistros();
-    fetchLotes();
   }, []);
+
+ useEffect(() => {
+     fetchRegistros(lazyParams.first, lazyParams.rows);
+     fetchLotes();
+   }, [
+     fetchRegistros,
+     lazyParams.first,
+     lazyParams.rows,
+     lazyParams.sortField,
+     lazyParams.sortOrder,
+     lazyParams.globalFilter,
+   ]);
+
+   // Manejar cambio de página y lazy loading
+     const onPage = useCallback(
+       (event) => {
+         setLazyParams({
+           ...lazyParams,
+           first: event.first,
+           rows: event.rows,
+           page: event.page + 1,
+         });
+       },
+       [lazyParams]
+     );
+  // Función para formatear la fecha en formato día/mes/año
+  const convertirFecha = (fecha) =>
+    fecha ? fecha.split("-").reverse().join("/") : "";
 
   const formatDateTime = (date, format = "DD-MM-YYYY hh:mm A") => {
     const fmt = new Intl.DateTimeFormat("en-US", {
@@ -109,7 +196,7 @@ function ControlRendimientoSecadoHornoMultilevel() {
       .replace("A", fmt.dayPeriod || "AM");
   };
 
-  const saveRegistro = async () => {
+  const saveRegistro = useCallback(async () => {
     setSubmitted(true);
 
     function isInvalid(value, min, max) {
@@ -274,7 +361,7 @@ function ControlRendimientoSecadoHornoMultilevel() {
         life: 3000,
       });
     }
-  };
+  }, [registro, lotes, convertirFecha]);
 
   const dateEditor = (options) => {
     const convertToInputFormat = (date) => {
@@ -444,15 +531,16 @@ function ControlRendimientoSecadoHornoMultilevel() {
     );
   };
 
-  const header = (
-    <div className="flex flex-wrap gap-2 align-items-center justify-content-between">
-      <InputText
-        type="search"
-        onInput={(e) => setGlobalFilter(e.target.value)}
-        placeholder="Buscador Global..."
-      />
-    </div>
-  );
+ const header = (
+      <div className="flex flex-wrap gap-2 align-items-center justify-content-between">
+        <InputText
+          type="search"
+          value={globalFilter}
+          onInput={onFilter}
+          placeholder="Buscar por Lote u Fecha de Registro"
+        />
+      </div>
+    );
 
   const openNew = () => {
     setRegistro(emptyRegister);
@@ -632,6 +720,15 @@ function ControlRendimientoSecadoHornoMultilevel() {
           ></Toolbar>
           <DataTable
             ref={dt}
+            onSort={onSort}
+            sortField={lazyParams.sortField}
+            sortOrder={lazyParams.sortOrder}
+            lazy
+            first={lazyParams.first}
+            rows={lazyParams.rows}
+            totalRecords={totalRecords}
+            onPage={onPage}
+            loading={loading}
             editMode="row"
             onRowEditComplete={onRowEditComplete}
             value={registros}
@@ -640,7 +737,6 @@ function ControlRendimientoSecadoHornoMultilevel() {
             globalFilter={globalFilter}
             header={header}
             paginator
-            rows={10}
             rowsPerPageOptions={[5, 10, 25]}
             paginatorTemplate="FirstPageLink PrevPageLink PageLinks NextPageLink LastPageLink CurrentPageReport RowsPerPageDropdown"
             currentPageReportTemplate="Mostrando del {first} al {last} de {totalRecords} Registros"

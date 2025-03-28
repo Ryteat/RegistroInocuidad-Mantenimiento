@@ -1,5 +1,11 @@
 import supabase from "../../../supabaseClient";
-import React, { useState, useEffect, useRef } from "react";
+import React, {
+  useEffect,
+  useState,
+  useRef,
+  useCallback,
+  useMemo,
+} from "react";
 import { useNavigate } from "react-router-dom";
 import logo2 from "../../../assets/mosca.png";
 import "./VisualizarLotes.css";
@@ -19,22 +25,107 @@ function VisualizarLotes() {
   const [relatedData, setRelatedData] = useState(null);
   const [registroDialog, setRegistroDialog] = useState(false);
   const toast = useRef(null);
-  const [globalFilter, setGlobalFilter] = useState(null);
+  const [globalFilter, setGlobalFilter] = useState("");
 
-  const fetchLotes = async () => {
-    try {
-      const { data, error } = await supabase.from("Lotes").select("*");
-      if (error) throw error;
-      setLotes(data || []);
-    } catch (err) {
-      console.error("Error fetching lotes:", err);
-    }
-  };
+  // Nuevos estados para lazy loading
+  const [loading, setLoading] = useState(false);
+  const [totalRecords, setTotalRecords] = useState(0);
+  const [lazyParams, setLazyParams] = useState({
+    first: 0,
+    rows: 10,
+    page: 1,
+    sortField: null,
+    sortOrder: null,
+    filters: {},
+    globalFilter: null,
+  });
 
-  useEffect(() => {
-    fetchLotes();
+  //Inicio de Sorting y Filtro global por lazy load
+  // Manejar sorting
+  const onSort = useCallback((event) => {
+    setLazyParams((prev) => ({
+      ...prev,
+      sortField: event.sortField,
+      sortOrder: event.sortOrder,
+    }));
   }, []);
 
+  // Manejar filtro global
+  const onFilter = useCallback((e) => {
+    const value = e.target.value;
+    setGlobalFilter(value);
+    setLazyParams((prev) => ({
+      ...prev,
+      globalFilter: value,
+      first: 0,
+    }));
+  }, []);
+  //FIN de Sorting y Filtro global por lazy load
+
+  const fetchLotes = useCallback(
+    async (start = 0, limit = 10) => {
+      setLoading(true);
+      try {
+        let query = supabase
+          .from("Lotes")
+          .select("*", { count: "exact" })
+          .range(start, start + limit - 1);
+        // Ordenar por defecto por fecha descendente (más nuevos primero)
+        // .order("fec_registro", { ascending: false });
+
+        // Aplicar sorting
+        if (lazyParams.sortField) {
+          query = query.order(lazyParams.sortField, {
+            ascending: lazyParams.sortOrder === 1,
+          });
+        }
+
+        // Aplicar filtro global
+        if (lazyParams.globalFilter) {
+          query = query.or(
+            `base_numero_lote.ilike.%${lazyParams.globalFilter}%,fecha_registro.ilike.%${lazyParams.globalFilter}%`
+          );
+        }
+
+        const { data, error, count } = await query;
+
+        if (error) throw error;
+        setLotes(data || []);
+        setTotalRecords(count || 0);
+      } catch (err) {
+        console.error(
+          "Error en la conexión a la base de datos Visualizar Lotes:",
+          err
+        );
+      } finally {
+        setLoading(false);
+      }
+    },
+    [lazyParams.sortField, lazyParams.sortOrder, lazyParams.globalFilter]
+  );
+
+  useEffect(() => {
+    fetchLotes(lazyParams.first, lazyParams.rows);
+  }, [
+    fetchLotes,
+    lazyParams.first,
+    lazyParams.rows,
+    lazyParams.sortField,
+    lazyParams.sortOrder,
+    lazyParams.globalFilter,
+  ]);
+  // Manejar cambio de página y lazy loading
+  const onPage = useCallback(
+    (event) => {
+      setLazyParams({
+        ...lazyParams,
+        first: event.first,
+        rows: event.rows,
+        page: event.page + 1,
+      });
+    },
+    [lazyParams]
+  );
   const fetchRelatedData = async (loteNumber) => {
     try {
       const [
@@ -118,8 +209,9 @@ function VisualizarLotes() {
     <div className="flex flex-wrap gap-2 align-items-center justify-content-between">
       <InputText
         type="search"
-        onInput={(e) => setGlobalFilter(e.target.value)}
-        placeholder="Buscador Global..."
+        value={globalFilter}
+        onInput={onFilter}
+        placeholder="Buscar por Lote u Fecha de Registro"
       />
     </div>
   );
@@ -172,6 +264,20 @@ function VisualizarLotes() {
       </div>
 
       <DataTable
+        onSort={onSort}
+        sortField={lazyParams.sortField}
+        sortOrder={lazyParams.sortOrder}
+        lazy
+        first={lazyParams.first}
+        rows={lazyParams.rows}
+        totalRecords={totalRecords}
+        onPage={onPage}
+        loading={loading}
+        paginator
+        rowsPerPageOptions={[5, 10, 25]}
+        paginatorTemplate="FirstPageLink PrevPageLink PageLinks NextPageLink LastPageLink CurrentPageReport RowsPerPageDropdown"
+        currentPageReportTemplate="Mostrando del {first} al {last} de {totalRecords} Registros"
+        showGridlines
         header={header}
         globalFilter={globalFilter}
         value={lotes}
