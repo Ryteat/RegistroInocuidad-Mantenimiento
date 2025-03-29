@@ -62,9 +62,10 @@ const ControlRendimientoProductoTerminado = () => {
     cons_gazaplastica: "",
     dese_gazaplastica: "",
 
-    operario_empaque: "",
-    encargado_bodega: "",
-    encargado_planta: "",
+    // operario_empaque: "",
+    // encargado_bodega: "",
+    // encargado_planta: "",
+    estado: "",
   };
 
   const [registros, setRegistros] = useState([]);
@@ -91,6 +92,7 @@ const ControlRendimientoProductoTerminado = () => {
     filters: {},
     globalFilter: null,
   });
+  const estados = ["Producto Terminado", "En Espera"];
 
   //Inicio de Sorting y Filtro global por lazy load
   // Manejar sorting
@@ -254,6 +256,7 @@ const ControlRendimientoProductoTerminado = () => {
     setSubmitted(true);
     if (
       !registro.fecha_produccion ||
+      !registro.estado ||
       !registro.hora ||
       !registro.lote ||
       !registro.cant_bolsas ||
@@ -279,15 +282,25 @@ const ControlRendimientoProductoTerminado = () => {
       !registro.cons_bolsagrande ||
       !registro.dese_bolsagrande ||
       !registro.cons_gazaplastica ||
-      !registro.dese_gazaplastica ||
-      !registro.operario_empaque ||
-      !registro.encargado_bodega ||
-      !registro.encargado_planta
+      !registro.dese_gazaplastica 
+      // !registro.operario_empaque ||
+      // !registro.encargado_bodega ||
+      // !registro.encargado_planta
     ) {
       toast.current.show({
         severity: "error",
         summary: "Error",
         detail: "Debes completar todos los campos requeridos",
+        life: 3000,
+      });
+      return;
+    }
+    // Verificar si se seleccionó al menos un lote
+    if(registro.lote.length === 0){
+      toast.current.show({
+        severity: "error",
+        summary: "Error",
+        detail: "Debes seleccionar al menos un lote",
         life: 3000,
       });
       return;
@@ -318,7 +331,7 @@ const ControlRendimientoProductoTerminado = () => {
         if (error) {
           toast.current.show({
             severity: "error",
-            detail: "Error al crear lote.",
+            detail: "Error al crear sku.",
           });
           return;
         }
@@ -337,7 +350,7 @@ const ControlRendimientoProductoTerminado = () => {
         if (skuError || !skuExistente) {
           toast.current.show({
             severity: "error",
-            detail: `El lote ${registro.base_codigo_sku} no existe.`,
+            detail: `El SKU ${registro.base_codigo_sku} no existe.`,
           });
           return;
         }
@@ -364,14 +377,15 @@ const ControlRendimientoProductoTerminado = () => {
       const lotesString = registro.lote
         .map((l) => l.base_numero_lote)
         .join(", ");
+        
 
       // 3. Insertar registro (sin incluir SKU)
       const { data, error } = await supabase
         .from("Control_Rendimiento_Producto_Terminado")
         .insert([
           {
+            estado: registro.estado,
             base_codigo_sku: baseCodigoSKUToInsert, // Solo enviamos la base
-            numero_sku: registro.numero_sku,
             fecha_produccion: convertirFecha(registro.fecha_produccion),
             hora: registro.hora,
             lote: lotesString,
@@ -553,7 +567,7 @@ const ControlRendimientoProductoTerminado = () => {
     const { id, ...updatedData } = newData;
     try {
       const { error } = await supabase
-        .from("Control_Neonatos")
+        .from("Control_Rendimiento_Producto_Terminado")
         .update(updatedData)
         .eq("id", id);
 
@@ -565,6 +579,7 @@ const ControlRendimientoProductoTerminado = () => {
     } catch (err) {
       console.error("Error inesperado:", err);
     }
+    fetchRegistros();
   };
 
   const onInputChange = (e, name) => {
@@ -641,6 +656,7 @@ const ControlRendimientoProductoTerminado = () => {
   );
 
   const cols = [
+    {field: "estado", header: "Estado"},
     { field: "base_codigo_sku", header: "Codigo SKU" },
     { field: "numero_sku", header: "SKU Generado" },
     { field: "lote", header: "Lotes" },
@@ -851,21 +867,34 @@ const ControlRendimientoProductoTerminado = () => {
               sortable
               style={{ minWidth: "10rem" }}
             ></Column>
-            <Column
+            {/* <Column
               field="operario_empaque"
               header="Operario Empaque"
               editor={(options) => textEditor(options)}
-            ></Column>
-            <Column
+            ></Column> */}
+            {/* <Column
               field="encargado_bodega"
               header="Encargado Bodega"
               editor={(options) => textEditor(options)}
-            ></Column>
-            <Column
+            ></Column> */}
+            {/* <Column
               field="encargado_planta"
               header="Encargado Planta"
               editor={(options) => textEditor(options)}
-            ></Column>
+            ></Column> */}
+            <Column
+                          field="estado"
+                          header="Estado"
+                          editor={(options) =>
+                            dropdownEditor({
+                              ...options,
+                              options: estados.map((estado) => ({
+                                label: estado,
+                                value: estado,
+                              })),
+                            })
+                          }
+                        ></Column>
             <Column
               field="fecha_produccion"
               header="Fecha Producción"
@@ -1050,8 +1079,23 @@ const ControlRendimientoProductoTerminado = () => {
             className="w-full md:w-14rem"
           />
           <br />
-          <Divider />
-          <h3>
+           <label htmlFor="estado" className="font-bold">
+                      Estado{" "}
+                      {submitted && !registro.estado && (
+                        <small className="p-error">Requerido.</small>
+                      )}
+                    </label>
+                    <Dropdown
+                      id="estado"
+                      value={registro.estado}
+                      options={estados}
+                      onChange={(e) => onInputChange(e, "estado")}
+                      placeholder="Selecciona un Estado"
+                      required
+                    />
+          <br />
+         {/* <Divider />
+           <h3>
             <strong>Encargados:</strong>
           </h3>
           <Divider />
@@ -1091,7 +1135,7 @@ const ControlRendimientoProductoTerminado = () => {
             value={registro.encargado_planta}
             onChange={(e) => onInputChange(e, "encargado_planta")}
           />
-          <br />
+          <br /> */}
           <Divider />
           <h3>
             <strong>Datos Producción:</strong>
