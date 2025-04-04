@@ -29,7 +29,7 @@ ChartJS.register(
     ChartDataLabels
 );
 
-const VisualizarKPIs = () => {
+const FlashReport = () => {
     const [kpiData, setKpiData] = useState([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
@@ -87,7 +87,7 @@ const VisualizarKPIs = () => {
         const fetchData = async () => {
             try {
                 const { data, error } = await supabase
-                    .from('visualizar_kpis')
+                    .from('flash_report')
                     .select('*')
                     .order('fecha', { ascending: true });
 
@@ -121,24 +121,20 @@ const VisualizarKPIs = () => {
 
     const kpiNames = {
         fecha: 'Fecha',
-    total_kg_pp_modulo: 'Ingreso PP al módulo (kg)',
-    total_cantidad_eggies: 'Cantidad de Eggies Recolectados',
-    total_gm_eggies: 'Total de gramos',
-    total_gm_colectados: 'Peso en gramos colectados',
-    total_cajas_inoculadas_destino: 'Cantidad cajas Inoculadas Destino',
-    total_cajas_procesadas_neonatos: 'Cajas Procesadas de Neonatos',
-    total_cajas_sembradas_rep: 'Cajas Sembradas Reproducción',
-    total_cajas_dieta_no_sembradas_rep: 'Cajas Dieta no Sembradas Reproducción',
-    total_g_neonatos_sembrados_caja_rep: 'Gramos Neonatos Sembrados Caja Reproducción',
-    total_cajas_sembradas_pro: 'Cajas Sembradas Producción',
-    total_cajas_dieta_no_sembradas_pro: 'Cajas Dieta no Sembradas Producción',
-    total_g_neonatos_sembrados_caja_pro: 'Gramos Neonatos Sembrados Caja Producción',
-    total_kg_larva_fresca: 'Larva Fresca (kg)',
-    total_cant_cajas_cosechadas: 'Cajas Cosechadas',
-    total_cant_cajas_desechadas: 'Cajas Desechadas',
-    total_larva_fresca_kg: 'Larva Fresca Total (kg)',
-    total_cajas_totales: 'Total de Cajas',
-    total_cant_bolsas: 'Cantidad de Bolsas'
+        total_larva_fresca_kg: 'Larva Fresca Total (kg)',
+        total_desecho_kg: 'Desecho Total (kg)',
+        total_gm_colectados: 'Gramos Colectados Totales',
+        total_cajas_inoculadas_destino: 'Cajas Inoculadas Destino',
+        total_cajas_sembradas_rep: 'Cajas Sembradas Reproducción',
+        total_g_neonatos_sembrados_caja_rep: 'Gramos Neonatos Sembrados Reproducción',
+        total_cajas_sembradas_pro: 'Cajas Sembradas Producción',
+        total_g_neonatos_sembrados_caja_pro: 'Gramos Neonatos Sembrados Producción',
+        total_cant_cajas_cosechadas: 'Cajas Cosechadas Totales',
+        total_cant_cajas_desechadas: 'Cajas Desechadas Totales',
+        total_cajas_totales: 'Total de Cajas',
+        promedio_kg_larva_fresca_por_caja: 'Promedio kg Larva Fresca por Caja',
+        total_kg_total_frass: 'Total Frass (kg)',
+        total_kg_material_grueso: 'Total Material Grueso (kg)'
     };
 
     const calcularVariacion = (current, previous) => {
@@ -148,25 +144,23 @@ const VisualizarKPIs = () => {
 
     const formatValue = (columnName, value) => {
         const floatColumns = [
-            'kg_pp_modulo', 'total_gm', 'gm_colectados',
-            'g_neonatos_sembrados_caja_rep', 'g_neonatos_sembrados_caja_pro',
-            'kg_larva_fresca'
+            'total_gm_colectados', 'total_g_neonatos_sembrados_caja_rep',
+            'total_g_neonatos_sembrados_caja_pro', 'promedio_kg_larva_fresca_por_caja',
+            'total_kg_total_frass', 'total_kg_material_grueso'
         ];
 
         const integerColumns = [
-            'cantidad_eggies', 'cajas_inoculadas_destino',
-            'cajas_procesadas_neonatos', 'cajas_sembradas_rep',
-            'cajas_dieta_no_sembradas_rep', 'cajas_sembradas_pro',
-            'cajas_dieta_no_sembradas_pro', 'cant_cajas_cosechadas',
-            'cant_cajas_desechadas', 'larva_fresca_kg', 'cajas_totales',
-            'cant_bolsas'
+            'total_larva_fresca_kg', 'total_desecho_kg',
+            'total_cajas_inoculadas_destino', 'total_cajas_sembradas_rep',
+            'total_cajas_sembradas_pro', 'total_cant_cajas_cosechadas',
+            'total_cant_cajas_desechadas', 'total_cajas_totales'
         ];
 
         if (floatColumns.includes(columnName)) {
-            return parseFloat(value).toFixed(2) + ' kg';
+            return parseFloat(value).toFixed(2) + (columnName.includes('kg') ? ' kg' : ' g');
         }
         if (integerColumns.includes(columnName)) {
-            return parseInt(value).toLocaleString('es-CR');
+            return parseInt(value).toLocaleString('es-CR') + (columnName.includes('kg') ? ' kg' : '');
         }
         return value;
     };
@@ -284,12 +278,12 @@ const VisualizarKPIs = () => {
         <div style={styles.container}>
             <h1>
                 <img src={logo2} alt="mosca" className="logo2" />
-                Visualización KPI's
+                Visualización del Daily Flash Report
             </h1>
 
             <div className="welcome-message">
                 <p>
-                    Bienvenido al panel de visualización de KPIs.
+                    Bienvenido al panel de visualización del Daily Flash Report.
                     Aquí puedes monitorear los indicadores clave de rendimiento en tiempo real y tomar decisiones basadas en datos.
                 </p>
             </div>
@@ -308,11 +302,10 @@ const VisualizarKPIs = () => {
             </h2>
 
             {selectedChart && (
-            <div style={styles.modalOverlay}>
-                <div style={styles.modalContent}>
-                    <div style={styles.modalHeader}>
-                        {/* Solo muestra el nombre del KPI y el rango */}
-                        <h3>{kpiNames[selectedChart]} - {formatWeekRange(weekRange.start, weekRange.end)}</h3>
+                <div style={styles.modalOverlay}>
+                    <div style={styles.modalContent}>
+                        <div style={styles.modalHeader}>
+                            <h3>{kpiNames[selectedChart]} - {formatWeekRange(weekRange.start, weekRange.end)}</h3>
                             <div style={styles.modalControls}>
                                 <button
                                     onClick={handleDownload}
@@ -402,7 +395,7 @@ const VisualizarKPIs = () => {
                                             callbacks: {
                                                 title: (context) => formatDate(context[0].parsed.x),
                                                 label: (context) =>
-                                                `${context.dataset.label}: ${formatValue(selectedChart, context.parsed.y)}`
+                                                    `${context.dataset.label}: ${formatValue(selectedChart, context.parsed.y)}`
                                             }
                                         }
                                     }
@@ -600,4 +593,4 @@ const styles = {
     }
 };
 
-export default VisualizarKPIs;
+export default FlashReport;
