@@ -66,6 +66,9 @@ import Visualizar from './pages/Visualizar/PagesVisualizar';
 import VisualizarKPIs from './pages/Visualizar/Registros/PagesVisualizarKPIs';
 import VisualizarLotes from './pages/Visualizar/Registros/PagesVisualizarLotes';
 import VisualizarSKUs from './pages/Visualizar/Registros/PagesVisuazlizarSKUs';
+import FlashReport from './pages/Visualizar/Registros/PagesFlashReport';
+
+
 const Layout = () => {
   return (
     <div>
@@ -160,6 +163,10 @@ const router = createBrowserRouter([{
         {
           path: `VisualizarSKUs`,
           element: <VisualizarSKUs />, // Componente hijo
+        },
+        {
+          path: `FlashReport`,
+          element: <FlashReport />, // Componente hijo
         },
       ],
     },

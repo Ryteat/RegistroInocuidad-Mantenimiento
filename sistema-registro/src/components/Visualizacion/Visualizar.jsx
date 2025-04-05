@@ -23,7 +23,7 @@ function Visualizar() {
             <button onClick={() => navigate("/Visualizar/VisualizarKPIs")}>
               Reporte KPIs
             </button>
-            <button onClick={() => navigate("/Gerencia/GestionUsuarios")}>
+            <button onClick={() => navigate("/Visualizar/FlashReport")}>
               Flash Report
             </button>
             <button onClick={() => navigate("/Visualizar/VisualizarLotes")}>

@@ -657,8 +657,8 @@ function NIB() {
             temp_ambiental: registro.temp_ambiental,
             hum_ambiental: registro.hum_ambiental,
             operario: registro.operario,
-            fec_colecta: currentDate,
-            hor_colecta: currentTime,
+            fec_colecta: convertirFecha(registro.fec_colecta),
+            hor_colecta: registro.hor_colecta,
             fec_registro: currentDate,
             hor_registro: currentTime,
             observaciones: registro.observaciones,
@@ -897,9 +897,9 @@ function NIB() {
     doc.text("Registros de Neonatos Inoculados", 14, 22);
 
     const exportData = selectedRegistros.map(
-      ({ fec_colecta, hor_colecta, ...row }) => ({
+      ({ fec_registro, hor_registro, ...row }) => ({
         ...row,
-        registrado: `${fec_colecta || ""} ${hor_colecta || ""}`,
+        registrado: `${fec_registro || ""} ${hor_registro || ""}`,
       })
     );
 
@@ -959,9 +959,9 @@ function NIB() {
 
     const headers = cols.map((col) => col.header);
     const exportData = selectedRegistros.map(
-      ({ fec_colecta, hor_colecta, ...registro }) => ({
+      ({ fec_registro, hor_registro, ...registro }) => ({
         ...registro,
-        registrado: `${fec_colecta || ""} ${hor_colecta || ""}`,
+        registrado: `${fec_registro || ""} ${hor_registro || ""}`,
       })
     );
 
@@ -1168,7 +1168,7 @@ function NIB() {
             <Column
               field="fec_colecta"
               header="Fecha Colecta"
-              // editor={(options) => textEditor(options)}
+              editor={(options) => dateEditor(options)}
               sortable
               style={{ minWidth: "10rem" }}
             ></Column>
@@ -1301,6 +1301,36 @@ function NIB() {
             className="w-full md:w-14rem"
             autoFocus
           />
+          <br />
+          <label htmlFor="fec_colecta" className="font-bold">
+            Fecha Colecta{" "}
+            {submitted && !registro.fec_colecta && (
+              <small className="p-error">Requerido.</small>
+            )}
+          </label>
+          <InputText
+            type="date"
+            id="fec_colecta"
+            value={registro.fec_colecta}
+            onChange={(e) => onInputChange(e, "fec_colecta")}
+            required
+          />
+          <br />
+          <label htmlFor="hor_colecta" className="font-bold">
+            Fecha Colecta{" "}
+            {submitted && !registro.hor_colecta && (
+              <small className="p-error">Requerido.</small>
+            )}
+          </label>
+          <InputText
+            type="time"
+            id="hor_colecta"
+            value={registro.hor_colecta}
+            onChange={(e) => onInputChange(e, "hor_colecta")}
+            required
+            
+          />
+
           <br />
           <label htmlFor="embudo" className="font-bold">
             # de Embudo{" "}
