@@ -324,8 +324,8 @@ function ControlIngresoySalidaRacks() {
         const { error: updateError } = await supabase
           .from("Lotes")
           .update({
-            cant_cajas_racks_ingreso: (loteExistente.cant_cajas_racks_ingreso || 0) - totalCajasNum,
-            cant_cajas_racks_salida: (loteExistente.cant_cajas_racks_salida || 0) + totalCajasNum,
+            cant_cajas_racks_ingreso: (loteExistente.cant_cajas_racks_ingreso ?? 0) - totalCajasNum,
+            cant_cajas_racks_salida: (loteExistente.cant_cajas_racks_salida ?? 0) + totalCajasNum,
             fecha_engorde: currentDate,
             etapa_actual: "Engorde",
           })
@@ -334,16 +334,16 @@ function ControlIngresoySalidaRacks() {
         if (updateError) throw updateError;
       } else if (registro.ingresoysalida === "Salida") {
         // Para salidas, se realizan dos casos:
-        if (registro.destino === "Producción" && loteExistente.etapa_actual === "Engorde") {
+        if (registro.destino === "Producción") {
           // Si el destino es "Producción" y la etapa actual es "Engorde", se actualiza la etapa a "Cosecha"
           // Caso "Producción": se suman las cajas a "cant_cajas_horno" y "cant_cajas_cosecha"
           const { error: updateError } = await supabase
             .from("Lotes")
             .update({
-              cant_cajas_racks_salida: (loteExistente.cant_cajas_racks_salida || 0) - totalCajasNum,
+              cant_cajas_racks_salida: (loteExistente.cant_cajas_racks_salida ?? 0) - totalCajasNum,
               etapa_actual: registro.etapas_actualizar.join(", "),
-              cant_cajas_horno: (loteExistente.cant_cajas_horno || 0) + totalCajasNum,
-              cant_cajas_cosecha: (loteExistente.cant_cajas_cosecha || 0) + totalCajasNum,
+              cant_cajas_horno: (loteExistente.cant_cajas_horno ?? 0) + totalCajasNum,
+              cant_cajas_cosecha: (loteExistente.cant_cajas_cosecha ?? 0) + totalCajasNum,
             })
             .eq("base_numero_lote", registro.base_numero_lote);
   
