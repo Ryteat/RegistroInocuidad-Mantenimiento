@@ -35,6 +35,8 @@ const ControlDespachoLabPro = () => {
     fecha_registro: "",
     hora_registro: "",
     observaciones: "",
+    cant_cajas_despachoLabPro: 0,
+    _originalCajas: 0, // Nuevo campo para almacenar el valor original
   };
   const [registros, setRegistros] = useState([]);
   const [registro, setRegistro] = useState(emptyRegister);
@@ -226,14 +228,17 @@ const ControlDespachoLabPro = () => {
       }
       // Actualizar la tabla Lotes con la nueva etapa_actual
       let cajasDe1X1 = registro.cant_cajas / 2;
+
+      const totalCajas =
+        registro.cant_cajas_despachoLabPro + cajasDe1X1;
+      // Actualizar la tabla Lotes con la nueva etapa_actual
+      
       const { error: updateError } = await supabase
         .from("Lotes")
         .update({
-          cant_cajas_despachoLabPro: cajasDe1X1,
-          cant_cajas_dieta: cajasDe1X1,
-          cant_cajas_despachodieta: cajasDe1X1,
-          cant_cajas_cosecha: cajasDe1X1,
-          cant_cajas_racks_salida: cajasDe1X1,
+          cant_cajas_despachoLabPro: totalCajas,
+          cant_cajas_dieta: totalCajas,
+          cant_cajas_despachodieta: totalCajas,
           etapa_actual: "DespachoHatchery",
         })
         .eq("base_numero_lote", registro.base_numero_lote);
@@ -777,8 +782,27 @@ const ControlDespachoLabPro = () => {
           </label>
           <Dropdown
             value={registro.base_numero_lote}
-            onChange={(e) => {
-              setRegistro({ ...registro, base_numero_lote: e.value });
+            onChange={async (e) => {
+              const loteSeleccionado = lotes.find(
+                (l) => l.base_numero_lote === e.value
+              );
+
+              if (loteSeleccionado) {
+                const { data: loteActual, error } = await supabase
+                  .from("Lotes")
+                  .select("cant_cajas_despachoLabPro")
+                  .eq("base_numero_lote", e.value)
+                  .single();
+
+                if (!error && loteActual) {
+                  setRegistro({
+                    ...registro,
+                    base_numero_lote: e.value, // Usar e.value en lugar del objeto completo
+                    cant_cajas_despachoLabPro:
+                      loteActual.cant_cajas_despachoLabPro || 0,
+                  });
+                }
+              }
             }}
             options={[...(lotes || [])]}
             optionLabel="base_numero_lote" // Mostrar el campo "label" en el dropdown

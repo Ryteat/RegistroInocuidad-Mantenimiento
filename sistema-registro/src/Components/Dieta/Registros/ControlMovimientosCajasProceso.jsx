@@ -137,7 +137,7 @@ const RecepcionMateriasPrimas = () => {
       const { data, error } = await supabase
         .from("Lotes")
         .select() // Si solo necesitas el campo base_numero_lote, podrías especificarlo: .select("base_numero_lote")
-        .in("etapa_actual", ["Dieta"]) // Filtra registros con etapa_actual igual a 'hatchery' o 'dieta'
+        .in("etapa_actual", ["Dieta", "DespachoDieta"]) // Filtra registros con etapa_actual igual a 'hatchery' o 'dieta'
         .order("fecha_registro", { ascending: false });
       if (error) throw error;
       setLotes(data || []); // Actualiza el estado con los datos obtenidos
@@ -311,11 +311,11 @@ const RecepcionMateriasPrimas = () => {
         registro.cant_cajas_despachodieta - registro.total_cajas;
 
       // Actualizar la tabla Lotes con la nueva etapa_actual
-      if (registro.tipo_dieta === "Producción") {
+      
         const { error: updateError } = await supabase
           .from("Lotes")
           .update({
-            cant_cajas_horno: registro.total_cajas,
+            cant_cajas_racks_ingreso: (loteExistente.cant_cajas_racks_ingreso || 0) + registro.total_cajas,
             cant_cajas_despachodieta: nuevasCajas,
             etapa_actual: "DespachoDieta",
           })
@@ -327,7 +327,7 @@ const RecepcionMateriasPrimas = () => {
             updateError.message || "Error desconocido al actualizar Lotes"
           );
         }
-      }
+      
       toast.current.show({
         severity: "success",
         summary: "Exitoso",
@@ -444,45 +444,47 @@ const RecepcionMateriasPrimas = () => {
 
   const onRowEditComplete = async ({ newData, data: oldData }) => {
     try {
-      // 1. Calcular diferencia de cajas
-      const diferencia =
-        newData.cajas_procesadas_neonatos - oldData.cajas_procesadas_neonatos;
-
-      // 2. Obtener lote actual
+      // 1. Calcular la diferencia de cajas entre el nuevo y el registro anterior
+      const diferencia = newData.total_cajas - oldData.total_cajas;
+  
+      // 2. Obtener el lote actual, seleccionando ambos campos necesarios
       const { data: lote, error: loteError } = await supabase
         .from("Lotes")
-        .select("cant_cajas_despachodieta")
+        .select("cant_cajas_despachodieta, cant_cajas_racks_ingreso")
         .eq("base_numero_lote", oldData.base_numero_lote)
         .single();
-
+  
       if (loteError) throw loteError;
-
-      // 3. Calcular nuevo valor
-      const nuevasCajas = lote.cant_cajas_despachodieta - diferencia;
-
-      if (nuevasCajas < 0) {
+  
+      // 3. Calcular nuevos valores:
+      //    - Se resta la diferencia al total de cajas despachadas (puede aumentar o disminuir)
+      //    - Se suma la diferencia al total de cajas en racks ingreso
+      const nuevasCajasDespachoDieta = lote.cant_cajas_despachodieta - diferencia;
+      const nuevasCajasRacksIngreso = lote.cant_cajas_racks_ingreso + diferencia;
+      console.log(nuevasCajasRacksIngreso)
+      // Validar que el nuevo valor de cajas despachadas no sea negativo
+      if (nuevasCajasDespachoDieta < 0) {
         throw new Error("Cantidad de cajas no puede ser negativa");
       }
-
-      // 4. Actualizar Control_Rendimiento_DietaySiembra
+  
+      // 4. Actualizar la tabla Control_Movimiento_Cajas_Proceso con los nuevos datos
       const { error: updateError } = await supabase
         .from("Control_Movimiento_Cajas_Proceso")
         .update(newData)
         .eq("id", newData.id);
-
       if (updateError) throw updateError;
-
-      // 5. Actualizar Lotes
+  
+      // 5. Actualizar el lote con los nuevos valores en ambas columnas
       const { error: loteUpdateError } = await supabase
         .from("Lotes")
         .update({
-          cant_cajas_despachodieta: nuevasCajas,
+          cant_cajas_despachodieta: nuevasCajasDespachoDieta,
+          cant_cajas_racks_ingreso: nuevasCajasRacksIngreso,
         })
         .eq("base_numero_lote", oldData.base_numero_lote);
-
       if (loteUpdateError) throw loteUpdateError;
-
-      // 6. Actualizar estado local
+  
+      // 6. Actualizar el estado local con los nuevos datos
       setRegistros((prev) =>
         prev.map((item) => (item.id === newData.id ? newData : item))
       );

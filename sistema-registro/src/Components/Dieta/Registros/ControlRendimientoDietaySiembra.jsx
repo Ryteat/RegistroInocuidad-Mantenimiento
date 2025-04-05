@@ -441,7 +441,7 @@ function ControLRendimientoDietaySiembra() {
       toast.current.show({
         severity: "success",
         summary: "Exitoso",
-        detail: "Registro creado correctamente",
+        detail: ("Registro creado correctamente"),
         life: 3000,
       });
 
