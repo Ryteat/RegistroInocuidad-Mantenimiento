@@ -55,6 +55,12 @@ function Horno() {
             >
               5- Control de Tiempos Perdidos
             </button>
+            <button
+              onClick={() => navigate("/Horno/ControlReempaque")}  // Cambiado de "/ControlReempaque"
+              className="back-button"
+            >
+              6- Control Reempaque Producto Terminado
+            </button>
             <button onClick={() => navigate(-1)} className="back-button">
               Volver al Menú Principal
             </button>

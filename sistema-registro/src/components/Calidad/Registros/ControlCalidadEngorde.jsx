@@ -373,13 +373,7 @@ function ControlCalidadEngorde() {
             selectionMode="multiple" 
             headerStyle={{ width: '3rem' }}
         ></Column>
-        <Column 
-          field="fecha_siembra" 
-          header="Fecha Siembra" 
-          editor={dateEditor} 
-          sortable 
-          body={(rowData) => rowData.fecha_siembra} // Mostrar directamente el valor formateado
-        />
+        
         <Column 
           field="fecha_revision" 
           header="Fecha Revisión" 

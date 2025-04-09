@@ -35,7 +35,7 @@ import "jspdf-autotable";
 
 function ControlRendimientoCosechayFrass() {
   let emptyRegister = {
-    fec_siembra: "",
+    
     fec_cosecha: "",
     cant_cajas_cosechadas: "",
     cant_cajas_lote: 0,
@@ -47,8 +47,7 @@ function ControlRendimientoCosechayFrass() {
     fec_registro: "",
     hor_registro: "",
     observaciones: "",
-    fec_almacenaje_frass: "",
-    cant_sacos: "",
+    
     tipo_produccion: "",
     tipo_control: "",
   };
@@ -247,7 +246,7 @@ function ControlRendimientoCosechayFrass() {
 
     // Validación principal
     if (
-      !registro.fec_siembra ||
+
       !registro.fec_cosecha ||
       !registro.cant_cajas_cosechadas ||
       !registro.kg_larva_fresca ||
@@ -255,9 +254,7 @@ function ControlRendimientoCosechayFrass() {
       !registro.kg_total_frass ||
       !registro.kg_material_grueso ||
       !registro.tipo_control ||
-      !registro.tipo_produccion ||
-      !registro.fec_almacenaje_frass ||
-      !registro.cant_sacos
+      !registro.tipo_produccion 
     ) {
       toast.current.show({
         severity: "error",
@@ -393,7 +390,6 @@ function ControlRendimientoCosechayFrass() {
         .insert([
           {
             base_numero_lote: registro.base_numero_lote,
-            fec_siembra: convertirFecha(registro.fec_siembra),
             fec_cosecha: convertirFecha(registro.fec_cosecha),
             cant_cajas_cosechadas: registro.cant_cajas_cosechadas,
             kg_larva_fresca: registro.kg_larva_fresca,
@@ -403,8 +399,6 @@ function ControlRendimientoCosechayFrass() {
             fec_registro: currentDate,
             hor_registro: currentTime,
             observaciones: registro.observaciones,
-            fec_almacenaje_frass: convertirFecha(registro.fec_almacenaje_frass),
-            cant_sacos: registro.cant_sacos,
             tipo_produccion: registro.tipo_produccion,
             tipo_control: registro.tipo_control,
           },
@@ -666,15 +660,12 @@ function ControlRendimientoCosechayFrass() {
     { field: "numero_lote", header: "Número Lote" },
     { field: "tipo_produccion", header: "Tipo Producción" },
     { field: "tipo_control", header: "Tipo Control" },
-    { field: "fec_siembra", header: "Fecha Siembra" },
     { field: "fec_cosecha", header: "Fecha Cosecha" },
     { field: "cant_cajas_cosechadas", header: "Cajas Cosechadas" },
     { field: "kg_larva_fresca", header: "Larva Fresca (KG)" },
     { field: "cant_cajas_desechadas", header: "Cajas Desechadas" },
     { field: "kg_total_frass", header: "Total Frass (KG)" },
     { field: "kg_material_grueso", header: "Material Grueso (KG)" },
-    { field: "cant_sacos", header: "Sacos" },
-    { field: "fec_almacenaje_frass", header: "Fecha Almacenaje Frass" },
     { field: "observaciones", header: "Observaciones" },
     { field: "registrado", header: "Registrado" },
   ];
@@ -861,12 +852,6 @@ function ControlRendimientoCosechayFrass() {
               sortable
             />
             <Column
-              field="fec_siembra"
-              header="Fecha Siembra"
-              editor={(options) => dateEditor(options)}
-              sortable
-            />
-            <Column
               field="fec_cosecha"
               header="Fecha Cosecha"
               editor={(options) => dateEditor(options)}
@@ -902,13 +887,7 @@ function ControlRendimientoCosechayFrass() {
               sortable
               editor={(options) => floatEditor(options)}
             />
-            <Column field="cant_sacos" header="Sacos" sortable />
-            <Column
-              field="fec_almacenaje_frass"
-              header="Fecha Almacenaje Frass"
-              sortable
-              editor={(options) => dateEditor(options)}
-            />
+            
             <Column
               field="observaciones"
               header="Observaciones"
@@ -973,20 +952,7 @@ function ControlRendimientoCosechayFrass() {
             className="w-full md:w-14rem"
             autoFocus
           />
-          <br />
-          <label htmlFor="fec_siembra" className="font-bold">
-            Fecha Siembra{" "}
-            {submitted && !registro.fec_siembra && (
-              <small className="p-error">Requerido.</small>
-            )}
-          </label>
-          <InputText
-            type="date"
-            id="fec_siembra"
-            value={registro.fec_siembra}
-            onChange={(e) => onInputChange(e, "fec_siembra")}
-            required
-          />
+
           <br />
           <label htmlFor="fec_cosecha" className="font-bold">
             Fecha Cosecha{" "}
@@ -1127,35 +1093,7 @@ function ControlRendimientoCosechayFrass() {
             placeholder="Selecciona un tipo"
             required
           />
-          <br />
-
-          <label htmlFor="fec_almacenaje_frass" className="font-bold">
-            Fecha Almacenaje Frass{" "}
-            {submitted && !registro.fec_almacenaje_frass && (
-              <small className="p-error">Requerido.</small>
-            )}
-          </label>
-          <InputText
-            type="date"
-            id="fec_almacenaje_frass"
-            value={registro.fec_almacenaje_frass}
-            onChange={(e) => onInputChange(e, "fec_almacenaje_frass")}
-            required
-          />
-          <br />
-          <label htmlFor="cant_sacos" className="font-bold">
-            Cantidad Sacos{" "}
-            {submitted && !registro.cant_sacos && (
-              <small className="p-error">Requerido.</small>
-            )}
-          </label>
-          <InputText
-            type="number"
-            id="cant_sacos"
-            value={registro.cant_sacos}
-            onChange={(e) => onInputChange(e, "cant_sacos")}
-            required
-          />
+          
           <br />
           <label htmlFor="observaciones" className="font-bold">
             Observaciones{" "}

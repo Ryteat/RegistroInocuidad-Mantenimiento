@@ -36,15 +36,16 @@ import ControlRendimientoSecadoHornoMultilevel from './pages/Horno/Registros/Pag
 import ControlRendimientoSecadoHornoMicroondas from './pages/Horno/Registros/PagesControlRendimientoSecadoHornoMicroondas.jsx';
 import ControlOperativoHornoMultilevel from './pages/Horno/Registros/PagesControlOperativoHornoMultilevel.jsx';
 import ControlRendimientoProductoTerminado from './pages/Horno/Registros/PagesControlRendimientoProductoTerminado.jsx'
+import ControlReempaque from './pages/Horno/Registros/PagesControlReempaque.jsx'
 
 //imports de paginas de Calidad
 import Calidad from './pages/Calidad/PagesCalidad.jsx';
 import ControlCalidadCosecha from './pages/Calidad/Registros/PagesControlCalidadCosecha.jsx';
 import RecepcionMateriasPrimas from './pages/Calidad/Registros/PagesRecepcionMateriasPrimas.jsx';
 import ControlNeonatos from './pages/Calidad/Registros/PagesControlNeonatos.jsx';
-import ControlCalidadEngordeHatchery from './components/Calidad/Registros/ControlCalidadEngordeHatchery.jsx';
-import ControlCalidadEngorde from './components/Calidad/Registros/ControlCalidadEngorde.jsx';
-import ControlCalidadHornoMicroondas from './components/Calidad/Registros/ControlCalidadHornoMicroondas.jsx';
+import ControlCalidadEngordeHatchery from './pages/Calidad/Registros/PagesControlCalidadEngordeHatchery.jsx';
+import ControlCalidadEngorde from './pages/Calidad/Registros/PagesControlCalidadEngorde.jsx';
+import ControlCalidadHornoMicroondas from './pages/Calidad/Registros/PagesControlCalidadHornoMicroondas.jsx';
 import ControlCalidadHornoMultilevel from './pages/Calidad/Registros/PagesControlCalidadHornoMultilevel.jsx';
 import ControlCalidadDietaSiembra from './pages/Calidad/Registros/PagesControlCalidadDietaSiembra.jsx';
 
@@ -198,6 +199,10 @@ const router = createBrowserRouter([{
       {
         path: `ControlRendimientoProductoTerminado`,
         element: <ControlRendimientoProductoTerminado />,
+      },
+      {
+        path: `ControlReempaque`,
+        element: <ControlReempaque />,
       },
     ],
   },

@@ -3,10 +3,9 @@ import React, {
   useState,
   useRef,
   useCallback,
-  useMemo,
 } from "react";
 import { useNavigate } from "react-router-dom";
-import "./ControLRendimientoDietaySiembra.css"; // Importa el CSS
+import "./ControLRendimientoDietaySiembra.css";
 import supabase from "../../../supabaseClient";
 import "primereact/resources/themes/lara-light-indigo/theme.css";
 import "primeicons/primeicons.css";
@@ -36,20 +35,22 @@ function ControLRendimientoDietaySiembra() {
     lts_agua: "",
     g_pure_banano: "",
     kg_otro: "",
+    kg_soya: "",
     kg_total: "",
     tipo_dieta: "",
+    dieta_hatchery: "",
     cajas_procesadas_neonatos: "",
     cant_cajas_dieta: 0,
-    _originalCajas: 0, // Nuevo campo para almacenar el valor original
+    _originalCajas: 0,
     cajas_sembradas_rep: "",
     cajas_dieta_no_sembradas_rep: "",
-    g_neonatos_sembrados_caja_rep: "",
     cajas_sembradas_pro: "",
     cajas_dieta_no_sembradas_pro: "",
-    g_neonatos_sembrados_caja_pro: "",
     tipo_control: "",
+    operario: "",
     fec_registro: "",
     hor_registro: "",
+    fecha_siembra: "",
     observaciones: "",
   };
 
@@ -63,26 +64,21 @@ function ControLRendimientoDietaySiembra() {
   const [registroDialog, setRegistroDialog] = useState(false);
   const navigate = useNavigate();
 
-  // Opciones para el campo "linea_produc"
   const tipoDieta = ["Producción", "Reproducción", "Neonatos"];
   const tipoControl = ["Control", "Prueba"];
-  //Errores de validación
-  const [observacionesObligatorio, setObservacionesObligatorio] =
-    useState(false);
+  const opcionesDietaHatchery = ["Sí", "No"];
+
+  const [observacionesObligatorio, setObservacionesObligatorio] = useState(false);
   const [erroresValidacion, setErroresValidacion] = useState({
     cajas_procesadas_neonatos: false,
-
     cajas_sembradas_rep: false,
     cajas_dieta_no_sembradas_rep: false,
-    g_neonatos_sembrados_caja_rep: false,
-
     cajas_sembradas_pro: false,
     cajas_dieta_no_sembradas_pro: false,
-    g_neonatos_sembrados_caja_pro: false,
   });
-  const [lotes, setLotes] = useState([]);
 
-  // Nuevos estados para lazy loading
+  const [lotes, setLotes] = useState([]);
+  const [operarios, setOperarios] = useState([]);
   const [loading, setLoading] = useState(false);
   const [totalRecords, setTotalRecords] = useState(0);
   const [lazyParams, setLazyParams] = useState({
@@ -95,27 +91,24 @@ function ControLRendimientoDietaySiembra() {
     globalFilter: null,
   });
 
-  //Inicio de Sorting y Filtro global por lazy load
-  // Manejar sorting
-  const onSort = useCallback((event) => {
-    setLazyParams((prev) => ({
-      ...prev,
-      sortField: event.sortField,
-      sortOrder: event.sortOrder,
-    }));
-  }, []);
+  const formatDate = (dateString) => {
+    if (!dateString) return "";
+    const [day, month, year] = dateString.split("/");
+    return `${day}-${month}-${year}`;
+  };
 
-  // Manejar filtro global
-  const onFilter = useCallback((e) => {
-    const value = e.target.value;
-    setGlobalFilter(value);
-    setLazyParams((prev) => ({
-      ...prev,
-      globalFilter: value,
-      first: 0,
-    }));
+  const fetchOperarios = useCallback(async () => {
+    try {
+      const { data, error } = await supabase
+        .from("Operarios")
+        .select("*")
+        .order("nombre", { ascending: true });
+      if (error) throw error;
+      setOperarios(data || []);
+    } catch (err) {
+      console.error("Error al cargar operarios:", err);
+    }
   }, []);
-  //FIN de Sorting y Filtro global por lazy load
 
   const fetchRegistros = useCallback(
     async (start = 0, limit = 10) => {
@@ -125,17 +118,13 @@ function ControLRendimientoDietaySiembra() {
           .from("Control_Rendimiento_DietaySiembra")
           .select("*", { count: "exact" })
           .range(start, start + limit - 1);
-        // Ordenar por defecto por fecha descendente (más nuevos primero)
-        // .order("fec_registro", { ascending: false });
 
-        // Aplicar sorting
         if (lazyParams.sortField) {
           query = query.order(lazyParams.sortField, {
             ascending: lazyParams.sortOrder === 1,
           });
         }
 
-        // Aplicar filtro global
         if (lazyParams.globalFilter) {
           query = query.or(
             `numero_lote.ilike.%${lazyParams.globalFilter}%,tipo_dieta.ilike.%${lazyParams.globalFilter}%,fec_registro.ilike.%${lazyParams.globalFilter}%`
@@ -155,15 +144,16 @@ function ControLRendimientoDietaySiembra() {
     },
     [lazyParams.sortField, lazyParams.sortOrder, lazyParams.globalFilter]
   );
+
   const fetchLotes = useCallback(async () => {
     try {
       const { data, error } = await supabase
         .from("Lotes")
-        .select() // Si solo necesitas el campo base_numero_lote, podrías especificarlo: .select("base_numero_lote")
-        .in("etapa_actual", ["DespachoHatchery", "Dieta"]) // Filtra registros con etapa_actual igual a 'hatchery' o 'dieta'
+        .select()
+        .in("etapa_actual", ["DespachoHatchery", "Dieta"])
         .order("fecha_registro", { ascending: false });
       if (error) throw error;
-      setLotes(data || []); // Actualiza el estado con los datos obtenidos
+      setLotes(data || []);
     } catch (err) {
       console.log("Error en la conexión a la base de datos Lotes", err);
     }
@@ -172,6 +162,7 @@ function ControLRendimientoDietaySiembra() {
   useEffect(() => {
     fetchRegistros(lazyParams.first, lazyParams.rows);
     fetchLotes();
+    fetchOperarios();
   }, [
     fetchRegistros,
     lazyParams.first,
@@ -181,7 +172,24 @@ function ControLRendimientoDietaySiembra() {
     lazyParams.globalFilter,
   ]);
 
-  // Manejar cambio de página y lazy loading
+  const onSort = useCallback((event) => {
+    setLazyParams((prev) => ({
+      ...prev,
+      sortField: event.sortField,
+      sortOrder: event.sortOrder,
+    }));
+  }, []);
+
+  const onFilter = useCallback((e) => {
+    const value = e.target.value;
+    setGlobalFilter(value);
+    setLazyParams((prev) => ({
+      ...prev,
+      globalFilter: value,
+      first: 0,
+    }));
+  }, []);
+
   const onPage = useCallback(
     (event) => {
       setLazyParams({
@@ -194,10 +202,7 @@ function ControLRendimientoDietaySiembra() {
     [lazyParams]
   );
 
-  const convertirFecha = (fecha) =>
-    fecha ? fecha.split("-").reverse().join("/") : "";
-
-  const formatDateTime = (date, format = "DD-MM-YYYY hh:mm A") => {
+  const formatDateTime = (date, format = "DD/MM/YYYY hh:mm A") => {
     const fmt = new Intl.DateTimeFormat("en-US", {
       day: "2-digit",
       month: "2-digit",
@@ -240,11 +245,6 @@ function ControLRendimientoDietaySiembra() {
       0,
       100
     );
-    const isNeonatosSembradosCajaRepInvalido = isInvalid(
-      registro.g_neonatos_sembrados_caja_rep,
-      0,
-      300
-    );
     const isCajasSembradasProInvalido = isInvalid(
       registro.cajas_sembradas_pro,
       0,
@@ -255,58 +255,39 @@ function ControLRendimientoDietaySiembra() {
       0,
       100
     );
-    const isNeonatosSembradosCajaProInvalido = isInvalid(
-      registro.g_neonatos_sembrados_caja_pro,
-      0,
-      300
-    );
 
-    // Actualizar el estado de errores
     setErroresValidacion({
       cajas_procesadas_neonatos: isCajasProcesadasNeonatosInvalido,
       cajas_sembradas_rep: isCajasSembradasRepInvalido,
       cajas_dieta_no_sembradas_rep: isCajasDietaNoSembradasRepInvalido,
-      g_neonatos_sembrados_caja_rep: isNeonatosSembradosCajaRepInvalido,
       cajas_sembradas_pro: isCajasSembradasProInvalido,
       cajas_dieta_no_sembradas_pro: isCajasDietaNoSembradasProInvalido,
-      g_neonatos_sembrados_caja_pro: isNeonatosSembradosCajaProInvalido,
     });
 
     const valoresFueraDeRango =
       isCajasProcesadasNeonatosInvalido ||
       isCajasSembradasRepInvalido ||
       isCajasDietaNoSembradasRepInvalido ||
-      isNeonatosSembradosCajaRepInvalido ||
       isCajasSembradasProInvalido ||
-      isCajasDietaNoSembradasProInvalido ||
-      isNeonatosSembradosCajaProInvalido;
+      isCajasDietaNoSembradasProInvalido;
 
-    if (
-      !registro.cantidad_tandas ||
-      !registro.kg_dieta_caja ||
-      !registro.kg_residuo_organico ||
-      !registro.kg_puntilla_arroz ||
-      !registro.kg_destilado_maiz ||
-      !registro.kg_melaza ||
-      !registro.g_espesante ||
-      !registro.lts_agua ||
-      !registro.g_pure_banano ||
-      !registro.kg_otro ||
-      !registro.kg_total ||
-      !registro.tipo_dieta ||
-      !registro.cajas_procesadas_neonatos ||
-      !registro.cajas_sembradas_rep ||
-      !registro.cajas_dieta_no_sembradas_rep ||
-      !registro.g_neonatos_sembrados_caja_rep ||
-      !registro.cajas_sembradas_pro ||
-      !registro.cajas_dieta_no_sembradas_pro ||
-      !registro.g_neonatos_sembrados_caja_pro ||
-      !registro.tipo_control
-    ) {
+    const camposRequeridos = [
+      "cantidad_tandas", "kg_dieta_caja", "kg_residuo_organico", 
+      "kg_puntilla_arroz", "kg_destilado_maiz", "kg_melaza", 
+      "g_espesante", "lts_agua", "g_pure_banano", "kg_otro", 
+      "kg_soya", "kg_total", "tipo_dieta", "dieta_hatchery",
+      "cajas_procesadas_neonatos", "cajas_sembradas_rep", 
+      "cajas_dieta_no_sembradas_rep", "cajas_sembradas_pro", 
+      "cajas_dieta_no_sembradas_pro", "tipo_control", "operario"
+    ];
+
+    const camposFaltantes = camposRequeridos.filter(field => !registro[field]);
+
+    if (camposFaltantes.length > 0) {
       toast.current.show({
         severity: "error",
         summary: "Error",
-        detail: "Llena todos los campos",
+        detail: "Por favor complete todos los campos requeridos",
         life: 3000,
       });
       return;
@@ -322,17 +303,14 @@ function ControLRendimientoDietaySiembra() {
       return;
     }
 
-    // Validación principal
     if (valoresFueraDeRango && !registro.observaciones) {
       setObservacionesObligatorio(true);
       const currentErrores = {
         "Cajas Procesadas Neonatos": isCajasProcesadasNeonatosInvalido,
         "Cajas Sembradas Reproduccion": isCajasSembradasRepInvalido,
         "Cajas no Sembradas Reproduccion": isCajasDietaNoSembradasRepInvalido,
-        "G Neonatos Sembrados Reproduccion": isNeonatosSembradosCajaRepInvalido,
         "Cajas Sembradas Produccion": isCajasSembradasProInvalido,
         "Cajas No Sembradas Produccion": isCajasDietaNoSembradasProInvalido,
-        "G Neonatos Sembrados Produccion": isNeonatosSembradosCajaProInvalido,
       };
 
       toast.current.show({
@@ -353,17 +331,15 @@ function ControLRendimientoDietaySiembra() {
       cajas_procesadas_neonatos: false,
       cajas_sembradas_rep: false,
       cajas_dieta_no_sembradas_rep: false,
-      g_neonatos_sembrados_caja_rep: false,
       cajas_sembradas_pro: false,
       cajas_dieta_no_sembradas_pro: false,
-      g_neonatos_sembrados_caja_pro: false,
     });
 
     try {
       const currentDate = formatDateTime(new Date(), "DD/MM/YYYY");
       const currentTime = formatDateTime(new Date(), "hh:mm A");
+      const fechaSiembra = formatDateTime(new Date(), "DD/MM/YYYY");
 
-      // Verificar si el lote seleccionado existe
       const { data: loteExistente, error: loteError } = await supabase
         .from("Lotes")
         .select("base_numero_lote")
@@ -395,20 +371,20 @@ function ControLRendimientoDietaySiembra() {
             lts_agua: registro.lts_agua,
             g_pure_banano: registro.g_pure_banano,
             kg_otro: registro.kg_otro,
+            kg_soya: registro.kg_soya,
             kg_total: registro.kg_total,
             tipo_dieta: registro.tipo_dieta,
+            dieta_hatchery: registro.dieta_hatchery,
             cajas_procesadas_neonatos: registro.cajas_procesadas_neonatos,
             cajas_sembradas_rep: registro.cajas_sembradas_rep,
             cajas_dieta_no_sembradas_rep: registro.cajas_dieta_no_sembradas_rep,
-            g_neonatos_sembrados_caja_rep:
-              registro.g_neonatos_sembrados_caja_rep,
             cajas_sembradas_pro: registro.cajas_sembradas_pro,
             cajas_dieta_no_sembradas_pro: registro.cajas_dieta_no_sembradas_pro,
-            g_neonatos_sembrados_caja_pro:
-              registro.g_neonatos_sembrados_caja_pro,
             tipo_control: registro.tipo_control,
+            operario: registro.operario,
             fec_registro: currentDate,
             hor_registro: currentTime,
+            fecha_siembra: fechaSiembra,
             observaciones: registro.observaciones,
           },
         ]);
@@ -420,7 +396,6 @@ function ControLRendimientoDietaySiembra() {
         );
       }
 
-      // Actualizar la tabla Lotes con la nueva etapa_actual
       const nuevasCajas =
         registro.cant_cajas_dieta - registro.cajas_procesadas_neonatos;
 
@@ -429,7 +404,7 @@ function ControLRendimientoDietaySiembra() {
         .update({
           cant_cajas_dieta: nuevasCajas,
           etapa_actual: "Dieta",
-          fecha_siembra: currentDate,
+          fecha_siembra: fechaSiembra,
         })
         .eq("base_numero_lote", registro.base_numero_lote);
 
@@ -441,7 +416,7 @@ function ControLRendimientoDietaySiembra() {
       toast.current.show({
         severity: "success",
         summary: "Exitoso",
-        detail: ("Registro creado correctamente"),
+        detail: "Registro creado correctamente",
         life: 3000,
       });
 
@@ -457,7 +432,7 @@ function ControLRendimientoDietaySiembra() {
         life: 3000,
       });
     }
-  }, [registro, lotes, convertirFecha]);
+  }, [registro, lotes, operarios]);
 
   const dateEditor = (options) => {
     const convertToInputFormat = (date) => {
@@ -516,7 +491,8 @@ function ControLRendimientoDietaySiembra() {
   const floatEditor = (options) => {
     return (
       <InputText
-        type="float"
+        type="number"
+        step="0.01"
         value={options.value}
         onChange={(e) => options.editorCallback(e.target.value)}
       />
@@ -527,20 +503,11 @@ function ControLRendimientoDietaySiembra() {
     return rowData.name !== "Blue Band";
   };
 
-  // const onRowEditInit = (event) => {  EXPLICACION EN TABLA
-  //   setRegistro({
-  //     ...event.data,
-  //     _originalCajas: event.data.cajas_procesadas_neonatos
-  //   });
-  //   setRegistroDialog(true);
-  // };
   const onRowEditComplete = async ({ newData, data: oldData }) => {
     try {
-      // 1. Calcular diferencia de cajas
       const diferencia =
         newData.cajas_procesadas_neonatos - oldData.cajas_procesadas_neonatos;
 
-      // 2. Obtener lote actual
       const { data: lote, error: loteError } = await supabase
         .from("Lotes")
         .select("cant_cajas_dieta")
@@ -549,14 +516,12 @@ function ControLRendimientoDietaySiembra() {
 
       if (loteError) throw loteError;
 
-      // 3. Calcular nuevo valor
       const nuevasCajas = lote.cant_cajas_dieta - diferencia;
 
       if (nuevasCajas < 0) {
         throw new Error("Cantidad de cajas no puede ser negativa");
       }
 
-      // 4. Actualizar Control_Rendimiento_DietaySiembra
       const { error: updateError } = await supabase
         .from("Control_Rendimiento_DietaySiembra")
         .update(newData)
@@ -564,7 +529,6 @@ function ControLRendimientoDietaySiembra() {
 
       if (updateError) throw updateError;
 
-      // 5. Actualizar Lotes
       const { error: loteUpdateError } = await supabase
         .from("Lotes")
         .update({
@@ -574,7 +538,6 @@ function ControLRendimientoDietaySiembra() {
 
       if (loteUpdateError) throw loteUpdateError;
 
-      // 6. Actualizar estado local
       setRegistros((prev) =>
         prev.map((item) => (item.id === newData.id ? newData : item))
       );
@@ -627,16 +590,16 @@ function ControLRendimientoDietaySiembra() {
     );
   };
 
- const header = (
-     <div className="flex flex-wrap gap-2 align-items-center justify-content-between">
-       <InputText
-         type="search"
-         value={globalFilter}
-         onInput={onFilter}
-         placeholder="Buscar por Lote, Tipo Dieta u Fecha de Registro"
-       />
-     </div>
-   );
+  const header = (
+    <div className="flex flex-wrap gap-2 align-items-center justify-content-between">
+      <InputText
+        type="search"
+        value={globalFilter}
+        onInput={onFilter}
+        placeholder="Buscar por Lote, Tipo Dieta u Fecha de Registro"
+      />
+    </div>
+  );
 
   const openNew = () => {
     setRegistro(emptyRegister);
@@ -673,28 +636,18 @@ function ControLRendimientoDietaySiembra() {
     { field: "lts_agua", header: "Lts Agua" },
     { field: "g_pure_banano", header: "G Puré Banano" },
     { field: "kg_otro", header: "Kg Otro" },
+    { field: "kg_soya", header: "Kg Soya" },
     { field: "kg_total", header: "Kg Total" },
     { field: "tipo_dieta", header: "Tipo Dieta" },
+    { field: "dieta_hatchery", header: "Dieta Hatchery" },
     { field: "cajas_procesadas_neonatos", header: "Cajas Procesadas Neonatos" },
     { field: "cajas_sembradas_rep", header: "Cajas Sembradas Rep" },
-    {
-      field: "cajas_dieta_no_sembradas_rep",
-      header: "Cajas Dieta No Sembradas Rep",
-    },
-    {
-      field: "g_neonatos_sembrados_caja_rep",
-      header: "G Neonatos Sembrados Caja Rep",
-    },
+    { field: "cajas_dieta_no_sembradas_rep", header: "Cajas Dieta No Sembradas Rep" },
     { field: "cajas_sembradas_pro", header: "Cajas Sembradas Pro" },
-    {
-      field: "cajas_dieta_no_sembradas_pro",
-      header: "Cajas Dieta No Sembradas Pro",
-    },
-    {
-      field: "g_neonatos_sembrados_caja_pro",
-      header: "G Neonatos Sembrados Caja Pro",
-    },
+    { field: "cajas_dieta_no_sembradas_pro", header: "Cajas Dieta No Sembradas Pro" },
     { field: "tipo_control", header: "Tipo Control" },
+    { field: "fecha_siembra", header: "Fecha Siembra" },
+    { field: "operario", header: "Operario" },
     { field: "observaciones", header: "Observaciones" },
     { field: "registrado", header: "Registrado" },
   ];
@@ -846,7 +799,6 @@ function ControLRendimientoDietaySiembra() {
             onPage={onPage}
             loading={loading}
             editMode="row"
-            // onRowEditInit={onRowEditInit} SE USA PARA ABRIR NUEVAMENTE EL DIALOGO PARA EDITARLO VALORARLO
             onRowEditComplete={onRowEditComplete}
             ref={dt}
             value={registros}
@@ -927,51 +879,14 @@ function ControLRendimientoDietaySiembra() {
               sortable
             />
             <Column
+              field="kg_soya"
+              header="Kg Soya"
+              editor={(options) => floatEditor(options)}
+              sortable
+            />
+            <Column
               field="kg_total"
               header="Kg Total"
-              editor={(options) => floatEditor(options)}
-              sortable
-            />
-
-            <Column
-              field="cajas_procesadas_neonatos"
-              header="Cajas Procesadas Neonatos"
-              editor={(options) => numberEditor(options)}
-              sortable
-            />
-            <Column
-              field="cajas_sembradas_rep"
-              header="G Cajas Sembradas Rep"
-              editor={(options) => floatEditor(options)}
-              sortable
-            />
-            <Column
-              field="cajas_dieta_no_sembradas_rep"
-              header="Cajas Dieta No Sembradas Rep"
-              editor={(options) => floatEditor(options)}
-              sortable
-            />
-            <Column
-              field="g_neonatos_sembrados_caja_rep"
-              header="G Neonatos Sembrados Caja Rep"
-              editor={(options) => floatEditor(options)}
-              sortable
-            />
-            <Column
-              field="cajas_sembradas_pro"
-              header="G Cajas Sembradas Pro"
-              editor={(options) => floatEditor(options)}
-              sortable
-            />
-            <Column
-              field="cajas_dieta_no_sembradas_pro"
-              header="Cajas Dieta No Sembradas Pro"
-              editor={(options) => floatEditor(options)}
-              sortable
-            />
-            <Column
-              field="g_neonatos_sembrados_caja_pro"
-              header="G Neonatos Sembrados Caja Pro"
               editor={(options) => floatEditor(options)}
               sortable
             />
@@ -982,12 +897,65 @@ function ControLRendimientoDietaySiembra() {
               sortable
             />
             <Column
+              field="dieta_hatchery"
+              header="Dieta Hatchery"
+              editor={(options) => textEditor(options)}
+              sortable
+            />
+            <Column
+              field="cajas_procesadas_neonatos"
+              header="Cajas Procesadas Neonatos"
+              editor={(options) => numberEditor(options)}
+              sortable
+            />
+            <Column
+              field="cajas_sembradas_rep"
+              header="Cajas Sembradas Rep"
+              editor={(options) => floatEditor(options)}
+              sortable
+            />
+            <Column
+              field="cajas_dieta_no_sembradas_rep"
+              header="Cajas Dieta No Sembradas Rep"
+              editor={(options) => floatEditor(options)}
+              sortable
+            />
+            <Column
+              field="cajas_sembradas_pro"
+              header="Cajas Sembradas Pro"
+              editor={(options) => floatEditor(options)}
+              sortable
+            />
+            <Column
+              field="cajas_dieta_no_sembradas_pro"
+              header="Cajas Dieta No Sembradas Pro"
+              editor={(options) => floatEditor(options)}
+              sortable
+            />
+            <Column
               field="tipo_control"
               header="Tipo Control"
               editor={(options) => textEditor(options)}
               sortable
             />
-            <Column field="fec_registro" header="Fecha Registro" sortable />
+            <Column
+              field="fecha_siembra"
+              header="Fecha Siembra"
+              sortable
+              body={(rowData) => formatDate(rowData.fecha_siembra)}
+            />
+            <Column
+              field="operario"
+              header="Operario"
+              editor={(options) => textEditor(options)}
+              sortable
+            />
+            <Column 
+              field="fec_registro" 
+              header="Fecha Registro" 
+              sortable 
+              body={(rowData) => formatDate(rowData.fec_registro)} 
+            />
             <Column field="hor_registro" header="Hora Registro" sortable />
             <Column
               field="observaciones"
@@ -1029,7 +997,6 @@ function ControLRendimientoDietaySiembra() {
               );
 
               if (loteSeleccionado) {
-                // Obtener los datos actualizados del lote desde Supabase
                 const { data: loteActual, error } = await supabase
                   .from("Lotes")
                   .select("cant_cajas_dieta")
@@ -1046,12 +1013,13 @@ function ControLRendimientoDietaySiembra() {
               }
             }}
             options={[...(lotes || [])]}
-            optionLabel="base_numero_lote" // Mostrar el campo "label" en el dropdown
-            optionValue="base_numero_lote" // Guardar el valor de "base_numero_lote"
+            optionLabel="base_numero_lote"
+            optionValue="base_numero_lote"
             placeholder="Selecciona un Número de lote"
             className="w-full md:w-14rem"
           />
           <br />
+          
           <label htmlFor="cantidad_tandas" className="font-bold">
             Cantidad Tandas{" "}
             {submitted && !registro.cantidad_tandas && (
@@ -1150,7 +1118,7 @@ function ControLRendimientoDietaySiembra() {
             )}
           </label>
           <InputText
-            type="numberr"
+            type="number"
             id="g_espesante"
             value={registro.g_espesante}
             onChange={(e) => onInputChange(e, "g_espesante")}
@@ -1165,7 +1133,7 @@ function ControLRendimientoDietaySiembra() {
             )}
           </label>
           <InputText
-            type="numberr"
+            type="number"
             id="lts_agua"
             value={registro.lts_agua}
             onChange={(e) => onInputChange(e, "lts_agua")}
@@ -1203,6 +1171,21 @@ function ControLRendimientoDietaySiembra() {
           />
           <br />
 
+          <label htmlFor="kg_soya" className="font-bold">
+            KG Soya{" "}
+            {submitted && !registro.kg_soya && (
+              <small className="p-error">Requerido.</small>
+            )}
+          </label>
+          <InputText
+            type="number"
+            id="kg_soya"
+            value={registro.kg_soya}
+            onChange={(e) => onInputChange(e, "kg_soya")}
+            required
+          />
+          <br />
+
           <label htmlFor="kg_total" className="font-bold">
             KG Total{" "}
             {submitted && !registro.kg_total && (
@@ -1234,6 +1217,22 @@ function ControLRendimientoDietaySiembra() {
           />
           <br />
 
+          <label htmlFor="dieta_hatchery" className="font-bold">
+            Dieta Hatchery{" "}
+            {submitted && !registro.dieta_hatchery && (
+              <small className="p-error">Requerido.</small>
+            )}
+          </label>
+          <Dropdown
+            id="dieta_hatchery"
+            value={registro.dieta_hatchery}
+            options={opcionesDietaHatchery}
+            onChange={(e) => onInputChange(e, "dieta_hatchery")}
+            placeholder="Seleccione una opción"
+            required
+          />
+          <br />
+
           <label htmlFor="tipo_control" className="font-bold">
             Tipo Control{" "}
             {submitted && !registro.tipo_control && (
@@ -1246,6 +1245,24 @@ function ControLRendimientoDietaySiembra() {
             options={tipoControl}
             onChange={(e) => onInputChange(e, "tipo_control")}
             placeholder="Selecciona un tipo de Control"
+            required
+          />
+          <br />
+
+          <label htmlFor="operario" className="font-bold">
+            Operario{" "}
+            {submitted && !registro.operario && (
+              <small className="p-error">Requerido.</small>
+            )}
+          </label>
+          <Dropdown
+            id="operario"
+            value={registro.operario}
+            options={operarios}
+            optionLabel="nombre"
+            optionValue="nombre"
+            onChange={(e) => onInputChange(e, "operario")}
+            placeholder="Seleccione un operario"
             required
           />
           <br />
@@ -1317,26 +1334,6 @@ function ControLRendimientoDietaySiembra() {
             required
           />
           <br />
-
-          <label htmlFor="g_neonatos_sembrados_caja_rep" className="font-bold">
-            G Neonatos Sembrados Caja Reproduccion{" "}
-            {submitted && !registro.g_neonatos_sembrados_caja_rep && (
-              <small className="p-error">Requerido.</small>
-            )}
-            {erroresValidacion.g_neonatos_sembrados_caja_rep && (
-              <small className="p-error">
-                Cajas Sembradas de Reproduccion debe de estar entre 0 a 300.
-              </small>
-            )}
-          </label>
-          <InputText
-            type="number"
-            id="g_neonatos_sembrados_caja_rep"
-            value={registro.g_neonatos_sembrados_caja_rep}
-            onChange={(e) => onInputChange(e, "g_neonatos_sembrados_caja_rep")}
-            required
-          />
-          <br />
           <Divider />
           <h3>
             <strong>Producción:</strong>
@@ -1382,26 +1379,6 @@ function ControLRendimientoDietaySiembra() {
           />
           <br />
 
-          <label htmlFor="g_neonatos_sembrados_caja_pro" className="font-bold">
-            G Neonatos Sembrados Caja Produccion{" "}
-            {submitted && !registro.g_neonatos_sembrados_caja_pro && (
-              <small className="p-error">Requerido.</small>
-            )}
-            {erroresValidacion.g_neonatos_sembrados_caja_pro && (
-              <small className="p-error">
-                Cajas Sembradas de Produccion debe de estar entre 0 a 300.
-              </small>
-            )}
-          </label>
-          <InputText
-            type="number"
-            id="g_neonatos_sembrados_caja_pro"
-            value={registro.g_neonatos_sembrados_caja_pro}
-            onChange={(e) => onInputChange(e, "g_neonatos_sembrados_caja_pro")}
-            required
-          />
-          <br />
-
           <label htmlFor="observaciones" className="font-bold">
             Observaciones{" "}
             {observacionesObligatorio && (
@@ -1418,4 +1395,5 @@ function ControLRendimientoDietaySiembra() {
     </>
   );
 }
+
 export default ControLRendimientoDietaySiembra;
