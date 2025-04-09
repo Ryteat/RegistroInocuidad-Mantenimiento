@@ -4,11 +4,3 @@
     margin-top: 10px;
     margin-bottom: 5px;
 }
-
-/* En tu archivo CSS principal */
-.p-dropdown-item {
-    transition: all 0.3s ease;
-  }
-  
-  .etapa-despachodieta { background-color: #96ffaf; }
-  .etapa-engorde { background-color: #96ffaf; }
