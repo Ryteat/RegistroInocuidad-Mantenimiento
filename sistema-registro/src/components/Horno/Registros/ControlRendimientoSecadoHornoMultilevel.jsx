@@ -1,8 +1,10 @@
-import React, { useEffect,
+import React, {
+  useEffect,
   useState,
   useRef,
   useCallback,
-  useMemo, } from "react";
+  useMemo,
+} from "react";
 import { useNavigate } from "react-router-dom";
 import "./ControlRendimientoSecadoHornoMultilevel.css"; // Importa el CSS
 import supabase from "../../../supabaseClient";
@@ -53,51 +55,49 @@ function ControlRendimientoSecadoHornoMultilevel() {
     cajas_totales: false,
   });
 
-
   // Nuevos estados para lazy loading
-    const [loading, setLoading] = useState(false);
-    const [totalRecords, setTotalRecords] = useState(0);
-    const [lazyParams, setLazyParams] = useState({
+  const [loading, setLoading] = useState(false);
+  const [totalRecords, setTotalRecords] = useState(0);
+  const [lazyParams, setLazyParams] = useState({
+    first: 0,
+    rows: 10,
+    page: 1,
+    sortField: null,
+    sortOrder: null,
+    filters: {},
+    globalFilter: null,
+  });
+
+  //Inicio de Sorting y Filtro global por lazy load
+  // Manejar sorting
+  const onSort = useCallback((event) => {
+    setLazyParams((prev) => ({
+      ...prev,
+      sortField: event.sortField,
+      sortOrder: event.sortOrder,
+    }));
+  }, []);
+
+  // Manejar filtro global
+  const onFilter = useCallback((e) => {
+    const value = e.target.value;
+    setGlobalFilter(value);
+    setLazyParams((prev) => ({
+      ...prev,
+      globalFilter: value,
       first: 0,
-      rows: 10,
-      page: 1,
-      sortField: null,
-      sortOrder: null,
-      filters: {},
-      globalFilter: null,
-    });
-  
-    //Inicio de Sorting y Filtro global por lazy load
-    // Manejar sorting
-    const onSort = useCallback((event) => {
-      setLazyParams((prev) => ({
-        ...prev,
-        sortField: event.sortField,
-        sortOrder: event.sortOrder,
-      }));
-    }, []);
-  
-    // Manejar filtro global
-    const onFilter = useCallback((e) => {
-      const value = e.target.value;
-      setGlobalFilter(value);
-      setLazyParams((prev) => ({
-        ...prev,
-        globalFilter: value,
-        first: 0,
-      }));
-    }, []);
-    //FIN de Sorting y Filtro global por lazy load
-  
-    
+    }));
+  }, []);
+  //FIN de Sorting y Filtro global por lazy load
+
   // Opciones para el campo "tipo_control"
   const tiposControl = ["Prueba", "Control"];
 
   const fetchRegistros = useCallback(
-      async (start = 0, limit = 10) => {
-        setLoading(true);
-        try {
-          let query = supabase
+    async (start = 0, limit = 10) => {
+      setLoading(true);
+      try {
+        let query = supabase
           .from("Control_Rendimiento_Secado_Horno_Multilevel")
           .select("*", { count: "exact" })
           .range(start, start + limit - 1);
@@ -124,7 +124,10 @@ function ControlRendimientoSecadoHornoMultilevel() {
         setRegistros(data || []);
         setTotalRecords(count || 0);
       } catch (err) {
-        console.error("Error en la conexión a la base de datos Secado Horno Multilevel", err);
+        console.error(
+          "Error en la conexión a la base de datos Secado Horno Multilevel",
+          err
+        );
       } finally {
         setLoading(false);
       }
@@ -136,9 +139,8 @@ function ControlRendimientoSecadoHornoMultilevel() {
       const { data, error } = await supabase
         .from("Lotes")
         .select()
-        .or(
-          "etapa_actual.ilike.%Horno%,etapa_actual.ilike.%ProductoTerminado%"
-        ).order("fecha_registro", { ascending: false }); // Busca "Horno" en cualquier posición del string
+        .or("etapa_actual.ilike.%Horno%,etapa_actual.ilike.%ProductoTerminado%")
+        .order("fecha_registro", { ascending: false }); // Busca "Horno" en cualquier posición del string
 
       if (error) throw error;
       setLotes(data || []);
@@ -147,30 +149,30 @@ function ControlRendimientoSecadoHornoMultilevel() {
     }
   }, []);
 
- useEffect(() => {
-     fetchRegistros(lazyParams.first, lazyParams.rows);
-     fetchLotes();
-   }, [
-     fetchRegistros,
-     lazyParams.first,
-     lazyParams.rows,
-     lazyParams.sortField,
-     lazyParams.sortOrder,
-     lazyParams.globalFilter,
-   ]);
+  useEffect(() => {
+    fetchRegistros(lazyParams.first, lazyParams.rows);
+    fetchLotes();
+  }, [
+    fetchRegistros,
+    lazyParams.first,
+    lazyParams.rows,
+    lazyParams.sortField,
+    lazyParams.sortOrder,
+    lazyParams.globalFilter,
+  ]);
 
-   // Manejar cambio de página y lazy loading
-     const onPage = useCallback(
-       (event) => {
-         setLazyParams({
-           ...lazyParams,
-           first: event.first,
-           rows: event.rows,
-           page: event.page + 1,
-         });
-       },
-       [lazyParams]
-     );
+  // Manejar cambio de página y lazy loading
+  const onPage = useCallback(
+    (event) => {
+      setLazyParams({
+        ...lazyParams,
+        first: event.first,
+        rows: event.rows,
+        page: event.page + 1,
+      });
+    },
+    [lazyParams]
+  );
   // Función para formatear la fecha en formato día/mes/año
   const convertirFecha = (fecha) =>
     fecha ? fecha.split("-").reverse().join("/") : "";
@@ -229,7 +231,7 @@ function ControlRendimientoSecadoHornoMultilevel() {
       });
       return;
     }
-    if (registro.cajas_totales > registro.cant_cajas_horno) {
+    if (registro.cajas_totales > registro.cant_cajas_horno && registro.base_numero_lote != "Sin Lote Asignado") {
       toast.current.show({
         severity: "error",
         summary: "Error",
@@ -267,13 +269,17 @@ function ControlRendimientoSecadoHornoMultilevel() {
       const currentDate = formatDateTime(new Date(), "DD/MM/YYYY");
       const currentTime = formatDateTime(new Date(), "hh:mm A");
 
+
+      if(registro.base_numero_lote === "Sin Lote Asignado"){
+        registro.base_numero_lote = null;
+      }else{
       // Verificar si el lote seleccionado existe
       const { data: loteExistente, error: loteError } = await supabase
         .from("Lotes")
         .select("base_numero_lote")
         .eq("base_numero_lote", registro.base_numero_lote)
         .single();
-
+     
       if (loteError || !loteExistente) {
         toast.current.show({
           severity: "error",
@@ -283,7 +289,7 @@ function ControlRendimientoSecadoHornoMultilevel() {
         });
         return;
       }
-
+    }
       const { data, error } = await supabase
         .from("Control_Rendimiento_Secado_Horno_Multilevel")
         .insert([
@@ -531,16 +537,16 @@ function ControlRendimientoSecadoHornoMultilevel() {
     );
   };
 
- const header = (
-      <div className="flex flex-wrap gap-2 align-items-center justify-content-between">
-        <InputText
-          type="search"
-          value={globalFilter}
-          onInput={onFilter}
-          placeholder="Buscar por Lote u Fecha de Registro"
-        />
-      </div>
-    );
+  const header = (
+    <div className="flex flex-wrap gap-2 align-items-center justify-content-between">
+      <InputText
+        type="search"
+        value={globalFilter}
+        onInput={onFilter}
+        placeholder="Buscar por Lote u Fecha de Registro"
+      />
+    </div>
+  );
 
   const openNew = () => {
     setRegistro(emptyRegister);
@@ -789,7 +795,12 @@ function ControlRendimientoSecadoHornoMultilevel() {
           </label>
           <Dropdown
             value={registro.base_numero_lote}
+            filter
             onChange={async (e) => {
+              setRegistro({
+                ...registro,
+                base_numero_lote: e.value,
+              });
               const loteSeleccionado = lotes.find(
                 (l) => l.base_numero_lote === e.value
               );
@@ -811,7 +822,13 @@ function ControlRendimientoSecadoHornoMultilevel() {
                 }
               }
             }}
-            options={[...(lotes || [])]}
+            options={[
+              // Opción "Nuevo Lote" con valor "nuevo"
+              {
+                base_numero_lote: "Sin Lote Asignado"
+              },
+              ...(lotes || []),
+            ]}
             optionLabel="base_numero_lote" // Mostrar el campo "label" en el dropdown
             optionValue="base_numero_lote" // Guardar el valor de "base_numero_lote"
             placeholder="Selecciona un Número de lote"

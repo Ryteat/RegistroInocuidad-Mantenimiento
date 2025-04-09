@@ -79,6 +79,7 @@ const ControlRendimientoProductoTerminado = () => {
   const navigate = useNavigate();
   const [lotes, setLotes] = useState([]);
   const [skus, setSKUs] = useState([]);
+  const [fechaSKU, setFechaSKU] = useState(""); 
 
   // Nuevos estados para lazy loading
   const [loading, setLoading] = useState(false);
@@ -234,9 +235,9 @@ const ControlRendimientoProductoTerminado = () => {
       .replace("A", fmt.dayPeriod || "AM");
   };
 
-  function generarFormatoJuliano(currentDate) {
+  function generarFormatoJuliano(fechaSKU) {
     // Dividir la fecha en día, mes y año
-    const [dia, mes, año] = currentDate.split("/").map(Number);
+    const [dia, mes, año] = fechaSKU.split("/").map(Number);
 
     // Crear fechas en UTC para evitar problemas con husos horarios
     const fecha = new Date(Date.UTC(año, mes - 1, dia));
@@ -306,9 +307,9 @@ const ControlRendimientoProductoTerminado = () => {
       return;
     }
 
-    try {
+    try {     
       const currentDate = formatDateTime(new Date(), "DD/MM/YYYY");
-      const posibleSKU = generarFormatoJuliano(currentDate);
+      const posibleSKU = generarFormatoJuliano(convertirFecha(fechaSKU));
       const currentTime = formatDateTime(new Date(), "hh:mm A");
       let baseCodigoSKUToInsert = registro.base_codigo_sku;
       // Si el valor es "nuevo", crear un lote
@@ -317,13 +318,15 @@ const ControlRendimientoProductoTerminado = () => {
         if (skus.some((sku) => sku.base_codigo_sku === posibleSKU)) {
           toast.current.show({
             severity: "warn",
-            detail: `El lote ${posibleSKU} ya existe. Selecciónalo.`,
+            detail: `El código SKU ${posibleSKU} ya existe. Selecciónalo.`,
           });
+          setFechaSKU("");
           return;
         }
 
         // Crear nuevo lote
         const { data, error } = await supabase.rpc("generar_sku_base", {
+          p_fecha_sku: convertirFecha(fechaSKU),
           p_fecha_registro: currentDate,
           p_hora_registro: currentTime,
         });
@@ -331,11 +334,11 @@ const ControlRendimientoProductoTerminado = () => {
         if (error) {
           toast.current.show({
             severity: "error",
-            detail: "Error al crear sku.",
+            detail: "Error al crear sku. " + error.message,
           });
           return;
         }
-
+      
         // Actualizar el valor local y el estado
         baseCodigoSKUToInsert = data;
         setRegistro({ ...registro, base_codigo_sku: data });
@@ -468,7 +471,7 @@ const ControlRendimientoProductoTerminado = () => {
         life: 3000,
       });
     }
-  }, [registro, lotes, convertirFecha]);
+  }, [registro, lotes]);
 
   const dateEditor = (options) => {
     const convertToInputFormat = (date) => {
@@ -1064,6 +1067,7 @@ const ControlRendimientoProductoTerminado = () => {
           </label>
 
           <Dropdown
+           filter
             value={registro.base_codigo_sku}
             onChange={(e) => {
               setRegistro({ ...registro, base_codigo_sku: e.value });
@@ -1078,6 +1082,22 @@ const ControlRendimientoProductoTerminado = () => {
             placeholder="Selecciona un Número de lote"
             className="w-full md:w-14rem"
           />
+          {registro.base_codigo_sku === "Nuevo SKU" && (
+                      <>
+                        <label htmlFor="fechaSKU" className="font-bold">
+                        Fecha Código SKU Manual{" "}
+                          {submitted && (
+                            <small className="p-error">Requerido.</small>
+                          )}
+                        </label>
+                        <InputText
+            type="date"
+            id="fechaSKU"
+            value={fechaSKU}
+            onChange={(e) => setFechaSKU(e.target.value)}
+          />
+                      </>
+                    )}
           <br />
            <label htmlFor="estado" className="font-bold">
                       Estado{" "}

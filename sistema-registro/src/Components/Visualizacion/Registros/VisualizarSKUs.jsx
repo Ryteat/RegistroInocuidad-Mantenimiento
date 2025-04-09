@@ -191,15 +191,15 @@ function VisualizarSKUs() {
           emptyMessage="No se encontraron lotes"
         >
           <Column field="base_numero_lote" header="Número de Lote" sortable />
-          <Column field="fecha_registro" header="Fecha Registro" />
+          <Column field="fecha_registro" header="Fecha Registro" sortable/>
           <Column field="hora_registro" header="Hora Registro" />
           <Column field="etapa_actual" header="Etapa Actual" />
-          <Column field="fecha_inoculacion" header="Fecha Inoculación" />
-          <Column field="fecha_siembra" header="Fecha Siembra" />
-          <Column field="fecha_engorde" header="Fecha Engorde" />
-          <Column field="fecha_cosecha" header="Fecha Cosecha" />
-          <Column field="fecha_horneado" header="Fecha Horneado" />
-          <Column field="fecha_empaque" header="Fecha Empaque" />
+          <Column field="fecha_inoculacion" header="Fecha Inoculación" sortable/>
+          <Column field="fecha_siembra" header="Fecha Siembra" sortable/>
+          <Column field="fecha_engorde" header="Fecha Engorde" sortable/>
+          <Column field="fecha_cosecha" header="Fecha Cosecha" sortable/>
+          <Column field="fecha_horneado" header="Fecha Horneado" sortable/>
+          <Column field="fecha_empaque" header="Fecha Empaque"sortable />
         </DataTable>
       </div>
     );
@@ -254,7 +254,7 @@ function VisualizarSKUs() {
         emptyMessage="No se encontraron SKUs"
       >
         <Column field="base_codigo_sku" header="Código SKU" sortable />
-        <Column field="fecha_registro" header="Fecha de Registro" />
+        <Column field="fecha_registro" header="Fecha de Registro" sortable />
         <Column field="hora_registro" header="Hora de Registro" />
       </DataTable>
 

@@ -819,6 +819,7 @@ const RecepcionMateriasPrimas = () => {
 
           <Dropdown
             value={registro.base_numero_lote}
+            filter
             onChange={async (e) => {
               const loteSeleccionado = lotes.find(
                 (l) => l.base_numero_lote === e.value
