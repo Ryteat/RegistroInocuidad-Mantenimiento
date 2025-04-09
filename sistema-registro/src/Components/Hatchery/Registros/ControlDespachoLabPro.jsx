@@ -1,4 +1,10 @@
-import React, { useEffect, useState, useRef } from "react";
+import React, {
+  useEffect,
+  useState,
+  useRef,
+  useCallback,
+  useMemo,
+} from "react";
 import { useNavigate } from "react-router-dom";
 import "./ControlDespachoLabPro.css"; // Importa el CSS
 import supabase from "../../../supabaseClient";
@@ -58,38 +64,134 @@ const ControlDespachoLabPro = () => {
   const destino = ["Producción", "Hatchery"];
   const [lotes, setLotes] = useState([]);
 
-  const convertirFecha = (fecha) =>
-    fecha ? fecha.split("-").reverse().join("/") : "";
+  // Nuevos estados para lazy loading
+  const [loading, setLoading] = useState(false);
+  const [totalRecords, setTotalRecords] = useState(0);
+  const [lazyParams, setLazyParams] = useState({
+    first: 0,
+    rows: 10,
+    page: 1,
+    sortField: null,
+    sortOrder: null,
+    filters: {},
+    globalFilter: null,
+  });
 
-  const fetchRegistros = async () => {
-    try {
-      const { data, error } = await supabase
-        .from("Control_Despacho_5dols_LabPro")
-        .select();
-      if (data) {
-        setRegistros(data);
+  // Memoizar lotes
+  const opcionesLotes = useMemo(
+    () =>
+      lotes.map((lote) => ({
+        label: lote.base_numero_lote,
+        value: lote.base_numero_lote,
+      })),
+    [lotes]
+  );
+
+  //Inicio de Sorting y Filtro global por lazy load
+  // Manejar sorting
+  const onSort = useCallback((event) => {
+    setLazyParams((prev) => ({
+      ...prev,
+      sortField: event.sortField,
+      sortOrder: event.sortOrder,
+    }));
+  }, []);
+
+  // Manejar filtro global
+  const onFilter = useCallback((e) => {
+    const value = e.target.value;
+    setGlobalFilter(value);
+    setLazyParams((prev) => ({
+      ...prev,
+      globalFilter: value,
+      first: 0,
+    }));
+  }, []);
+  //FIN de Sorting y Filtro global por lazy load
+
+  //Inicio de FETCHs REGISTROS
+  // Memoizar funciones de fetching
+
+  const fetchRegistros = useCallback(
+    async (start = 0, limit = 10) => {
+      setLoading(true);
+      try {
+        let query = supabase
+          .from("Control_Despacho_5dols_LabPro")
+          .select("*", { count: "exact" })
+          .range(start, start + limit - 1);
+        // Ordenar por defecto por fecha descendente (más nuevos primero)
+        // .order("fec_registro", { ascending: false });
+
+        // Aplicar sorting
+        if (lazyParams.sortField) {
+          query = query.order(lazyParams.sortField, {
+            ascending: lazyParams.sortOrder === 1,
+          });
+        }
+
+        // Aplicar filtro global
+        if (lazyParams.globalFilter) {
+          query = query.or(
+            `numero_lote.ilike.%${lazyParams.globalFilter}%,fec_registro.ilike.%${lazyParams.globalFilter}%`
+          );
+        }
+
+        const { data, error, count } = await query;
+
+        if (error) throw error;
+        setRegistros(data || []);
+        setTotalRecords(count || 0);
+      } catch (err) {
+        console.error("Error en la conexión a la base de datos NIB", err);
+      } finally {
+        setLoading(false);
       }
-    } catch {
-      console.log("Error en la conexión a la base de datos");
-    }
-  };
-  const fetchLotes = async () => {
+    },
+    [lazyParams.sortField, lazyParams.sortOrder, lazyParams.globalFilter]
+  );
+
+  const fetchLotes = useCallback(async () => {
     try {
       const { data, error } = await supabase
         .from("Lotes")
-        .select() // Si solo necesitas el campo base_numero_lote, podrías especificarlo: .select("base_numero_lote")
-        .in("etapa_actual", ["Hatchery"]); // Filtra registros con etapa_actual igual a 'hatchery' o 'dieta'
+        .select()
+        .in("etapa_actual", ["Hatchery"])
+        .order("fecha_registro", { ascending: false });
       if (error) throw error;
-      setLotes(data || []); // Actualiza el estado con los datos obtenidos
+      setLotes(data || []);
     } catch (err) {
-      console.log("Error en la conexión a la base de datos Lotes", err);
+      console.error("Error en la conexión a la base de datos Lotes", err);
     }
-  };
+  }, []);
 
   useEffect(() => {
-    fetchRegistros();
+    fetchRegistros(lazyParams.first, lazyParams.rows);
     fetchLotes();
-  }, []);
+  }, [
+    lazyParams.first,
+    lazyParams.rows,
+    lazyParams.sortField,
+    lazyParams.sortOrder,
+    lazyParams.globalFilter,
+  ]);
+
+  // Manejar cambio de página y lazy loading
+  const onPage = useCallback(
+    (event) => {
+      setLazyParams({
+        ...lazyParams,
+        first: event.first,
+        rows: event.rows,
+        page: event.page + 1,
+      });
+    },
+    [lazyParams]
+  );
+  //Fin de FETCH REGISTROS
+
+  const convertirFecha = (fecha) =>
+    fecha ? fecha.split("-").reverse().join("/") : "";
 
   const formatDateTime = (date, format = "DD-MM-YYYY hh:mm A") => {
     const fmt = new Intl.DateTimeFormat("en-US", {
@@ -112,7 +214,7 @@ const ControlDespachoLabPro = () => {
       .replace("A", fmt.dayPeriod || "AM");
   };
 
-  const saveRegistro = async () => {
+  const saveRegistro = useCallback(async () => {
     setSubmitted(true);
 
     // Validar los campos
@@ -229,10 +331,9 @@ const ControlDespachoLabPro = () => {
       // Actualizar la tabla Lotes con la nueva etapa_actual
       let cajasDe1X1 = registro.cant_cajas / 2;
 
-      const totalCajas =
-        registro.cant_cajas_despachoLabPro + cajasDe1X1;
+      const totalCajas = registro.cant_cajas_despachoLabPro + cajasDe1X1;
       // Actualizar la tabla Lotes con la nueva etapa_actual
-      
+
       const { error: updateError } = await supabase
         .from("Lotes")
         .update({
@@ -267,7 +368,7 @@ const ControlDespachoLabPro = () => {
         life: 3000,
       });
     }
-  };
+  }, [registro, lotes]);
 
   const dateEditor = (options) => {
     const convertToInputFormat = (date) => {
@@ -382,7 +483,7 @@ const ControlDespachoLabPro = () => {
 
       // 3. Calcular NUEVAS CAJAS (¡ESTE ERA EL ERROR!)
       const nuevasCajas = newData.cant_cajas / 2; // Dividir directamente el nuevo valor
-      
+
       if (nuevasCajas < 0) {
         throw new Error("La cantidad de cajas no puede ser negativa.");
       }
@@ -411,7 +512,7 @@ const ControlDespachoLabPro = () => {
 
       // 6. Actualizar estado local
       setRegistros((prev) =>
-        prev.map((n) => 
+        prev.map((n) =>
           n.id === id ? { ...n, ...newData, cant_cajas: newData.cant_cajas } : n
         )
       );
@@ -422,7 +523,6 @@ const ControlDespachoLabPro = () => {
         detail: "¡Cajas convertidas a 1x1 correctamente!",
         life: 3000,
       });
-
     } catch (err) {
       console.error("Error:", err);
       toast.current.show({
@@ -432,45 +532,10 @@ const ControlDespachoLabPro = () => {
         life: 3000,
       });
     }
-};
-  const onInputChange = (e, name) => {
-    let val = e.target.value;
-    let _registro = { ...registro };
-    _registro[name] = val;
-    setRegistro(_registro);
   };
-
-  const leftToolbarTemplate = () => {
-    return (
-      <div className="flex flex-wrap gap-2">
-        <Button
-          label="Nuevo"
-          icon="pi pi-plus"
-          severity="success"
-          onClick={openNew}
-        />
-      </div>
-    );
-  };
-
-  const rightToolbarTemplate = () => {
-    return (
-      <div className="exportar-container flex flex-wrap gap-2">
-        <Button
-          label="Exportar a Excel"
-          icon="pi pi-upload"
-          className="p-button-help"
-          onClick={exportXlsx}
-        />
-        <Button
-          label="Exportar a PDF"
-          icon="pi pi-file-pdf"
-          className="p-button-danger"
-          onClick={exportPdf}
-        />
-      </div>
-    );
-  };
+  const onInputChange = useCallback((e, name) => {
+    setRegistro((prev) => ({ ...prev, [name]: e.target.value }));
+  }, []);
 
   const header = (
     <div className="flex flex-wrap gap-2 align-items-center justify-content-between">
@@ -528,7 +593,7 @@ const ControlDespachoLabPro = () => {
     dataKey: col.field,
   }));
 
-  const exportPdf = () => {
+  const exportPdf = useCallback(() => {
     if (selectedRegistros.length === 0) {
       toast.current.show({
         severity: "warn",
@@ -591,9 +656,9 @@ const ControlDespachoLabPro = () => {
     }
 
     doc.save("Control_Despacho_5dols_LabPro.pdf");
-  };
+  }, [selectedRegistros]);
 
-  const exportXlsx = () => {
+  const exportXlsx = useCallback(() => {
     if (selectedRegistros.length === 0) {
       toast.current.show({
         severity: "warn",
@@ -626,7 +691,43 @@ const ControlDespachoLabPro = () => {
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, "Registros");
     XLSX.writeFile(wb, "Control_Despacho_5dols_LabPro.xlsx");
-  };
+  }, [selectedRegistros]);
+
+  const leftToolbarTemplate = useMemo(
+    () => () =>
+      (
+        <div className="flex flex-wrap gap-2">
+          <Button
+            label="Nuevo"
+            icon="pi pi-plus"
+            severity="success"
+            onClick={openNew}
+          />
+        </div>
+      ),
+    [exportPdf, exportXlsx] // Añadir las funciones como dependencias
+  );
+
+  const rightToolbarTemplate = useMemo(
+    () => () =>
+      (
+        <div className="exportar-container flex flex-wrap gap-2">
+          <Button
+            label="Exportar a Excel"
+            icon="pi pi-upload"
+            className="p-button-help"
+            onClick={exportXlsx}
+          />
+          <Button
+            label="Exportar a PDF"
+            icon="pi pi-file-pdf"
+            className="p-button-danger"
+            onClick={exportPdf}
+          />
+        </div>
+      ),
+    []
+  );
 
   return (
     <>
@@ -661,6 +762,16 @@ const ControlDespachoLabPro = () => {
             right={rightToolbarTemplate}
           ></Toolbar>
           <DataTable
+            selectionMode="multiple"
+            onSort={onSort}
+            sortField={lazyParams.sortField}
+            sortOrder={lazyParams.sortOrder}
+            lazy
+            first={lazyParams.first}
+            rows={lazyParams.rows}
+            totalRecords={totalRecords}
+            onPage={onPage}
+            loading={loading}
             editMode="row"
             onRowEditComplete={onRowEditComplete}
             ref={dt}
@@ -670,7 +781,6 @@ const ControlDespachoLabPro = () => {
             globalFilter={globalFilter}
             header={header}
             paginator
-            rows={10}
             rowsPerPageOptions={[5, 10, 25]}
             paginatorTemplate="FirstPageLink PrevPageLink PageLinks NextPageLink LastPageLink CurrentPageReport RowsPerPageDropdown"
             currentPageReportTemplate="Mostrando del {first} al {last} de {totalRecords} Registros"
@@ -782,6 +892,7 @@ const ControlDespachoLabPro = () => {
           </label>
           <Dropdown
             value={registro.base_numero_lote}
+            filter
             onChange={async (e) => {
               const loteSeleccionado = lotes.find(
                 (l) => l.base_numero_lote === e.value

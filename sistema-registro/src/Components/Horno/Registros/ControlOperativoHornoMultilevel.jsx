@@ -71,7 +71,6 @@ const ControlOperativoHornoMultilevel = () => {
   const navigate = useNavigate();
 
   const tipoControl = ["Control", "Prueba"];
-  const [lotes, setLotes] = useState([]);
 
   const convertirFecha = (fecha) =>
     fecha ? fecha.split("-").reverse().join("/") : "";
@@ -88,27 +87,8 @@ const ControlOperativoHornoMultilevel = () => {
       console.log("Error en la conexión a la base de datos");
     }
   };
-  const fetchLotes = async () => {
-    try {
-      const { data, error } = await supabase
-        .from("Lotes")
-        .select() // Si solo necesitas el campo base_numero_lote, podrías especificarlo: .select("base_numero_lote")
-        .in("etapa_actual", [
-          "Cosecha",
-          "HornoMul",
-          "HornoMic",
-          "ProductoTerminado",
-        ]); // Filtra registros con etapa_actual igual a 'hatchery' o 'dieta'
-      if (error) throw error;
-      setLotes(data || []); // Actualiza el estado con los datos obtenidos
-    } catch (err) {
-      console.log("Error en la conexión a la base de datos Lotes", err);
-    }
-  };
-
   useEffect(() => {
     fetchRegistros();
-    fetchLotes();
   }, []);
 
   const formatDateTime = (date, format = "DD-MM-YYYY hh:mm A") => {
@@ -179,27 +159,10 @@ const ControlOperativoHornoMultilevel = () => {
       const currentDate = formatDateTime(new Date(), "DD/MM/YYYY");
       const currentTime = formatDateTime(new Date(), "hh:mm A");
 
-      // Verificar si el lote seleccionado existe
-      const { data: loteExistente, error: loteError } = await supabase
-        .from("Lotes")
-        .select("base_numero_lote")
-        .eq("base_numero_lote", registro.base_numero_lote)
-        .single();
-
-      if (loteError || !loteExistente) {
-        toast.current.show({
-          severity: "error",
-          summary: "Error",
-          detail: `El lote ${registro.base_numero_lote} no existe.`,
-          life: 3000,
-        });
-        return;
-      }
       const { data, error } = await supabase
         .from("Control_Operativo_Horno_Multilevel")
         .insert([
           {
-            base_numero_lote: registro.base_numero_lote, // Lote seleccionado
             operario_horno: registro.operario_horno,
             coordinador_planta: registro.coordinador_planta,
             d_voltaje: registro.d_voltaje,
@@ -239,18 +202,6 @@ const ControlOperativoHornoMultilevel = () => {
         console.error("Error en Supabase:", error);
         throw new Error(
           error.message || "Error desconocido al guardar en Supabase"
-        );
-      }
-      // Actualizar la tabla Lotes con la nueva etapa_actual
-      const { error: updateError } = await supabase
-        .from("Lotes")
-        .update({ etapa_actual: "HornoMul" }) // Cambia "Control de Rendimiento" por la etapa que corresponda
-        .eq("base_numero_lote", registro.base_numero_lote);
-
-      if (updateError) {
-        console.error("Error al actualizar Lotes:", updateError);
-        throw new Error(
-          updateError.message || "Error desconocido al actualizar Lotes"
         );
       }
       toast.current.show({
@@ -645,13 +596,6 @@ const ControlOperativoHornoMultilevel = () => {
           >
             <Column selectionMode="multiple" exportable={false}></Column>
             <Column
-              field="numero_lote"
-              header="Número Lote"
-              // editor={(options) => textEditor(options)}
-              sortable
-              style={{ minWidth: "10rem" }}
-            ></Column>
-            <Column
               field="operario_horno"
               header="Operario Horno"
               editor={(options) => textEditor(options)}
@@ -829,25 +773,7 @@ const ControlOperativoHornoMultilevel = () => {
         onHide={hideDialog}
       >
         <div className="p-field">
-          <label htmlFor="base_numero_lote" className="font-bold">
-            Número de lote{" "}
-            {submitted && !registro.base_numero_lote && (
-              <small className="p-error">Requerido.</small>
-            )}
-          </label>
 
-          <Dropdown
-            value={registro.base_numero_lote}
-            onChange={(e) => {
-              setRegistro({ ...registro, base_numero_lote: e.value });
-            }}
-            options={[...(lotes || [])]}
-            optionLabel="base_numero_lote" // Mostrar el campo "label" en el dropdown
-            optionValue="base_numero_lote" // Guardar el valor de "base_numero_lote"
-            placeholder="Selecciona un Número de lote"
-            className="w-full md:w-14rem"
-          />
-          <br />
           <label htmlFor="operario_horno" className="font-bold">
             Operario Horno{" "}
             {submitted && !registro.operario_horno && (

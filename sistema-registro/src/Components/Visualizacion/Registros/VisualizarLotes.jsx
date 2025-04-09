@@ -69,9 +69,9 @@ function VisualizarLotes() {
         let query = supabase
           .from("Lotes")
           .select("*", { count: "exact" })
+          // .order("fec_registro", { ascending: false })  // Si se ordena por comando hay que hacer unos cambios de lazyload
           .range(start, start + limit - 1);
-        // Ordenar por defecto por fecha descendente (más nuevos primero)
-        // .order("fec_registro", { ascending: false });
+         
 
         // Aplicar sorting
         if (lazyParams.sortField) {
@@ -304,8 +304,8 @@ function VisualizarLotes() {
         metaKeySelection={false}
         tableStyle={{ minWidth: "50rem" }}
       >
-        <Column field="base_numero_lote" header="Número de Lote" />
-        <Column field="fecha_registro" header="Fecha Registro" />
+        <Column field="base_numero_lote" header="Número de Lote" sortable />
+        <Column field="fecha_registro" header="Fecha Registro"  sortable/>
         <Column field="hora_registro" header="Hora Registro" />
         <Column field="etapa_actual" header="Etapa Actual" />
       </DataTable>

@@ -162,7 +162,7 @@ function NIB() {
     };
   }, []);
 
-  // Generar PDF
+  // Generar Word
   const generarWord = useCallback(async () => {
     const datos = datosImpresionRef.current;
 
@@ -465,7 +465,6 @@ function NIB() {
     fetchNeonatos(lazyParams.first, lazyParams.rows);
     fetchLotes();
   }, [
-    // fetchNeonatos,
     lazyParams.first,
     lazyParams.rows,
     lazyParams.sortField,
@@ -1150,7 +1149,6 @@ function NIB() {
             style={{ width: "100%" }}
             dataKey="id"
             paginator
-            // rows={10}
             rowsPerPageOptions={[5, 10, 25]}
             paginatorTemplate="FirstPageLink PrevPageLink PageLinks NextPageLink LastPageLink CurrentPageReport RowsPerPageDropdown"
             currentPageReportTemplate="Showing {first} to {last} of {totalRecords} Usuarios"
@@ -1287,6 +1285,7 @@ function NIB() {
 
           <Dropdown
             value={registro.base_numero_lote}
+            filter
             onChange={(e) => {
               setRegistro({ ...registro, base_numero_lote: e.value });
             }}
