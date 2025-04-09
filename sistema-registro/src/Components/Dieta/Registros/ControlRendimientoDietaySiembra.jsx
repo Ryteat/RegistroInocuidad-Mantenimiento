@@ -24,6 +24,16 @@ import "jspdf-autotable";
 import logo2 from "../../../assets/mosca.png";
 
 function ControLRendimientoDietaySiembra() {
+  // Lista estática de operarios
+  const operariosFijos = [
+    { nombre: "Stiven" },
+    { nombre: "Patrick" },
+    { nombre: "Pablo" },
+    { nombre: "Kendal" },
+    { nombre: "José Luis" },
+    { nombre: "Jose Geovani" },
+  ];
+
   let emptyRegister = {
     cantidad_tandas: "",
     kg_dieta_caja: "",
@@ -36,9 +46,9 @@ function ControLRendimientoDietaySiembra() {
     g_pure_banano: "",
     kg_otro: "",
     kg_soya: "",
+    dieta_hatchery: "",
     kg_total: "",
     tipo_dieta: "",
-    dieta_hatchery: "",
     cajas_procesadas_neonatos: "",
     cant_cajas_dieta: 0,
     _originalCajas: 0,
@@ -66,7 +76,6 @@ function ControLRendimientoDietaySiembra() {
 
   const tipoDieta = ["Producción", "Reproducción", "Neonatos"];
   const tipoControl = ["Control", "Prueba"];
-  const opcionesDietaHatchery = ["Sí", "No"];
 
   const [observacionesObligatorio, setObservacionesObligatorio] = useState(false);
   const [erroresValidacion, setErroresValidacion] = useState({
@@ -78,7 +87,7 @@ function ControLRendimientoDietaySiembra() {
   });
 
   const [lotes, setLotes] = useState([]);
-  const [operarios, setOperarios] = useState([]);
+  const [operarios, setOperarios] = useState(operariosFijos);
   const [loading, setLoading] = useState(false);
   const [totalRecords, setTotalRecords] = useState(0);
   const [lazyParams, setLazyParams] = useState({
@@ -96,19 +105,6 @@ function ControLRendimientoDietaySiembra() {
     const [day, month, year] = dateString.split("/");
     return `${day}-${month}-${year}`;
   };
-
-  const fetchOperarios = useCallback(async () => {
-    try {
-      const { data, error } = await supabase
-        .from("Operarios")
-        .select("*")
-        .order("nombre", { ascending: true });
-      if (error) throw error;
-      setOperarios(data || []);
-    } catch (err) {
-      console.error("Error al cargar operarios:", err);
-    }
-  }, []);
 
   const fetchRegistros = useCallback(
     async (start = 0, limit = 10) => {
@@ -162,7 +158,6 @@ function ControLRendimientoDietaySiembra() {
   useEffect(() => {
     fetchRegistros(lazyParams.first, lazyParams.rows);
     fetchLotes();
-    fetchOperarios();
   }, [
     fetchRegistros,
     lazyParams.first,
@@ -275,7 +270,7 @@ function ControLRendimientoDietaySiembra() {
       "cantidad_tandas", "kg_dieta_caja", "kg_residuo_organico", 
       "kg_puntilla_arroz", "kg_destilado_maiz", "kg_melaza", 
       "g_espesante", "lts_agua", "g_pure_banano", "kg_otro", 
-      "kg_soya", "kg_total", "tipo_dieta", "dieta_hatchery",
+      "kg_soya", "dieta_hatchery", "kg_total", "tipo_dieta",
       "cajas_procesadas_neonatos", "cajas_sembradas_rep", 
       "cajas_dieta_no_sembradas_rep", "cajas_sembradas_pro", 
       "cajas_dieta_no_sembradas_pro", "tipo_control", "operario"
@@ -372,9 +367,9 @@ function ControLRendimientoDietaySiembra() {
             g_pure_banano: registro.g_pure_banano,
             kg_otro: registro.kg_otro,
             kg_soya: registro.kg_soya,
+            dieta_hatchery: registro.dieta_hatchery,
             kg_total: registro.kg_total,
             tipo_dieta: registro.tipo_dieta,
-            dieta_hatchery: registro.dieta_hatchery,
             cajas_procesadas_neonatos: registro.cajas_procesadas_neonatos,
             cajas_sembradas_rep: registro.cajas_sembradas_rep,
             cajas_dieta_no_sembradas_rep: registro.cajas_dieta_no_sembradas_rep,
@@ -637,9 +632,9 @@ function ControLRendimientoDietaySiembra() {
     { field: "g_pure_banano", header: "G Puré Banano" },
     { field: "kg_otro", header: "Kg Otro" },
     { field: "kg_soya", header: "Kg Soya" },
+    { field: "dieta_hatchery", header: "Dieta Hatchery" },
     { field: "kg_total", header: "Kg Total" },
     { field: "tipo_dieta", header: "Tipo Dieta" },
-    { field: "dieta_hatchery", header: "Dieta Hatchery" },
     { field: "cajas_procesadas_neonatos", header: "Cajas Procesadas Neonatos" },
     { field: "cajas_sembradas_rep", header: "Cajas Sembradas Rep" },
     { field: "cajas_dieta_no_sembradas_rep", header: "Cajas Dieta No Sembradas Rep" },
@@ -885,6 +880,12 @@ function ControLRendimientoDietaySiembra() {
               sortable
             />
             <Column
+              field="dieta_hatchery"
+              header="Dieta Hatchery"
+              editor={(options) => textEditor(options)}
+              sortable
+            />
+            <Column
               field="kg_total"
               header="Kg Total"
               editor={(options) => floatEditor(options)}
@@ -893,12 +894,6 @@ function ControLRendimientoDietaySiembra() {
             <Column
               field="tipo_dieta"
               header="Tipo Dieta"
-              editor={(options) => textEditor(options)}
-              sortable
-            />
-            <Column
-              field="dieta_hatchery"
-              header="Dieta Hatchery"
               editor={(options) => textEditor(options)}
               sortable
             />
@@ -1186,6 +1181,20 @@ function ControLRendimientoDietaySiembra() {
           />
           <br />
 
+          <label htmlFor="dieta_hatchery" className="font-bold">
+            Dieta Hatchery{" "}
+            {submitted && !registro.dieta_hatchery && (
+              <small className="p-error">Requerido.</small>
+            )}
+          </label>
+          <InputText
+            id="dieta_hatchery"
+            value={registro.dieta_hatchery}
+            onChange={(e) => onInputChange(e, "dieta_hatchery")}
+            required
+          />
+          <br />
+
           <label htmlFor="kg_total" className="font-bold">
             KG Total{" "}
             {submitted && !registro.kg_total && (
@@ -1217,22 +1226,6 @@ function ControLRendimientoDietaySiembra() {
           />
           <br />
 
-          <label htmlFor="dieta_hatchery" className="font-bold">
-            Dieta Hatchery{" "}
-            {submitted && !registro.dieta_hatchery && (
-              <small className="p-error">Requerido.</small>
-            )}
-          </label>
-          <Dropdown
-            id="dieta_hatchery"
-            value={registro.dieta_hatchery}
-            options={opcionesDietaHatchery}
-            onChange={(e) => onInputChange(e, "dieta_hatchery")}
-            placeholder="Seleccione una opción"
-            required
-          />
-          <br />
-
           <label htmlFor="tipo_control" className="font-bold">
             Tipo Control{" "}
             {submitted && !registro.tipo_control && (
@@ -1248,23 +1241,6 @@ function ControLRendimientoDietaySiembra() {
             required
           />
           <br />
-
-          <label htmlFor="operario" className="font-bold">
-            Operario{" "}
-            {submitted && !registro.operario && (
-              <small className="p-error">Requerido.</small>
-            )}
-          </label>
-          <Dropdown
-            id="operario"
-            value={registro.operario}
-            options={operarios}
-            optionLabel="nombre"
-            optionValue="nombre"
-            onChange={(e) => onInputChange(e, "operario")}
-            placeholder="Seleccione un operario"
-            required
-          />
           <br />
           <Divider />
           <h3>
@@ -1378,7 +1354,22 @@ function ControLRendimientoDietaySiembra() {
             required
           />
           <br />
-
+          <label htmlFor="operario" className="font-bold">
+            Operario{" "}
+            {submitted && !registro.operario && (
+              <small className="p-error">Requerido.</small>
+            )}
+          </label>
+          <Dropdown
+            id="operario"
+            value={registro.operario}
+            options={operarios}
+            optionLabel="nombre"
+            optionValue="nombre"
+            onChange={(e) => onInputChange(e, "operario")}
+            placeholder="Seleccione un operario"
+            required
+          />
           <label htmlFor="observaciones" className="font-bold">
             Observaciones{" "}
             {observacionesObligatorio && (
