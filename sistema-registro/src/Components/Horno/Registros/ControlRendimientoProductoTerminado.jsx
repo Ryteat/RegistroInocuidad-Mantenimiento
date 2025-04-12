@@ -928,11 +928,6 @@ const ControlRendimientoProductoTerminado = () => {
               editor={(options) => numberEditor(options)}
             ></Column>
             <Column
-              field="operario"
-              header="Operario"
-              editor={(options) => textEditor(options)}
-            ></Column>
-            <Column
               field="cons_cartonnormal"
               header="Consumo Cartón Normal"
               editor={(options) => numberEditor(options)}
@@ -1042,7 +1037,11 @@ const ControlRendimientoProductoTerminado = () => {
               header="Desecho Gasa Plástica"
               editor={(options) => numberEditor(options)}
             ></Column>
-
+            <Column
+              field="operario"
+              header="Operario"
+              editor={(options) => textEditor(options)}
+            ></Column>
             <Column
               field="observaciones"
               header="Observaciones"
@@ -1608,6 +1607,18 @@ const ControlRendimientoProductoTerminado = () => {
             onChange={(e) => onInputChange(e, "dese_gazaplastica")}
           />
 
+          <br />
+          <label htmlFor="operario" className="font-bold">
+            Operario{" "}
+            {submitted && !registro.operario && (
+              <small className="p-error">Requerido.</small>
+            )}
+          </label>
+          <InputText
+            id="operario"
+            value={registro.operario}
+            onChange={(e) => onInputChange(e, "operario")}
+          />
           <br />
 
           <label htmlFor="observaciones" className="font-bold">

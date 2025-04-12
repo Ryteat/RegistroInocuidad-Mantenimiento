@@ -872,6 +872,8 @@ function ControlIngresoySalidaRacks() {
             <Column field="total_cajas" header="Total Cajas" sortable />
             <Column
               field="responsable"
+             
+             
               header="Responsable"
               sortable
               editor={(options) => textEditor(options)}
