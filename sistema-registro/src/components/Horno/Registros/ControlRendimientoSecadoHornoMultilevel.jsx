@@ -28,7 +28,7 @@ function ControlRendimientoSecadoHornoMultilevel() {
     fecha_registro: "",
     hora_registro: "",
     tipo_control: "",
-    fecha_siembra: "",
+    
     fecha_produccion: "",
     hora_proceso: "",
     larva_fresca_kg: "",
@@ -216,7 +216,6 @@ function ControlRendimientoSecadoHornoMultilevel() {
     const valoresFueraDeRango = isCajasTotalesInvalido;
     if (
       !registro.tipo_control ||
-      !registro.fecha_siembra ||
       !registro.fecha_produccion ||
       !registro.hora_proceso ||
       !registro.larva_fresca_kg ||
@@ -297,7 +296,6 @@ function ControlRendimientoSecadoHornoMultilevel() {
             fecha_registro: currentDate,
             hora_registro: currentTime,
             tipo_control: registro.tipo_control,
-            fecha_siembra: convertirFecha(registro.fecha_siembra),
             fecha_produccion: convertirFecha(registro.fecha_produccion),
             hora_proceso: registro.hora_proceso,
             larva_fresca_kg: registro.larva_fresca_kg,
@@ -574,7 +572,6 @@ function ControlRendimientoSecadoHornoMultilevel() {
   const cols = [
     { field: "numero_lote", header: "Número Lote" },
     { field: "tipo_control", header: "Tipo Control" },
-    { field: "fecha_siembra", header: "Fecha Siembra" },
     { field: "fecha_produccion", header: "Fecha Producción" },
     { field: "hora_proceso", header: "Hora Proceso" },
     { field: "larva_fresca_kg", header: "Larva Fresca (kg)" },
@@ -755,10 +752,6 @@ function ControlRendimientoSecadoHornoMultilevel() {
               sortable
               style={{ minWidth: "10rem" }}
             ></Column>
-            <Column field="fecha_registro" header="Fecha Registro" sortable />
-            <Column field="hora_registro" header="Hora Registro" sortable />
-            <Column field="tipo_control" header="Tipo Control" sortable />
-            <Column field="fecha_siembra" header="Fecha Siembra" sortable />
             <Column
               field="fecha_produccion"
               header="Fecha Producción"
@@ -770,9 +763,14 @@ function ControlRendimientoSecadoHornoMultilevel() {
               header="Larva Fresca (kg)"
               sortable
             />
+            <Column field="tipo_control" header="Tipo Control" sortable />
+            
             <Column field="cajas_totales" header="Cajas Totales" sortable />
             <Column field="desecho_kg" header="Desecho (kg)" sortable />
+            <Column field="fecha_registro" header="Fecha Registro" sortable />
+            <Column field="hora_registro" header="Hora Registro" sortable />
             <Column field="observaciones" header="Observaciones" sortable />
+
           </DataTable>
         </div>
       </div>
@@ -835,35 +833,6 @@ function ControlRendimientoSecadoHornoMultilevel() {
             className="w-full md:w-14rem"
           />
           <br />
-          <label htmlFor="tipo_control" className="font-bold">
-            Tipo Control{" "}
-            {submitted && !registro.tipo_control && (
-              <small className="p-error">Requerido.</small>
-            )}
-          </label>
-          <Dropdown
-            id="tipo_control"
-            value={registro.tipo_control}
-            options={tiposControl}
-            onChange={(e) => onInputChange(e, "tipo_control")}
-            placeholder="Selecciona un tipo"
-            required
-          />
-          <br />
-          <label htmlFor="fecha_siembra" className="font-bold">
-            Fecha Siembra{" "}
-            {submitted && !registro.fecha_siembra && (
-              <small className="p-error">Requerido.</small>
-            )}
-          </label>
-          <InputText
-            type="date"
-            id="fecha_siembra"
-            value={registro.fecha_siembra}
-            onChange={(e) => onInputChange(e, "fecha_siembra")}
-            required
-          />
-          <br />
           <label htmlFor="fecha_produccion" className="font-bold">
             Fecha Producción{" "}
             {submitted && !registro.fecha_produccion && (
@@ -892,6 +861,24 @@ function ControlRendimientoSecadoHornoMultilevel() {
             required
           />
           <br />
+          <label htmlFor="tipo_control" className="font-bold">
+            Tipo Control{" "}
+            {submitted && !registro.tipo_control && (
+              <small className="p-error">Requerido.</small>
+            )}
+          </label>
+          <Dropdown
+            id="tipo_control"
+            value={registro.tipo_control}
+            options={tiposControl}
+            onChange={(e) => onInputChange(e, "tipo_control")}
+            placeholder="Selecciona un tipo"
+            required
+          />
+          <br />
+          
+
+
           <label htmlFor="larva_fresca_kg" className="font-bold">
             Larva Fresca (kg){" "}
             {submitted && !registro.larva_fresca_kg && (

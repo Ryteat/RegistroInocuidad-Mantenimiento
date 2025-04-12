@@ -61,6 +61,7 @@ function ControLRendimientoDietaySiembra() {
     fec_registro: "",
     hor_registro: "",
     fecha_siembra: "",
+    fecha_prod: "", // Nuevo campo añadido
     observaciones: "",
   };
 
@@ -380,6 +381,7 @@ function ControLRendimientoDietaySiembra() {
             fec_registro: currentDate,
             hor_registro: currentTime,
             fecha_siembra: fechaSiembra,
+            fecha_prod: registro.fecha_prod, // Nuevo campo añadido
             observaciones: registro.observaciones,
           },
         ]);
@@ -519,7 +521,10 @@ function ControLRendimientoDietaySiembra() {
 
       const { error: updateError } = await supabase
         .from("Control_Rendimiento_DietaySiembra")
-        .update(newData)
+        .update({
+          ...newData,
+          fecha_prod: newData.fecha_prod // Incluir el nuevo campo
+        })
         .eq("id", newData.id);
 
       if (updateError) throw updateError;
@@ -621,6 +626,7 @@ function ControLRendimientoDietaySiembra() {
 
   const cols = [
     { field: "numero_lote", header: "Número Lote" },
+    { field: "fecha_prod", header: "Fecha Producción" },
     { field: "cantidad_tandas", header: "Cantidad Tandas" },
     { field: "kg_dieta_caja", header: "Kg Dieta Caja" },
     { field: "kg_residuo_organico", header: "Kg Residuo Orgánico" },
@@ -733,6 +739,7 @@ function ControLRendimientoDietaySiembra() {
       ({ fec_registro, hor_registro, ...registro }) => ({
         ...registro,
         registrado: `${fec_registro || ""} ${hor_registro || ""}`,
+        fecha_prod: row.fecha_prod // Nuevo campo añadido
       })
     );
 
@@ -813,6 +820,12 @@ function ControLRendimientoDietaySiembra() {
               sortable
               style={{ minWidth: "10rem" }}
             ></Column>
+            <Column
+              field="fecha_prod"
+              header="Fecha Producción"
+              sortable
+              body={(rowData) => formatDate(rowData.fecha_prod)}
+            />
             <Column
               field="cantidad_tandas"
               header="Cantidad Tandas"
@@ -1019,7 +1032,32 @@ function ControLRendimientoDietaySiembra() {
             className="w-full md:w-14rem"
           />
           <br />
-          
+          <label htmlFor="fecha_prod" className="font-bold">
+            Fecha Producción{" "}
+            {submitted && !registro.fecha_prod && (
+              <small className="p-error">Requerido.</small>
+            )}
+          </label>
+          <InputText
+            type="date"
+            id="fecha_prod"
+            value={registro.fecha_prod ? 
+              registro.fecha_prod.split('/').reverse().join('-') : 
+              ''}
+            onChange={(e) => {
+              const selectedDate = e.target.value;
+              if (selectedDate) {
+                const [year, month, day] = selectedDate.split('-');
+                const formattedDate = `${day}/${month}/${year}`;
+                setRegistro({...registro, fecha_prod: formattedDate});
+              } else {
+                setRegistro({...registro, fecha_prod: ''});
+              }
+            }}
+            required
+          />
+          <br />
+
           <label htmlFor="cantidad_tandas" className="font-bold">
             Cantidad Tandas{" "}
             {submitted && !registro.cantidad_tandas && (

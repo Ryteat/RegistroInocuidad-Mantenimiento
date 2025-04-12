@@ -70,7 +70,8 @@ function ControlIngresoySalidaRacks() {
   });
 
   const IngresoySalida = ["Ingreso", "Salida"];
-  const destino = ["Producción", "Hatchery"];
+  const destino = ["Producción", "Hatchery", "Frass", "Vacías", "Pruebas", "Otros (especifique en las observacines)"];
+  const responsable = ["Cristian", "Carlos", "Arlyn"];
 
   // Nuevos estados para lazy loading
   const [loading, setLoading] = useState(false);
@@ -679,7 +680,7 @@ function ControlIngresoySalidaRacks() {
     { field: "numero_lote", header: "Número Lote" },
     { field: "ingresoysalida", header: "Ingreso/Salida" },
     { field: "base_numero_lote", header: "Número de Lote" },
-    { field: "destino", header: "Destino" },
+    { field: "detalle", header: "Detalle" },
     { field: "total_cajas", header: "Total de Cajas" },
     { field: "responsable", header: "Responsable" },
     { field: "observaciones", header: "Observaciones" },
@@ -863,7 +864,7 @@ function ControlIngresoySalidaRacks() {
 
             <Column
               field="destino"
-              header="Destino"
+              header="Detalle"
               editor={(options) => textEditor(options)}
               sortable
             />
@@ -992,7 +993,7 @@ function ControlIngresoySalidaRacks() {
 
           <br />
           <label htmlFor="destino" className="font-bold">
-            Destino{" "}
+            Detalle{" "}
             {submitted && !registro.destino && (
               <small className="p-error">Requerido.</small>
             )}
@@ -1002,7 +1003,7 @@ function ControlIngresoySalidaRacks() {
             value={registro.destino}
             options={destino}
             onChange={(e) => onInputChange(e, "destino")}
-            placeholder="Selecciona un destino"
+            placeholder="Selecciona el detalle correspondiente"
             required
           />
           <br />

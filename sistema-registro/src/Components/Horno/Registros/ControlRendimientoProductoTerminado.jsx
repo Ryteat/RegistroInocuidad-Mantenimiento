@@ -34,6 +34,7 @@ const ControlRendimientoProductoTerminado = () => {
     fecha_produccion: "",
     hora: "",
     cant_bolsas: "",
+    presentacion: "",
     operario: "",
     fecha_registro: "",
     hora_registro: "",
@@ -261,6 +262,7 @@ const ControlRendimientoProductoTerminado = () => {
       !registro.hora ||
       !registro.lote ||
       !registro.cant_bolsas ||
+      !registro.presentacion ||
       !registro.operario ||
       !registro.cons_cartonnormal ||
       !registro.dese_cartonnormal ||
@@ -393,6 +395,7 @@ const ControlRendimientoProductoTerminado = () => {
             hora: registro.hora,
             lote: lotesString,
             cant_bolsas: registro.cant_bolsas,
+            presentacion: registro.presentacion,
             operario: registro.operario,
             fecha_registro: currentDate,
             hora_registro: currentTime,
@@ -666,7 +669,8 @@ const ControlRendimientoProductoTerminado = () => {
     { field: "fecha_produccion", header: "Fecha Producción" },
     { field: "hora", header: "Hora" },
 
-    { field: "cant_bolsas", header: "Cantidad Bolsas" },
+    { field: "cant_bolsas", header: "Cantidad Bolsas/Unidad Empaque" },
+    { field: "presentacion", header: "Presentación" },
     { field: "SKU", header: "SKU" },
     { field: "operario", header: "Operario" },
 
@@ -914,8 +918,13 @@ const ControlRendimientoProductoTerminado = () => {
               editor={(options) => textEditor(options)}
             ></Column>
             <Column
+              field="presentacion"
+              header="Presentación"
+              editor={(options) => numberEditor(options)}
+            ></Column>
+            <Column
               field="cant_bolsas"
-              header="Cantidad Bolsas"
+              header="Cantidad Bolsas/Unidad Empaque"
               editor={(options) => numberEditor(options)}
             ></Column>
             <Column
@@ -1208,11 +1217,24 @@ const ControlRendimientoProductoTerminado = () => {
             maxSelectedLabels={3}
             className="w-full"
           />
+          <br />
 
+          <label htmlFor="presentacion" className="font-bold">
+            Presentación{" "}
+            {submitted && !registro.presentacion && (
+              <small className="p-error">Requerido.</small>
+            )}
+          </label>
+          <InputText
+            type="number"
+            id="presentacion"
+            value={registro.presentacion}
+            onChange={(e) => onInputChange(e, "presentacion")}
+          />
           <br />
 
           <label htmlFor="cant_bolsas" className="font-bold">
-            Cantidad Bolsas{" "}
+            Cantidad Bolsas/Unidad Empaque{" "}
             {submitted && !registro.cant_bolsas && (
               <small className="p-error">Requerido.</small>
             )}

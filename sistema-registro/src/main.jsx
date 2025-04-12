@@ -44,7 +44,6 @@ import ControlCalidadCosecha from './pages/Calidad/Registros/PagesControlCalidad
 import RecepcionMateriasPrimas from './pages/Calidad/Registros/PagesRecepcionMateriasPrimas.jsx';
 import ControlNeonatos from './pages/Calidad/Registros/PagesControlNeonatos.jsx';
 import ControlCalidadEngordeHatchery from './pages/Calidad/Registros/PagesControlCalidadEngordeHatchery.jsx';
-import ControlCalidadEngorde from './pages/Calidad/Registros/PagesControlCalidadEngorde.jsx';
 import ControlCalidadHornoMicroondas from './pages/Calidad/Registros/PagesControlCalidadHornoMicroondas.jsx';
 import ControlCalidadHornoMultilevel from './pages/Calidad/Registros/PagesControlCalidadHornoMultilevel.jsx';
 import ControlCalidadDietaSiembra from './pages/Calidad/Registros/PagesControlCalidadDietaSiembra.jsx';
@@ -229,10 +228,7 @@ const router = createBrowserRouter([{
         path: `ControlCalidadEngordeHatchery`,
         element: <ControlCalidadEngordeHatchery />,
       },
-      {
-        path: `ControlCalidadEngorde`,
-        element: <ControlCalidadEngorde />,
-      },
+      
       {
         path: `ControlCalidadHornoMicroondas`,
         element: <ControlCalidadHornoMicroondas />,
