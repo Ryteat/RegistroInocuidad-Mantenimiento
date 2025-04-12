@@ -868,10 +868,12 @@ function ControlIngresoySalidaRacks() {
               editor={(options) => textEditor(options)}
               sortable
             />
-            <Column field="ingresoysalida" header="Ingresp/Salida" sortable />
+            <Column field="ingresoysalida" header="Ingreso/Salida" sortable />
             <Column field="total_cajas" header="Total Cajas" sortable />
             <Column
               field="responsable"
+             
+             
               header="Responsable"
               sortable
               editor={(options) => textEditor(options)}

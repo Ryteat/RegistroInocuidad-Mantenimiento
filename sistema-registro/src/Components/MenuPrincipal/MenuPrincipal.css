@@ -1,45 +1,83 @@
 .menu-principal {
   text-align: center;
   padding: 20px;
-  background-color: #ffffff; /* Fondo blanco */
-  min-height: 100vh;
-  font-family: 'Arial', sans-serif; /* Fuente más moderna */
+  max-width: 1000px;
+  margin: 0 auto;
 }
 
-.menuprincipal-container h1 {
-  color: #556b2f;
-}
-
-.botones {
+h1 {
+  color: #333;
+  margin-bottom: 30px;
   display: flex;
-  flex-direction: column;
   align-items: center;
+  justify-content: center;
   gap: 15px;
 }
 
-.botones button {
-  margin: 10px;
-  padding: 10px 20px;
-  font-size: 16px;
-  background-color: #556b2f;
-  color: white;
-  border: none;
-  border-radius: 8px;
-  cursor: pointer;
-  transition: background-color 0.3s ease;
-}
-
-.botones button:hover {
-  background-color: #6b8e23;
-}
-
-body {
-  background-color: #e2ede0 !important; /* Prioridad más alta */
-  color: #556b2f; /* Asegura que el texto se vea correctamente */
+.logo {
+  width: 200px;
+  margin-top: 30px;
 }
 
 .logo2 {
-  position:initial;
-  width: 25px; /* Cambia este valor al tamaño deseado */
-  height: auto; 
+  width: 50px;
+}
+
+.grid-botones {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 15px;
+  margin: 0 auto;
+  max-width: 800px;
+}
+
+.boton-grid {
+  padding: 15px;
+  font-size: 16px;
+  border: none;
+  border-radius: 8px;
+  background-color: #778c43;
+  color: white;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  min-height: 60px;
+}
+
+.boton-grid:hover {
+  background-color: #b7cd7f;
+  transform: translateY(-2px);
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+}
+
+.boton-grid.cols-1 {
+  grid-column: span 1;
+}
+
+.boton-grid.cols-2 {
+  
+  grid-column: span 2;
+}
+
+.logout-button {
+  background-color: #445a14;
+  margin-top: 20px;
+}
+
+.logout-button:hover {
+  background-color: #DC143C;
+}
+
+@media (max-width: 600px) {
+  .grid-botones {
+    grid-template-columns: 1fr;
+  }
+  
+  .boton-grid.cols-1, 
+  .boton-grid.cols-2 {
+    grid-column: span 1;
+  }
 }

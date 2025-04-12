@@ -14,14 +14,12 @@ function MenuPrincipal() {
     try {
       if (!departamento) return false;
       
-      // Asegurar que sea array (convertir si es string)
       const userDepartments = Array.isArray(departamento) 
         ? departamento 
         : typeof departamento === 'string'
           ? departamento.split(',')
           : [];
 
-      // Normalizar nombres (trim + minúsculas)
       const normalizedUserDepartments = userDepartments.map(d => d.trim().toLowerCase());
       
       return requiredDepartments.some(rd => 
@@ -37,46 +35,81 @@ function MenuPrincipal() {
     navigate('/');
   };
 
+  // Matriz de botones con sus propiedades
+  const botones = [
+    {
+      texto: 'Registros Hatchery',
+      ruta: '/Hatchery',
+      departamentos: ['Hatchery'],
+      cols: 1
+    },
+    {
+      texto: 'Registros Dieta',
+      ruta: '/Dieta',
+      departamentos: ['Dieta'],
+      cols: 1
+    },
+    {
+      texto: 'Registros Horno',
+      ruta: '/Horno',
+      departamentos: ['Horno'],
+      cols: 1
+    },
+    {
+      texto: 'Registros Calidad',
+      ruta: '/Calidad',
+      departamentos: ['Calidad'],
+      cols: 1
+    },
+    {
+      texto: 'Registros Cosecha',
+      ruta: '/Cosecha',
+      departamentos: ['Cosecha'],
+      cols: 1
+    },
+    {
+      texto: 'Registros Mantenimiento',
+      ruta: '/Mantenimiento',
+      departamentos: ['Mantenimiento'],
+      cols: 1
+    },
+    {
+      texto: 'Información Gerencia',
+      ruta: '/Gerencia',
+      departamentos: ['Gerencia'],
+      cols: 2  // Este ocupará dos columnas
+    },
+    {
+      texto: 'Visualizar información',
+      ruta: '/Visualizar',
+      departamentos: ['Visualizar'],
+      cols: 2  // Este ocupará dos columnas
+    }
+  ];
+
   return (
     <div className="menu-principal">
       <h1>
         <img src={logo2} alt="mosca" className="logo2" /> Menú Principal
       </h1>
 
-      <div className="botones">
-        {hasDepartment(['Hatchery']) && (
-          <button onClick={() => navigate('/Hatchery')}>Registros Hatchery</button>
-        )}
-
-        {hasDepartment(['Dieta']) && (
-          <button onClick={() => navigate('/Dieta')}>Registros Dieta</button>
-        )}
-
-        {hasDepartment(['Horno']) && (
-          <button onClick={() => navigate('/Horno')}>Registros Horno</button>
-        )}
-
-        {hasDepartment(['Calidad']) && (
-          <button onClick={() => navigate('/Calidad')}>Registros Calidad</button>
-        )}
-
-        {hasDepartment(['Cosecha']) && (
-          <button onClick={() => navigate('/Cosecha')}>Registros Cosecha</button>
-        )}
-
-        {hasDepartment(['Mantenimiento']) && (
-          <button onClick={() => navigate('/Mantenimiento')}>Registros Mantenimiento</button>
-        )}
-
-        {hasDepartment(['Gerencia']) && (
-          <button onClick={() => navigate('/Gerencia')}>Información Gerencia</button>
-        )}
-
-        {hasDepartment(['Visualizar']) && (
-          <button onClick={() => navigate('/Visualizar')}>Visualizar información</button>
-        )}
-
-        <button onClick={handleLogout} className="logout-button">
+      <div className="grid-botones">
+        {botones.map((boton, index) => (
+          hasDepartment(boton.departamentos) && (
+            <button
+              key={index}
+              className={`boton-grid cols-${boton.cols}`}
+              onClick={() => navigate(boton.ruta)}
+            >
+              {boton.texto}
+            </button>
+          )
+        ))}
+        
+        <button 
+          onClick={handleLogout} 
+          className="boton-grid logout-button cols-2"
+        >
           Cerrar Sesión
         </button>
       </div>

@@ -6,72 +6,85 @@ import logo2 from "../../assets/mosca.png";
 function Hatchery() {
   const navigate = useNavigate();
   const location = useLocation();
-
-  // Verifica si estás en la ruta principal de Hatchery
   const isRootPath = location.pathname === "/Hatchery";
+
+  // Matriz de botones organizados
+  const botones = [
+    {
+      titulo: 'Ingreso de Pre-Pupas',
+      subtitulo: 'A Invernadero',
+      ruta: '/Hatchery/IngresoPPInvernadero',
+      cols: 2,
+      className: 'boton-grid hatchery-button'
+    },
+    {
+      titulo: 'Colecta de Eggies',
+      subtitulo: 'Del Invernadero',
+      ruta: '/Hatchery/ColectaInvernadero',
+      cols: 1,
+      className: 'boton-grid hatchery-button'
+    },
+    {
+      titulo: 'NIB',
+      subtitulo: 'Neonatos Inoculados',
+      ruta: '/Hatchery/NIB',
+      cols: 1,
+      className: 'boton-grid hatchery-button'
+    },
+    {
+      titulo: 'Control de Rendimiento',
+      subtitulo: 'Cosecha-Reproducción',
+      ruta: '/Hatchery/ControlRendimientoCosechaReproduccion',
+      cols: 1,
+      className: 'boton-grid hatchery-button'
+    },
+    {
+      titulo: 'Control Despacho',
+      subtitulo: 'Laboratorio Producción',
+      ruta: '/Hatchery/ControlDespachoLabPro',
+      cols: 1,
+      className: 'boton-grid hatchery-button'
+    }
+  ];
 
   return (
     <div className="hatchery-container">
-      
-
       {isRootPath && (
-        
         <>
-        <h1>
-          <img src={logo2} alt="mosca" className="logo2" />
-          Registros de Hatchery
-        </h1>
-        <div className="welcome-message">
-          <p>Esta es la página de registros de hatchery.</p>
+          <header className="hatchery-header">
+            <img src={logo2} alt="Logo" className="logo2" />
+            <h1>Registros de Hatchery</h1>
+          </header>
+          
+          <div className="welcome-message">
+            <p>Sistema de registro para operaciones de hatchery</p>
           </div>
-          <div className="botones">
-            <button
-              onClick={() => navigate("/Hatchery/IngresoPPInvernadero")}
-              className="back-button"
-            >
-              1- Ingreso de Pre-Pupas a Invernadero
-            </button>
+          
+          <div className="grid-botones">
+            {botones.map((boton, index) => (
+              <button
+                key={index}
+                className={`${boton.className} cols-${boton.cols}`}
+                onClick={() => navigate(boton.ruta)}
+              >
+                <span className="button-main-text">{boton.titulo}</span>
+                {boton.subtitulo && <span className="button-subtext">{boton.subtitulo}</span>}
+              </button>
+            ))}
             
             <button
-              onClick={() => navigate("/Hatchery/ColectaInvernadero")}
-              className="back-button"
+              className="boton-grid logout-button cols-2"
+              onClick={() => navigate(-1)}
             >
-              2- Colecta de Eggies del Invernadero
-            </button>
-
-            <button
-              onClick={() => navigate("/Hatchery/NIB")}
-              className="back-button"
-            >
-              3- NIB - Neonatos Inoculados
-            </button>
-
-            <button
-              onClick={() => navigate("/Hatchery/ControlRendimientoCosechaReproduccion")}
-              className="back-button"
-            >
-              4- Control de Rendimiento Cosecha-Reproducción
-            </button>
-
-            <button
-              onClick={() => navigate("/Hatchery/ControlDespachoLabPro")}
-              className="back-button"
-            >
-              5- Control Despacho Laboratorio Producción
-            </button>
-
-            <button onClick={() => navigate(-1)} className="back-button">
               Volver al Menú Principal
             </button>
           </div>
         </>
-     
-    )}
+      )}
 
-    {/* Aquí se renderizarán las subrutas */}
-    <Outlet />
-  </div>
-);
+      <Outlet />
+    </div>
+  );
 }
 
 export default Hatchery;

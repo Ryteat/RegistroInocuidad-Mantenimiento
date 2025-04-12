@@ -32,7 +32,7 @@ function ControlRendimientoSecadoHornoMultilevel() {
     fecha_produccion: "",
     hora_proceso: "",
     larva_fresca_kg: "",
-    cajas_totales: "",
+    //cajas_totales: "",
     cant_cajas_horno: 0,
     _originalCajas: 0, // Nuevo campo para almacenar el valor original
     desecho_kg: "",
@@ -51,9 +51,9 @@ function ControlRendimientoSecadoHornoMultilevel() {
   const [lotes, setLotes] = useState([]);
   const [observacionesObligatorio, setObservacionesObligatorio] =
     useState(false);
-  const [erroresValidacion, setErroresValidacion] = useState({
+  /*const [erroresValidacion, setErroresValidacion] = useState({
     cajas_totales: false,
-  });
+  });*/
 
   // Nuevos estados para lazy loading
   const [loading, setLoading] = useState(false);
@@ -205,7 +205,7 @@ function ControlRendimientoSecadoHornoMultilevel() {
       return value < min || value > max;
     }
 
-    const isCajasTotalesInvalido = isInvalid(
+    /*const isCajasTotalesInvalido = isInvalid(
       registro.cajas_totales,
       0,
       registro.cant_cajas_horno
@@ -213,13 +213,13 @@ function ControlRendimientoSecadoHornoMultilevel() {
     setErroresValidacion({
       total_cajas: isCajasTotalesInvalido,
     });
-    const valoresFueraDeRango = isCajasTotalesInvalido;
+    const valoresFueraDeRango = isCajasTotalesInvalido;*/
     if (
       !registro.tipo_control ||
       !registro.fecha_produccion ||
       !registro.hora_proceso ||
       !registro.larva_fresca_kg ||
-      !registro.cajas_totales ||
+      //!registro.cajas_totales ||
       !registro.desecho_kg
     ) {
       toast.current.show({
@@ -230,7 +230,7 @@ function ControlRendimientoSecadoHornoMultilevel() {
       });
       return;
     }
-    if (registro.cajas_totales > registro.cant_cajas_horno && registro.base_numero_lote != "Sin Lote Asignado") {
+    /*if (registro.cajas_totales > registro.cant_cajas_horno && registro.base_numero_lote != "Sin Lote Asignado") {
       toast.current.show({
         severity: "error",
         summary: "Error",
@@ -238,13 +238,13 @@ function ControlRendimientoSecadoHornoMultilevel() {
         life: 3000,
       });
       return;
-    }
+    }*/
     // Validación principal
     if (valoresFueraDeRango && !registro.observaciones) {
       setObservacionesObligatorio(true);
-      const currentErrores = {
+      /*const currentErrores = {
         "Cajas Totales": isCajasTotalesInvalido,
-      };
+      };*/
 
       toast.current.show({
         severity: "error",
@@ -260,9 +260,9 @@ function ControlRendimientoSecadoHornoMultilevel() {
     }
 
     setObservacionesObligatorio(false);
-    setErroresValidacion({
+    /*setErroresValidacion({
       cajas_totales: false,
-    });
+    });*/
 
     try {
       const currentDate = formatDateTime(new Date(), "DD/MM/YYYY");
@@ -299,7 +299,7 @@ function ControlRendimientoSecadoHornoMultilevel() {
             fecha_produccion: convertirFecha(registro.fecha_produccion),
             hora_proceso: registro.hora_proceso,
             larva_fresca_kg: registro.larva_fresca_kg,
-            cajas_totales: registro.cajas_totales,
+            //cajas_totales: registro.cajas_totales,
             desecho_kg: registro.desecho_kg,
             observaciones: registro.observaciones,
             base_numero_lote: registro.base_numero_lote,
@@ -313,7 +313,7 @@ function ControlRendimientoSecadoHornoMultilevel() {
       }
 
       // Actualizar la tabla Lotes con la nueva etapa_actual
-      const nuevasCajas = registro.cant_cajas_horno - registro.cajas_totales;
+      //const nuevasCajas = registro.cant_cajas_horno - registro.cajas_totales;
 
       // Convertir el valor de la base de datos (texto con etapas) a un array.
       // Se asume que 'registro.etapa_actual' es la columna que contiene la cadena separada por comas.
@@ -445,7 +445,7 @@ function ControlRendimientoSecadoHornoMultilevel() {
   const onRowEditComplete = async ({ newData, data: oldData }) => {
     try {
       // 1. Calcular diferencia de cajas
-      const diferencia = newData.cajas_totales - oldData.cajas_totales;
+      //const diferencia = newData.cajas_totales - oldData.cajas_totales;
 
       // 2. Obtener lote actual
       const { data: lote, error: loteError } = await supabase
@@ -575,7 +575,7 @@ function ControlRendimientoSecadoHornoMultilevel() {
     { field: "fecha_produccion", header: "Fecha Producción" },
     { field: "hora_proceso", header: "Hora Proceso" },
     { field: "larva_fresca_kg", header: "Larva Fresca (kg)" },
-    { field: "cajas_totales", header: "Cajas Totales" },
+    //{ field: "cajas_totales", header: "Cajas Totales" },
     { field: "desecho_kg", header: "Desecho (kg)" },
     { field: "observaciones", header: "Observaciones" },
     { field: "registrado", header: "Registrado" },
@@ -764,8 +764,6 @@ function ControlRendimientoSecadoHornoMultilevel() {
               sortable
             />
             <Column field="tipo_control" header="Tipo Control" sortable />
-            
-            <Column field="cajas_totales" header="Cajas Totales" sortable />
             <Column field="desecho_kg" header="Desecho (kg)" sortable />
             <Column field="fecha_registro" header="Fecha Registro" sortable />
             <Column field="hora_registro" header="Hora Registro" sortable />
@@ -894,24 +892,7 @@ function ControlRendimientoSecadoHornoMultilevel() {
           />
           <br />
 
-          <label htmlFor="cajas_totales" className="font-bold">
-            Cajas Totales (0 - {registro.cant_cajas_horno}){" "}
-            {submitted && !registro.cajas_totales && (
-              <small className="p-error">Requerido.</small>
-            )}
-            {erroresValidacion.cajas_totales && (
-              <small className="p-error">
-                {`Cantidad Total Cajas debe de ser entre 0 y ${registro.cant_cajas_horno}`}
-              </small>
-            )}
-          </label>
-          <InputText
-            type="number"
-            id="cajas_totales"
-            value={registro.cajas_totales}
-            onChange={(e) => onInputChange(e, "cajas_totales")}
-            required
-          />
+          
           <br />
           <label htmlFor="desecho_kg" className="font-bold">
             Desecho (kg){" "}

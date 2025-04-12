@@ -6,58 +6,71 @@ import logo2 from "../../assets/mosca.png";
 function Cosecha() {
   const navigate = useNavigate();
   const location = useLocation();
-
-  // Verifica si estás en la ruta principal de Coseccha
   const isRootPath = location.pathname === "/Cosecha";
 
+  // Matriz de botones organizados
+  const botones = [
+    {
+      titulo: 'Control de Ingreso/Salida',
+      subtitulo: 'de Racks',
+      ruta: '/Cosecha/ControlIngresoySalidaRacks',
+      cols: 2,
+      className: 'boton-grid cosecha-button'
+    },
+    {
+      titulo: 'Control de Rendimiento',
+      subtitulo: 'Cosecha y Frass',
+      ruta: '/Cosecha/ControlRendimientoCosechayFrass',
+      cols: 1,
+      className: 'boton-grid cosecha-button'
+    },
+    {
+      titulo: 'Control de Tiempos',
+      subtitulo: 'Tiempos Perdidos',
+      ruta: '/ControlTiempos',
+      cols: 1,
+      className: 'boton-grid cosecha-button tiempo-button'
+    }
+  ];
+
   return (
-   
     <div className="cosecha-container">
-
       {isRootPath && (
-        
         <>
-        <h1>
-          <img src={logo2} alt="mosca" className="logo2" />
-          Registros de Cosecha
-        </h1>
-        <div className="welcome-message">
-          <p>Esta es la página de registros de Cosecha.</p>
+          <header className="cosecha-header">
+            <img src={logo2} alt="Logo" className="logo2" />
+            <h1>Registros de Cosecha</h1>
+          </header>
+          
+          <div className="welcome-message">
+            <p>Sistema de registro para operaciones de cosecha</p>
           </div>
-          <div className="botones">
-          <button
-              onClick={() => navigate("/Cosecha/ControlIngresoySalidaRacks")}
-              className="back-button"
-            >
-              1- Control de Ingreso o Salida de Racks
-            </button>
+          
+          <div className="grid-botones">
+            {botones.map((boton, index) => (
+              <button
+                key={index}
+                className={`${boton.className} cols-${boton.cols}`}
+                onClick={() => navigate(boton.ruta)}
+              >
+                <span className="button-main-text">{boton.titulo}</span>
+                {boton.subtitulo && <span className="button-subtext">{boton.subtitulo}</span>}
+              </button>
+            ))}
+            
             <button
-              onClick={() => navigate("/Cosecha/ControlRendimientoCosechayFrass")}
-              className="back-button"
+              className="boton-grid logout-button cols-2"
+              onClick={() => navigate(-1)}
             >
-              2- Control de Rendimiento Cosecha y Frass
-            </button>
-            
-             <button
-              onClick={() => navigate("/ControlTiempos")}
-              className="back-button"
-            >
-              3-Control de Tiempos Perdidos
-            </button>
-
-            
-
-            <button onClick={() => navigate(-1)} className="back-button">
               Volver al Menú Principal
             </button>
           </div>
         </>
-     
-    )}
+      )}
 
-    {/* Aquí se renderizarán las subrutas */}
-    <Outlet />
-  </div>
-);
+      <Outlet />
+    </div>
+  );
 }
+
 export default Cosecha;
