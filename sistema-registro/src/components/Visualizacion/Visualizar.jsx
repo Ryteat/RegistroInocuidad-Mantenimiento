@@ -8,6 +8,40 @@ function Visualizar() {
   const location = useLocation();
   const isRootPath = location.pathname === "/Visualizar";
 
+  // Matriz de botones con sus propiedades
+  const botones = [
+    {
+      texto: 'Reporte KPIs',
+      ruta: '/Visualizar/VisualizarKPIs',
+      cols: 1,
+      className: 'boton-grid'
+    },
+    {
+      texto: 'Flash Report',
+      ruta: '/Visualizar/FlashReport',
+      cols: 1,
+      className: 'boton-grid'
+    },
+    {
+      texto: 'Visualizar Lotes',
+      ruta: '/Visualizar/VisualizarLotes',
+      cols: 1,
+      className: 'boton-grid'
+    },
+    {
+      texto: 'Visualizar SKUs',
+      ruta: '/Visualizar/VisualizarSKUs',
+      cols: 1,
+      className: 'boton-grid'
+    },
+    {
+      texto: 'Volver al Menú Principal',
+      ruta: -1, // Usamos -1 para el navigate back
+      cols: 2,
+      className: 'boton-grid logout-button' // Clases iguales al botón de cerrar sesión
+    }
+  ];
+
   return (
     <div className="gerencia-container">
       {isRootPath && (
@@ -17,24 +51,18 @@ function Visualizar() {
             Visualización de datos relevantes
           </h1>
           <div className="welcome-message">
-            <p>Esta es la página de registros de mantenimiento.</p>
+            <p>Esta es la página que perimte la visualización de los datos relevantes del proceso productivo.</p>
           </div>
-          <div className="botones">
-            <button onClick={() => navigate("/Visualizar/VisualizarKPIs")}>
-              Reporte KPIs
-            </button>
-            <button onClick={() => navigate("/Visualizar/FlashReport")}>
-              Flash Report
-            </button>
-            <button onClick={() => navigate("/Visualizar/VisualizarLotes")}>
-              Visualizar Lotes
-            </button>
-            <button onClick={() => navigate("/Visualizar/VisualizarSKUs")}>
-              Visualizar SKUs
-            </button>
-            <button onClick={() => navigate(-1)}>
-              Volver al Menú Principal
-            </button>
+          <div className="grid-botones">
+            {botones.map((boton, index) => (
+              <button
+                key={index}
+                className={`${boton.className} cols-${boton.cols}`}
+                onClick={() => navigate(boton.ruta)}
+              >
+                {boton.texto}
+              </button>
+            ))}
           </div>
         </>
       )}

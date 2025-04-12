@@ -1,14 +1,46 @@
 import React from 'react';
 import { useNavigate, Outlet, useLocation } from 'react-router-dom';
 import './Mantenimiento.css';
-import logo2 from "../../assets/mosca.png"; // Asegúrate de tener esta imagen en la ruta correcta
+import logo2 from "../../assets/mosca.png";
 
 function Mantenimiento() {
   const navigate = useNavigate();
   const location = useLocation();
-
-  // Verifica si estás en la ruta principal de Mantenimiento
   const isRootPath = location.pathname === "/Mantenimiento";
+
+  // Matriz de botones con sus propiedades
+  const botones = [
+    {
+      texto: 'Limpieza y Desinfección de Equipos Maquinaria Pesada',
+      ruta: '/Mantenimiento/LimpiezaDesinfeccionEquiposMaquinariaPesada',
+      cols: 1,
+      className: 'boton-grid'
+    },
+    {
+      texto: 'Reporte de Inspección Diario de Montacargas',
+      ruta: '/Mantenimiento/ReporteInspeccion',
+      cols: 1,
+      className: 'boton-grid'
+    },
+    {
+      texto: 'Reporte de Inspección Semanal de Montacargas',
+      ruta: '/Mantenimiento/ReporteInspeccionSemanal',
+      cols: 1,
+      className: 'boton-grid'
+    },
+    {
+      texto: 'Registro Preoperacional Teletruk',
+      ruta: '/Mantenimiento/PreoperacionalTeletruk',
+      cols: 1,
+      className: 'boton-grid'
+    },
+    {
+      texto: 'Volver al Menú Principal',
+      ruta: -1,
+      cols: 2,
+      className: 'boton-grid logout-button'
+    }
+  ];
 
   return (
     <div className="mantenimiento-container">
@@ -21,39 +53,16 @@ function Mantenimiento() {
           <div className="welcome-message">
             <p>Esta es la página de registros de mantenimiento.</p>
           </div>
-          <div className="botones">
-            <button
-              onClick={() => navigate("/Mantenimiento/LimpiezaDesinfeccionEquiposMaquinariaPesada")}
-              className="back-button"
-            >
-              1- Limpieza y Desinfeccion de Equipos Maquinaria Pesada
-            </button>
-
-            <button
-              onClick={() => navigate("/Mantenimiento/ReporteInspeccion")}
-              className="back-button"
-            >
-              2- Reporte de Inspección Diario de Montacargas
-            </button>
-
-            <button
-              onClick={() => navigate("/Mantenimiento/ReporteInspeccionSemanal")}
-              className="back-button"
-            >
-              2- Reporte de Inspección Semanal de Montacargas
-            </button>
-
-            
-            <button
-              onClick={() => navigate("/Mantenimiento/PreoperacionalTeletruk")}
-              className="back-button"
-            >
-              3- Registro PreoperacionalTeletruk
-            </button>
-            
-            <button onClick={() => navigate(-1)} className="back-button">
-              Volver al Menú Principal
-            </button>
+          <div className="grid-botones">
+            {botones.map((boton, index) => (
+              <button
+                key={index}
+                className={`${boton.className} cols-${boton.cols}`}
+                onClick={() => navigate(boton.ruta)}
+              >
+                {boton.texto}
+              </button>
+            ))}
           </div>
         </>
       )}

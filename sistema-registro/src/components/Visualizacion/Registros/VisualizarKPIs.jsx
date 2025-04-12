@@ -75,7 +75,7 @@ const VisualizarKPIs = () => {
             endOfWeek.setHours(23, 59, 59, 999);
 
             return {
-                start: new Date(startOfWeek.getTime() - tzOffset),
+                start: new Date(startOfWeek.setDate(costaRicaDate.getDate() - (costaRicaDate.getDay() || 7) + 1)),
                 end: new Date(endOfWeek.getTime() - tzOffset)
             };
         };
@@ -86,14 +86,24 @@ const VisualizarKPIs = () => {
     useEffect(() => {
         const fetchData = async () => {
             try {
-                const { data, error } = await supabase
+                // Primero obtenemos solo el último registro para la fecha de actualización
+                const { data: lastRecord, error: lastError } = await supabase
+                    .from('visualizar_kpis')
+                    .select('fecha')
+                    .order('fecha', { ascending: false })
+                    .limit(1);
+    
+                if (lastError) throw lastError;
+    
+                // Luego obtenemos todos los datos para el gráfico
+                const { data: allData, error: allError } = await supabase
                     .from('visualizar_kpis')
                     .select('*')
                     .order('fecha', { ascending: true });
-
-                if (error) throw error;
-
-                const parsedData = data.map(item => {
+    
+                if (allError) throw allError;
+    
+                const parsedData = allData.map(item => {
                     if (typeof item.fecha === 'string' && item.fecha.includes('/')) {
                         const [day, month, year] = item.fecha.split('/');
                         const dateString = `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}T00:00:00-06:00`;
@@ -107,17 +117,21 @@ const VisualizarKPIs = () => {
                         fecha: new Date(item.fecha)
                     };
                 });
-
+    
                 setKpiData(parsedData);
+                // Guardamos la fecha del último registro por separado
+                setLastUpdated(lastRecord[0]?.fecha);
             } catch (err) {
                 setError(err.message);
             } finally {
                 setLoading(false);
             }
         };
-
+    
         fetchData();
     }, []);
+
+    const [lastUpdated, setLastUpdated] = useState(null);
 
     const kpiNames = {
         fecha: 'Fecha',
@@ -303,9 +317,11 @@ const VisualizarKPIs = () => {
                 </button>
             </div>
 
+         
             <h2 style={styles.header}>
-                Indicadores Clave - Actualizado al {formatDate(kpiData[kpiData.length - 1]?.fecha)}
+                Indicadores Clave - Actualizado al {lastUpdated ? formatDate(lastUpdated) : 'No hay datos'}
             </h2>
+            
 
             {selectedChart && (
             <div style={styles.modalOverlay}>
