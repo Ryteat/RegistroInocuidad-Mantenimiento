@@ -58,12 +58,7 @@ function Calidad() {
             >
               6- Control Calidad Engorde Hatchery
             </button>
-            <button
-              onClick={() => navigate("/Calidad/ControlCalidadEngorde")}
-              className="back-button"
-            >
-              7- Control Calidad Engorde 
-            </button>
+            
             <button
               onClick={() => navigate("/Calidad/ControlCalidadHornoMicroondas")}
               className="back-button"

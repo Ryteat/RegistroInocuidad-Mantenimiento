@@ -245,6 +245,7 @@ function ControlRendimientoCosechayFrass() {
     );
 
     // Validación principal
+    /*
     if (
 
       !registro.fec_cosecha ||
@@ -263,8 +264,7 @@ function ControlRendimientoCosechayFrass() {
         life: 3000,
       });
       return;
-    }
-
+    }*/
     // Mostrar mensajes de error específicos para cada campo fuera de rango
     if (erroresValidacion.cant_cajas_cosechadas) {
       toast.current.show({
@@ -837,8 +837,12 @@ function ControlRendimientoCosechayFrass() {
               sortable
               style={{ minWidth: "10rem" }}
             ></Column>
-            <Column field="fec_registro" header="Fecha Registro" sortable />
-            <Column field="hor_registro" header="Hora Registro" sortable />
+            <Column
+              field="fec_cosecha"
+              header="Fecha Cosecha"
+              editor={(options) => dateEditor(options)}
+              sortable
+            />
             <Column
               field="tipo_produccion"
               header="Tipo Producción"
@@ -851,12 +855,7 @@ function ControlRendimientoCosechayFrass() {
               editor={(options) => textEditor(options)}
               sortable
             />
-            <Column
-              field="fec_cosecha"
-              header="Fecha Cosecha"
-              editor={(options) => dateEditor(options)}
-              sortable
-            />
+            
             <Column
               field="cant_cajas_cosechadas"
               header="Cajas Cosechadas"
@@ -894,6 +893,8 @@ function ControlRendimientoCosechayFrass() {
               sortable
               editor={(options) => textEditor(options)}
             />
+            <Column field="fec_registro" header="Fecha Registro" sortable />
+            <Column field="hor_registro" header="Hora Registro" sortable />
             <Column
               header="Herramientas"
               rowEditor={allowEdit}
@@ -971,9 +972,7 @@ function ControlRendimientoCosechayFrass() {
           <br />
           <label htmlFor="cant_cajas_cosechadas" className="font-bold">
             Cajas Cosechadas (0 - {registro.cant_cajas_lote}){" "}
-            {submitted && !registro.cant_cajas_cosechadas && (
-              <small className="p-error">Requerido.</small>
-            )}
+            
             {erroresValidacion.cant_cajas_cosechadas && (
               <small className="p-error">
                 {`Cantidad Cajas Procesadas Fuera de rango 500 a ${registro.cant_cajas_lote}`}
@@ -990,9 +989,7 @@ function ControlRendimientoCosechayFrass() {
           <br />
           <label htmlFor="kg_larva_fresca" className="font-bold">
             Larva Fresca Estandar (KG) (0 - 12000){" "}
-            {submitted && !registro.kg_larva_fresca && (
-              <small className="p-error">Requerido.</small>
-            )}
+            
             {erroresValidacion.kg_larva_fresca && (
               <small className="p-error">
                 Kg Larva Fresca fuera de rango 0 a 12000.
@@ -1009,9 +1006,7 @@ function ControlRendimientoCosechayFrass() {
           <br />
           <label htmlFor="cant_cajas_desechadas" className="font-bold">
             Cajas Desechadas (=0){" "}
-            {submitted && !registro.cant_cajas_desechadas && (
-              <small className="p-error">Requerido.</small>
-            )}
+            
             {erroresValidacion.cant_cajas_desechadas && (
               <small className="p-error">
                 Kg Larva Fresca fuera de rango 0 a 12000.
@@ -1028,9 +1023,7 @@ function ControlRendimientoCosechayFrass() {
           <br />
           <label htmlFor="kg_total_frass" className="font-bold">
             Frass Fino Total (KG) (0 - 6000){" "}
-            {submitted && !registro.kg_total_frass && (
-              <small className="p-error">Requerido.</small>
-            )}
+            
             {erroresValidacion.kg_total_frass && (
               <small className="p-error">
                 Kg Total Frass Fuera de rango 0 a 6000.
@@ -1047,9 +1040,7 @@ function ControlRendimientoCosechayFrass() {
           <br />
           <label htmlFor="kg_material_grueso" className="font-bold">
             Total Material Grueso (KG) (0 - 6000){" "}
-            {submitted && !registro.kg_material_grueso && (
-              <small className="p-error">Requerido.</small>
-            )}
+            
             {erroresValidacion.kg_material_grueso && (
               <small className="p-error">
                 Kg Material Grueso Fuera de rango 0 a 6000.

@@ -44,6 +44,7 @@ function ControlCalidadEngordeHatchery() {
     color: "",
     brix: "",
     pH: "",
+    tamano: "",
     observaciones: ""
   };
 
@@ -130,7 +131,8 @@ function ControlCalidadEngordeHatchery() {
       'peso',
       'color',
       'brix',
-      'pH'
+      'pH',
+      'tamano'
     ];
 
     const faltanCampos = camposRequeridos.some(campo => !registro[campo]);
@@ -417,7 +419,7 @@ function ControlCalidadEngordeHatchery() {
         <Column field="humedad_dieta" header="Humedad Dieta (%)" editor={numberEditor} sortable />
         <Column field="humedad_cualitativa" header="Humedad Cualitativa (%)" editor={numberEditor} sortable />
         <Column field="temperatura_dieta" header="Temp. Dieta (°C)" editor={numberEditor} sortable />
-        <Column field="peso" header="Peso (g)" editor={numberEditor} sortable />
+        <Column field="peso" header="Peso (mg)" editor={numberEditor} sortable />
         <Column field="color" header="Color" editor={(options) => (
           <Dropdown
             value={options.value}
@@ -427,6 +429,7 @@ function ControlCalidadEngordeHatchery() {
         )} sortable />
         <Column field="brix" header="Brix (%)" editor={numberEditor} sortable />
         <Column field="pH" header="pH" editor={numberEditor} sortable />
+        <Column field="tamano" header="Tamaño" editor={numberEditor} sortable />
         <Column field="observaciones" header="Observaciones" editor={(options) => (
           <InputText value={options.value} onChange={(e) => options.editorCallback(e.target.value)} />
         )} sortable />
@@ -521,7 +524,7 @@ function ControlCalidadEngordeHatchery() {
             onChange={(e) => setRegistro({...registro, temperatura_dieta: e.target.value})}
           />
 
-          <label>Peso (g) *</label>
+          <label>Peso (mg) *</label>
           <InputText
             type="number"
             value={registro.peso}
@@ -548,6 +551,13 @@ function ControlCalidadEngordeHatchery() {
             step="0.1"
             value={registro.pH}
             onChange={(e) => setRegistro({...registro, pH: e.target.value})}
+          />
+          <label>Tamaño *</label>
+          <InputText
+            type="number"
+            step="0.1"
+            value={registro.tamano}
+            onChange={(e) => setRegistro({...registro, tamano: e.target.value})}
           />
 
           <label>Observaciones</label>

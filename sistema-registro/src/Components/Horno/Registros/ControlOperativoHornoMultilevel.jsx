@@ -21,7 +21,7 @@ import logo2 from "../../../assets/mosca.png";
 const ControlOperativoHornoMultilevel = () => {
   let emptyRegister = {
     operario_horno: "",
-    coordinador_planta: "",
+
 
     d_voltaje: "",
     d_amperaje: "",
@@ -51,6 +51,7 @@ const ControlOperativoHornoMultilevel = () => {
     psi_tanque1: "",
     psi_tanque2: "",
     psi_tanque3: "",
+    psi_tanque4: "",
 
     fec_registro: "",
     hor_registro: "",
@@ -116,7 +117,7 @@ const ControlOperativoHornoMultilevel = () => {
     setSubmitted(true);
     if (
       !registro.operario_horno ||
-      !registro.coordinador_planta ||
+
       !registro.d_voltaje ||
       !registro.d_amperaje ||
       !registro.temp_seteada ||
@@ -142,6 +143,7 @@ const ControlOperativoHornoMultilevel = () => {
       !registro.psi_tanque1 ||
       !registro.psi_tanque2 ||
       !registro.psi_tanque3 ||
+      !registro.psi_tanque4 ||
       !registro.hor_inicio ||
       !registro.hor_fin ||
       !registro.tipo_control
@@ -164,7 +166,7 @@ const ControlOperativoHornoMultilevel = () => {
         .insert([
           {
             operario_horno: registro.operario_horno,
-            coordinador_planta: registro.coordinador_planta,
+
             d_voltaje: registro.d_voltaje,
             d_amperaje: registro.d_amperaje,
             temp_seteada: registro.temp_seteada,
@@ -190,6 +192,7 @@ const ControlOperativoHornoMultilevel = () => {
             psi_tanque1: registro.psi_tanque1,
             psi_tanque2: registro.psi_tanque2,
             psi_tanque3: registro.psi_tanque3,
+            psi_tanque4: registro.psi_tanque4,
             fec_registro: currentDate,
             hor_registro: currentTime,
             observaciones: registro.observaciones,
@@ -408,8 +411,11 @@ const ControlOperativoHornoMultilevel = () => {
   );
 
   const cols = [
-    { field: "operario_horno", header: "Operario Horno" },
-    { field: "coordinador_planta", header: "Coordinador Planta" },
+
+    { field: "hor_inicio", header: "Hora de Inicio" },
+    { field: "hor_fin", header: "Hora de Fin" },
+    { field: "hora_toma_dato", header: "Hora de toma de dato" },
+    { field: "tipo_control", header: "Tipo de Control" },
     { field: "d_voltaje", header: "D. Voltaje" },
     { field: "d_amperaje", header: "D. Amperaje" },
     { field: "temp_seteada", header: "Temp. Seteada" },
@@ -435,9 +441,8 @@ const ControlOperativoHornoMultilevel = () => {
     { field: "psi_tanque1", header: "Psi Tanque 1" },
     { field: "psi_tanque2", header: "Psi Tanque 2" },
     { field: "psi_tanque3", header: "Psi Tanque 3" },
-    { field: "hor_inicio", header: "Hora de Inicio" },
-    { field: "hor_fin", header: "Hora de Fin" },
-    { field: "tipo_control", header: "Tipo de Control" },
+    { field: "psi_tanque4", header: "Psi Tanque 4" },
+    { field: "operario_horno", header: "Operario Horno" },
     { field: "observaciones", header: "Observaciones" },
     { field: "registrado", header: "Registrado" },
   ];
@@ -595,15 +600,21 @@ const ControlOperativoHornoMultilevel = () => {
             currentPageReportTemplate="Mostrando del {first} al {last} de {totalRecords} Registros"
           >
             <Column selectionMode="multiple" exportable={false}></Column>
+            
             <Column
-              field="operario_horno"
-              header="Operario Horno"
-              editor={(options) => textEditor(options)}
+              field="hor_inicio"
+              header="Hora de Inicio"
+              editor={(options) => timeEditor(options)}
             ></Column>
             <Column
-              field="coordinador_planta"
-              header="Coordinador Planta"
-              editor={(options) => textEditor(options)}
+              field="hor_fin"
+              header="Hora de Fin"
+              editor={(options) => timeEditor(options)}
+            ></Column>
+            <Column
+              field="hora_toma_dato"
+              header="Hora Toma Datos"
+              editor={(options) => timeEditor(options)}
             ></Column>
             <Column
               field="tipo_control"
@@ -737,17 +748,18 @@ const ControlOperativoHornoMultilevel = () => {
               editor={(options) => textEditor(options)}
             ></Column>
             <Column
-              field="hor_inicio"
-              header="Hora de Inicio"
-              editor={(options) => timeEditor(options)}
+              field="psi_tanque4"
+              header="Psi Tanque 4"
+              editor={(options) => textEditor(options)}
             ></Column>
-            <Column
-              field="hor_fin"
-              header="Hora de Fin"
-              editor={(options) => timeEditor(options)}
-            ></Column>
+            
             <Column field="fec_registro" header="Fecha Registro"></Column>
             <Column field="hor_registro" header="Hora Registro"></Column>
+            <Column
+              field="operario_horno"
+              header="Operario Horno"
+              editor={(options) => textEditor(options)}
+            ></Column>
             <Column
               field="observaciones"
               header="Observaciones"
@@ -774,39 +786,14 @@ const ControlOperativoHornoMultilevel = () => {
       >
         <div className="p-field">
 
-          <label htmlFor="operario_horno" className="font-bold">
-            Operario Horno{" "}
-            {submitted && !registro.operario_horno && (
-              <small className="p-error">Requerido.</small>
-            )}
-          </label>
-          <InputText
-            id="operario_horno"
-            value={registro.operario_horno}
-            onChange={(e) => onInputChange(e, "operario_horno")}
-          />
-
-          <br />
-
-          <label htmlFor="coordinador_planta" className="font-bold">
-            Coordinador Planta{" "}
-            {submitted && !registro.coordinador_planta && (
-              <small className="p-error">Requerido.</small>
-            )}
-          </label>
-          <InputText
-            id="coordinador_planta"
-            value={registro.coordinador_planta}
-            onChange={(e) => onInputChange(e, "coordinador_planta")}
-          />
-
-          <br />
+        <Divider />
+          <h3>Rango de Temperatura de operación:</h3>
+          <h3>90°C a 140°C</h3>
+          <Divider />
 
           <label htmlFor="hor_inicio" className="font-bold">
             Hora Inicio{" "}
-            {submitted && !registro.hor_inicio && (
-              <small className="p-error">Requerido.</small>
-            )}
+            
           </label>
           <InputText
             type="time"
@@ -816,6 +803,44 @@ const ControlOperativoHornoMultilevel = () => {
           />
 
           <br />
+          <label htmlFor="hor_fin" className="font-bold">
+            Hora Fin{" "}
+            
+          </label>
+          <InputText
+            type="time"
+            id="hor_fin"
+            value={registro.hor_fin}
+            onChange={(e) => onInputChange(e, "hor_fin")}
+          />
+
+          <br />
+          <label htmlFor="hora_toma_dato" className="font-bold">
+            Hora de Toma de Datos{" "}
+          </label>
+          <InputText
+            type="time"
+            id="hora_toma_dato"
+            value={registro.hor_fin}
+            onChange={(e) => onInputChange(e, "hora_toma_dato")}
+          />
+
+          <br />
+
+          <label htmlFor="tipo_control" className="font-bold">
+            Tipo Control{" "}
+            {submitted && !registro.tipo_control && (
+              <small className="p-error">Requerido.</small>
+            )}
+          </label>
+          <Dropdown
+            id="tipo_control"
+            value={registro.tipo_control}
+            options={tipoControl}
+            onChange={(e) => onInputChange(e, "tipo_control")}
+            placeholder="Selecciona una opción"
+            required
+          />
 
           <Divider />
           <h3>Datos Panel de Control del Equipo</h3>
@@ -1207,40 +1232,40 @@ const ControlOperativoHornoMultilevel = () => {
           />
 
           <br />
+          <label htmlFor="psi_tanque4" className="font-bold">
+            Tanque #4 (psi){" "}
+            {submitted && !registro.psi_tanque4 && (
+              <small className="p-error">Requerido.</small>
+            )}
+          </label>
+          <InputText
+            type="number"
+            id="psi_tanque4"
+            value={registro.psi_tanque4}
+            onChange={(e) => onInputChange(e, "psi_tanque4")}
+          />
+
+          <br />
 
           <Divider />
           <h3>Control</h3>
           <Divider />
 
-          <label htmlFor="hor_fin" className="font-bold">
-            Hora Fin{" "}
-            {submitted && !registro.hor_fin && (
+          <label htmlFor="operario_horno" className="font-bold">
+            Operario Horno{" "}
+            {submitted && !registro.operario_horno && (
               <small className="p-error">Requerido.</small>
             )}
           </label>
           <InputText
-            type="time"
-            id="hor_fin"
-            value={registro.hor_fin}
-            onChange={(e) => onInputChange(e, "hor_fin")}
+            id="operario_horno"
+            value={registro.operario_horno}
+            onChange={(e) => onInputChange(e, "operario_horno")}
           />
+
+          
 
           <br />
-
-          <label htmlFor="tipo_control" className="font-bold">
-            Tipo Control{" "}
-            {submitted && !registro.tipo_control && (
-              <small className="p-error">Requerido.</small>
-            )}
-          </label>
-          <Dropdown
-            id="tipo_control"
-            value={registro.tipo_control}
-            options={tipoControl}
-            onChange={(e) => onInputChange(e, "tipo_control")}
-            placeholder="Selecciona una opción"
-            required
-          />
 
           <label htmlFor="observaciones" className="font-bold">
             Observaciones{" "}
