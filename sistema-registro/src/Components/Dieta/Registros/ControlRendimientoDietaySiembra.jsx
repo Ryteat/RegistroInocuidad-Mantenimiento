@@ -45,7 +45,7 @@ function ControLRendimientoDietaySiembra() {
     lts_agua: "",
     g_pure_banano: "",
     kg_otro: "",
-    kg_soya: "",
+    kg_harina_soya: "",
     dieta_hatchery: "",
     kg_total: "",
     tipo_dieta: "",
@@ -101,7 +101,10 @@ function ControLRendimientoDietaySiembra() {
     globalFilter: null,
   });
 
-  const formatDate = (dateString) => {
+  const convertirFecha = (fecha) =>
+    fecha ? fecha.split("-").reverse().join("/") : "";
+
+  const formatDate = (dateString) => {  //FORMATEA LA FECHA DE DD/MM/YYYY A DD-MM-YYYY 
     if (!dateString) return "";
     const [day, month, year] = dateString.split("/");
     return `${day}-${month}-${year}`;
@@ -271,7 +274,7 @@ function ControLRendimientoDietaySiembra() {
       "cantidad_tandas", "kg_dieta_caja", "kg_residuo_organico", 
       "kg_puntilla_arroz", "kg_destilado_maiz", "kg_melaza", 
       "g_espesante", "lts_agua", "g_pure_banano", "kg_otro", 
-      "kg_soya", "dieta_hatchery", "kg_total", "tipo_dieta",
+      "kg_harina_soya", "dieta_hatchery", "kg_total", "tipo_dieta",
       "cajas_procesadas_neonatos", "cajas_sembradas_rep", 
       "cajas_dieta_no_sembradas_rep", "cajas_sembradas_pro", 
       "cajas_dieta_no_sembradas_pro", "tipo_control", "operario"
@@ -289,14 +292,18 @@ function ControLRendimientoDietaySiembra() {
       return;
     }
 
-    if (registro.cajas_sembradas_pro > registro.cant_cajas_dieta) {
+    if (
+      registro.cajas_sembradas_pro > registro.cant_cajas_dieta &&
+      !registro.observaciones // Solo bloquea si NO hay observaciones
+    ) {
+      setObservacionesObligatorio(true);
       toast.current.show({
         severity: "error",
         summary: "Error",
-        detail: `No puedes procesar más cajas (${registro.cajas_sembradas_pro}) de las disponibles en el lote (${registro.cant_cajas_dieta})`,
+        detail: `No puedes procesar más cajas (${registro.cajas_sembradas_pro}) de las disponibles (${registro.cant_cajas_dieta}) sin una observación.`,
         life: 3000,
       });
-      return;
+      return; // Solo retorna si no hay observaciones
     }
 
     if (valoresFueraDeRango && !registro.observaciones) {
@@ -336,6 +343,9 @@ function ControLRendimientoDietaySiembra() {
       const currentTime = formatDateTime(new Date(), "hh:mm A");
       const fechaSiembra = formatDateTime(new Date(), "DD/MM/YYYY");
 
+      if(registro.base_numero_lote === "Neonatos"){
+        registro.base_numero_lote = null;
+      }else{
       const { data: loteExistente, error: loteError } = await supabase
         .from("Lotes")
         .select("base_numero_lote")
@@ -352,6 +362,7 @@ function ControLRendimientoDietaySiembra() {
         return;
       }
 
+    }
       const { data, error } = await supabase
         .from("Control_Rendimiento_DietaySiembra")
         .insert([
@@ -367,7 +378,7 @@ function ControLRendimientoDietaySiembra() {
             lts_agua: registro.lts_agua,
             g_pure_banano: registro.g_pure_banano,
             kg_otro: registro.kg_otro,
-            kg_soya: registro.kg_soya,
+            kg_harina_soya: registro.kg_harina_soya,
             dieta_hatchery: registro.dieta_hatchery,
             kg_total: registro.kg_total,
             tipo_dieta: registro.tipo_dieta,
@@ -381,7 +392,7 @@ function ControLRendimientoDietaySiembra() {
             fec_registro: currentDate,
             hor_registro: currentTime,
             fecha_siembra: fechaSiembra,
-            fecha_prod: registro.fecha_prod, // Nuevo campo añadido
+            fecha_prod: convertirFecha(registro.fecha_prod),
             observaciones: registro.observaciones,
           },
         ]);
@@ -637,7 +648,7 @@ function ControLRendimientoDietaySiembra() {
     { field: "lts_agua", header: "Lts Agua" },
     { field: "g_pure_banano", header: "G Puré Banano" },
     { field: "kg_otro", header: "Kg Otro" },
-    { field: "kg_soya", header: "Kg Soya" },
+    { field: "kg_harina_soya", header: "Kg Soya" },
     { field: "dieta_hatchery", header: "Dieta Hatchery" },
     { field: "kg_total", header: "Kg Total" },
     { field: "tipo_dieta", header: "Tipo Dieta" },
@@ -824,7 +835,7 @@ function ControLRendimientoDietaySiembra() {
               field="fecha_prod"
               header="Fecha Producción"
               sortable
-              body={(rowData) => formatDate(rowData.fecha_prod)}
+              // body={(rowData) => formatDate(rowData.fecha_prod)}
             />
             <Column
               field="cantidad_tandas"
@@ -887,7 +898,7 @@ function ControLRendimientoDietaySiembra() {
               sortable
             />
             <Column
-              field="kg_soya"
+              field="kg_harina_soya"
               header="Kg Soya"
               editor={(options) => floatEditor(options)}
               sortable
@@ -950,7 +961,7 @@ function ControLRendimientoDietaySiembra() {
               field="fecha_siembra"
               header="Fecha Siembra"
               sortable
-              body={(rowData) => formatDate(rowData.fecha_siembra)}
+              // body={(rowData) => formatDate(rowData.fecha_siembra)}
             />
             <Column
               field="operario"
@@ -962,7 +973,7 @@ function ControLRendimientoDietaySiembra() {
               field="fec_registro" 
               header="Fecha Registro" 
               sortable 
-              body={(rowData) => formatDate(rowData.fec_registro)} 
+              // body={(rowData) => formatDate(rowData.fec_registro)} 
             />
             <Column field="hor_registro" header="Hora Registro" sortable />
             <Column
@@ -1209,17 +1220,17 @@ function ControLRendimientoDietaySiembra() {
           />
           <br />
 
-          <label htmlFor="kg_soya" className="font-bold">
+          <label htmlFor="kg_harina_soya" className="font-bold">
             KG Soya{" "}
-            {submitted && !registro.kg_soya && (
+            {submitted && !registro.kg_harina_soya && (
               <small className="p-error">Requerido.</small>
             )}
           </label>
           <InputText
             type="number"
-            id="kg_soya"
-            value={registro.kg_soya}
-            onChange={(e) => onInputChange(e, "kg_soya")}
+            id="kg_harina_soya"
+            value={registro.kg_harina_soya}
+            onChange={(e) => onInputChange(e, "kg_harina_soya")}
             required
           />
           <br />
@@ -1409,22 +1420,6 @@ function ControLRendimientoDietaySiembra() {
             required
           />
           <br />
-          <label htmlFor="operario" className="font-bold">
-            Operario{" "}
-            {submitted && !registro.operario && (
-              <small className="p-error">Requerido.</small>
-            )}
-          </label>
-          <Dropdown
-            id="operario"
-            value={registro.operario}
-            options={operarios}
-            optionLabel="nombre"
-            optionValue="nombre"
-            onChange={(e) => onInputChange(e, "operario")}
-            placeholder="Seleccione un operario"
-            required
-          />
           <label htmlFor="observaciones" className="font-bold">
             Observaciones{" "}
             {observacionesObligatorio && (

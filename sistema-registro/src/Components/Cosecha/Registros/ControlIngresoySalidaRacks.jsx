@@ -347,7 +347,7 @@ function ControlIngresoySalidaRacks() {
               (loteExistente.cant_cajas_racks_ingreso ?? 0) - totalCajasNum, // Restar de ingreso
             cant_cajas_racks_salida:
               (loteExistente.cant_cajas_racks_salida ?? 0) + totalCajasNum, // Sumar a salida
-            fecha_engorde: new Date().toISOString(),
+            fecha_engorde: currentDate,
             etapa_actual: "Engorde",
           })
           .eq("base_numero_lote", registro.base_numero_lote);

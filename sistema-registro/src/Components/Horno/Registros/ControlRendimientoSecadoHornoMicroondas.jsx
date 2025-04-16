@@ -34,9 +34,6 @@ function ControlRendimientoSecadoHornoMultilevel() {
     fec_produccion: "",
     hor_proceso: "",
     kg_larva_fresca: "",
-    cajas_totales: "",
-    cant_cajas_horno: 0,
-    _originalCajas: 0, // Nuevo campo para almacenar el valor original
     kg_desecho: "",
     hor_inicio: "",
     hor_fin: "",
@@ -207,19 +204,7 @@ function ControlRendimientoSecadoHornoMultilevel() {
   };
 
   const saveRegistro = useCallback(async () => {
-    console.log(registro.cant_cajas_horno);
     setSubmitted(true);
-
-    function isInvalid(value, min, max) {
-      return value < min || value > max;
-    }
-
-    const isCajasTotalesInvalido = isInvalid(
-      registro.cajas_totales,
-      0,
-      registro.cant_cajas_horno
-    );
-
     if (
       !registro.kg_minuto ||
       !registro.velocidad_banda ||
@@ -230,7 +215,6 @@ function ControlRendimientoSecadoHornoMultilevel() {
       !registro.fec_produccion ||
       !registro.hor_proceso ||
       !registro.kg_larva_fresca ||
-      !registro.cajas_totales ||
       !registro.kg_desecho ||
       !registro.hor_inicio ||
       !registro.hor_fin ||
@@ -244,19 +228,12 @@ function ControlRendimientoSecadoHornoMultilevel() {
       });
       return;
     }
-    if (registro.cajas_totales > registro.cant_cajas_horno) {
-      toast.current.show({
-        severity: "error",
-        summary: "Error",
-        detail: `No puedes procesar más cajas (${registro.cajas_totales}) de las disponibles en el lote (${registro.cant_cajas_horno})`,
-        life: 3000,
-      });
-      return;
-    }
     try {
       const currentDate = formatDateTime(new Date(), "DD/MM/YYYY");
       const currentTime = formatDateTime(new Date(), "hh:mm A");
-
+      if(registro.base_numero_lote === "Sin Lote Asignado"){
+        registro.base_numero_lote = null;
+      }else{
       // Verificar si el lote seleccionado existe
       const { data: loteExistente, error: loteError } = await supabase
         .from("Lotes")
@@ -273,6 +250,7 @@ function ControlRendimientoSecadoHornoMultilevel() {
         });
         return;
       }
+    }
       const { data, error } = await supabase
         .from("Control_Rendimiento_Secado_Horno_Microondas")
         .insert([
@@ -303,24 +281,10 @@ function ControlRendimientoSecadoHornoMultilevel() {
           error.message || "Error desconocido al guardar en Supabase"
         );
       }
-      // Actualizar la tabla Lotes con la nueva etapa_actual
-      const nuevasCajas = registro.cant_cajas_horno - registro.cajas_totales;
-
-      // Actualizar Lotes
-      let nuevasEtapas = [...registro.etapas_actualizar];
-
-      if (registro.ingresoysalida === "Salida") {
-        // Agregar Producto Terminado si no existe
-        if (!nuevasEtapas.includes("Producto Terminado")) {
-          nuevasEtapas.push("Producto Terminado");
-        }
-      }
 
       const { error: updateError } = await supabase
         .from("Lotes")
         .update({
-          cant_cajas_horno: nuevasCajas,
-          etapa_actual: nuevasEtapas.join(", "), // Unir todas las etapas
           fecha_horneado: currentDate,
         })
         .eq("base_numero_lote", registro.base_numero_lote);
@@ -424,23 +388,7 @@ function ControlRendimientoSecadoHornoMultilevel() {
       // 1. Calcular diferencia de cajas
       const diferencia = newData.cajas_totales - oldData.cajas_totales;
 
-      // 2. Obtener lote actual
-      const { data: lote, error: loteError } = await supabase
-        .from("Lotes")
-        .select("cant_cajas_horno")
-        .eq("base_numero_lote", oldData.base_numero_lote)
-        .single();
-
-      if (loteError) throw loteError;
-
-      // 3. Calcular nuevo valor
-      const nuevasCajas = lote.cant_cajas_horno - diferencia;
-
-      if (nuevasCajas < 0) {
-        throw new Error("Cantidad de cajas no puede ser negativa");
-      }
-
-      // 4. Actualizar Control_Rendimiento_DietaySiembra
+      // 2. Actualizar Control_Rendimiento_DietaySiembra
       const { error: updateError } = await supabase
         .from("Control_Rendimiento_Secado_Horno_Multilevel")
         .update(newData)
@@ -448,11 +396,10 @@ function ControlRendimientoSecadoHornoMultilevel() {
 
       if (updateError) throw updateError;
 
-      // 5. Actualizar Lotes
+      // 3. Actualizar Lotes
       const { error: loteUpdateError } = await supabase
         .from("Lotes")
         .update({
-          cant_cajas_horno: nuevasCajas,
           etapa_actual: "HornoMic",
         })
         .eq("base_numero_lote", oldData.base_numero_lote);
@@ -556,7 +503,6 @@ function ControlRendimientoSecadoHornoMultilevel() {
     { field: "fec_produccion", header: "Fecha Producción" },
     { field: "hor_proceso", header: "Hora Proceso" },
     { field: "kg_larva_fresca", header: "Kg Larva Fresca" },
-    { field: "cajas_totales", header: "Cajas Totales" },
     { field: "kg_desecho", header: "Kg Desecho" },
     { field: "hor_inicio", header: "Hora Inicio" },
     { field: "hor_fin", header: "Hora Fin" },
@@ -791,12 +737,6 @@ function ControlRendimientoSecadoHornoMultilevel() {
               sortable
             />
             <Column
-              field="cajas_totales"
-              header="Cajas Totales"
-              editor={(options) => numberEditor(options)}
-              sortable
-            />
-            <Column
               field="kg_desecho"
               header="Kg Desecho"
               editor={(options) => floatEditor(options)}
@@ -855,36 +795,25 @@ function ControlRendimientoSecadoHornoMultilevel() {
             )}
           </label>
           <Dropdown
-            value={registro.base_numero_lote}
-            filter
-            onChange={async (e) => {
-              const loteSeleccionado = lotes.find(
-                (l) => l.base_numero_lote === e.value
-              );
-
-              if (loteSeleccionado) {
-                // Obtener los datos actualizados del lote desde Supabase
-                const { data: loteActual, error } = await supabase
-                  .from("Lotes")
-                  .select("cant_cajas_horno")
-                  .eq("base_numero_lote", e.value)
-                  .single();
-
-                if (!error && loteActual) {
-                  setRegistro({
-                    ...registro,
-                    base_numero_lote: e.value,
-                    cant_cajas_horno: loteActual.cant_cajas_horno || 0,
-                  });
-                }
-              }
-            }}
-            options={[...(lotes || [])]}
-            optionLabel="base_numero_lote" // Mostrar el campo "label" en el dropdown
-            optionValue="base_numero_lote" // Guardar el valor de "base_numero_lote"
-            placeholder="Selecciona un Número de lote"
-            className="w-full md:w-14rem"
-          />
+                      value={registro.base_numero_lote}
+                      filter
+                      onChange={async (e) => {
+                        setRegistro({
+                          ...registro,
+                          base_numero_lote: e.value,
+                        });
+                      }}
+                      options={[
+                        {
+                          base_numero_lote: "Sin Lote Asignado"
+                        },
+                        ...(lotes || []),
+                      ]}
+                      optionLabel="base_numero_lote" // Mostrar el campo "label" en el dropdown
+                      optionValue="base_numero_lote" // Guardar el valor de "base_numero_lote"
+                      placeholder="Selecciona un Número de lote"
+                      className="w-full md:w-14rem"
+                    />
           <br />
           <label htmlFor="kg_minuto" className="font-bold">
             Kg Minuto{" "}
@@ -1010,20 +939,6 @@ function ControlRendimientoSecadoHornoMultilevel() {
             id="kg_larva_fresca"
             value={registro.kg_larva_fresca}
             onChange={(e) => onInputChange(e, "kg_larva_fresca")}
-            required
-          />
-          <br />
-          <label htmlFor="cajas_totales" className="font-bold">
-            Cajas Totales{" "}
-            {submitted && !registro.cajas_totales && (
-              <small className="p-error">Requerido.</small>
-            )}
-          </label>
-          <InputText
-            type="number"
-            id="cajas_totales"
-            value={registro.cajas_totales}
-            onChange={(e) => onInputChange(e, "cajas_totales")}
             required
           />
           <br />

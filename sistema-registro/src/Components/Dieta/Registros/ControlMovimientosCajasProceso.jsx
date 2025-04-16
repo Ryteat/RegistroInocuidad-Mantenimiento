@@ -267,14 +267,16 @@ const RecepcionMateriasPrimas = () => {
     try {
       const currentDate = formatDateTime(new Date(), "DD/MM/YYYY"); // Fecha actual
       const currentTime = formatDateTime(new Date(), "hh:mm A"); // Hora actual
-
-      // Verificar si el lote seleccionado existe
+    
+      // Verificar si el lote seleccionado existe y traer los campos necesarios
       const { data: loteExistente, error: loteError } = await supabase
         .from("Lotes")
-        .select("base_numero_lote")
+        .select("base_numero_lote, cant_cajas_racks_ingreso, cant_cajas_despachodieta")
         .eq("base_numero_lote", registro.base_numero_lote)
         .single();
-
+        
+      console.log(loteExistente);
+    
       if (loteError || !loteExistente) {
         toast.current.show({
           severity: "error",
@@ -284,6 +286,8 @@ const RecepcionMateriasPrimas = () => {
         });
         return;
       }
+    
+      // Insertar en Control_Movimiento_Cajas_Proceso
       const { data, error } = await supabase
         .from("Control_Movimiento_Cajas_Proceso")
         .insert([
@@ -298,43 +302,47 @@ const RecepcionMateriasPrimas = () => {
             hora_registro: currentTime,
             observaciones: registro.observaciones,
           },
-        ]); //Cambiar aqui este insert y poner cada columna ya que las fechas se tienen que formatear
+        ]);
+    
       if (error) {
         console.error("Error en Supabase:", error);
         throw new Error(
           error.message || "Error desconocido al guardar en Supabase"
         );
       }
-
-      // Actualizar la tabla Lotes con la nueva etapa_actual
-      const nuevasCajas =
-        registro.cant_cajas_despachodieta - registro.total_cajas;
-
-      // Actualizar la tabla Lotes con la nueva etapa_actual
-      
-        const { error: updateError } = await supabase
-          .from("Lotes")
-          .update({
-            cant_cajas_racks_ingreso: (loteExistente.cant_cajas_racks_ingreso || 0) + registro.total_cajas,
-            cant_cajas_despachodieta: nuevasCajas,
-            etapa_actual: "DespachoDieta",
-          })
-          .eq("base_numero_lote", registro.base_numero_lote);
-
-        if (updateError) {
-          console.error("Error al actualizar Lotes:", updateError);
-          throw new Error(
-            updateError.message || "Error desconocido al actualizar Lotes"
-          );
-        }
-      
+    
+      // Convertir a números para evitar problemas con null o strings
+      const cajasIngresoActuales = Number(loteExistente.cant_cajas_racks_ingreso || 0);
+      const totalCajas = Number(registro.total_cajas || 0);
+      // Suponiendo que cant_cajas_despachodieta es el valor que se va a disminuir
+      const cajasDespachoActuales = Number(loteExistente.cant_cajas_despachodieta || 0);
+      const nuevasCajasDespachodieta = cajasDespachoActuales - totalCajas;
+    
+      // Actualizar la tabla Lotes sumando las cajas totales a las cajas ya ingresadas
+      const { error: updateError } = await supabase
+        .from("Lotes")
+        .update({
+          // Suma acumulada para cant_cajas_racks_ingreso
+          cant_cajas_racks_ingreso: cajasIngresoActuales + totalCajas,
+          cant_cajas_despachodieta: nuevasCajasDespachodieta,
+          etapa_actual: "DespachoDieta",
+        })
+        .eq("base_numero_lote", registro.base_numero_lote);
+    
+      if (updateError) {
+        console.error("Error al actualizar Lotes:", updateError);
+        throw new Error(
+          updateError.message || "Error desconocido al actualizar Lotes"
+        );
+      }
+    
       toast.current.show({
         severity: "success",
         summary: "Exitoso",
         detail: "Registro creado correctamente",
         life: 3000,
       });
-
+    
       setRegistro(emptyRegister);
       setRegistroDialog(false);
       setSubmitted(false);
@@ -347,6 +355,7 @@ const RecepcionMateriasPrimas = () => {
         life: 3000,
       });
     }
+    
   }, [registro, lotes, convertirFecha]);
 
   const dateEditor = (options) => {
