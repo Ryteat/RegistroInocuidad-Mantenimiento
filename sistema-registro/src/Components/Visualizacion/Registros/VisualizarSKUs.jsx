@@ -67,10 +67,10 @@ function VisualizarSKUs() {
         try {
           let query = supabase
           .from("SKU")
-    .select("base_codigo_sku, fecha_registro, hora_registro", { count: "exact" })
-          .range(start, start + limit - 1);
+          .select("base_codigo_sku, fecha_registro, hora_registro", { count: "exact" })
+          .range(start, start + limit - 1)
         // Ordenar por defecto por fecha descendente (más nuevos primero)
-        // .order("fec_registro", { ascending: false });
+        //  .order("fecha_registro", { ascending: false });
 
         // Aplicar sorting
         if (lazyParams.sortField) {

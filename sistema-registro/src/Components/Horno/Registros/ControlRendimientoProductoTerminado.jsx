@@ -1608,18 +1608,7 @@ const ControlRendimientoProductoTerminado = () => {
           />
 
           <br />
-          <label htmlFor="operario" className="font-bold">
-            Operario{" "}
-            {submitted && !registro.operario && (
-              <small className="p-error">Requerido.</small>
-            )}
-          </label>
-          <InputText
-            id="operario"
-            value={registro.operario}
-            onChange={(e) => onInputChange(e, "operario")}
-          />
-          <br />
+          
 
           <label htmlFor="observaciones" className="font-bold">
             Observaciones{" "}

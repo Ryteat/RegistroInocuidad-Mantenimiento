@@ -68,6 +68,7 @@ function Hatchery() {
                 onClick={() => navigate(boton.ruta)}
               >
                 <span className="button-main-text">{boton.titulo}</span>
+                {"-"}
                 {boton.subtitulo && <span className="button-subtext">{boton.subtitulo}</span>}
               </button>
             ))}
