@@ -307,7 +307,7 @@ const RecepcionMateriasPrimas = () => {
       if (error) {
         console.error("Error en Supabase:", error);
         throw new Error(
-          error.message || "Error desconocido al guardar en Supabase"
+          "Error en Supabase: Mirar consola para ver error" || "Error desconocido al guardar en Supabase"
         );
       }
     
@@ -324,6 +324,7 @@ const RecepcionMateriasPrimas = () => {
         .update({
           // Suma acumulada para cant_cajas_racks_ingreso
           cant_cajas_racks_ingreso: cajasIngresoActuales + totalCajas,
+          cant_cajas_racks_salida: cajasIngresoActuales + totalCajas,
           cant_cajas_despachodieta: nuevasCajasDespachodieta,
           etapa_actual: "DespachoDieta",
         })
@@ -406,6 +407,7 @@ const RecepcionMateriasPrimas = () => {
     return (
       <InputText
         type="number"
+onKeyDown={handleKeyPress}
         value={options.value}
         onChange={(e) => options.editorCallback(e.target.value)}
       />
@@ -447,6 +449,18 @@ const RecepcionMateriasPrimas = () => {
     );
   };
 
+  const handleKeyPress = (e) => {
+    const invalidChars = ['e', 'E', '+', '-'];
+    if (invalidChars.includes(e.key)) {
+      e.preventDefault();
+    }
+    
+    // Si es un campo decimal, permite un solo punto
+    if (e.key === '.' && e.target.value.includes('.')) {
+      e.preventDefault();
+    }
+  };
+
   const allowEdit = (rowData) => {
     return rowData.name !== "Blue Band";
   };
@@ -459,11 +473,29 @@ const RecepcionMateriasPrimas = () => {
       // 2. Obtener el lote actual, seleccionando ambos campos necesarios
       const { data: lote, error: loteError } = await supabase
         .from("Lotes")
-        .select("cant_cajas_despachodieta, cant_cajas_racks_ingreso")
+        .select("cant_cajas_despachodieta, cant_cajas_racks_ingreso, etapa_actual")
         .eq("base_numero_lote", oldData.base_numero_lote)
         .single();
   
-      if (loteError) throw loteError;
+        if (loteError || !lote) {
+          toast.current.show({
+            severity: 'error',
+            summary: 'Error',
+            detail: 'No se encontró el lote asociado',
+            life: 3000
+          });
+          return;
+        }
+    
+        if (lote.etapa_actual !== 'DespachoDieta') {
+          toast.current.show({
+            severity: 'error',
+            summary: 'Edición bloqueada',
+            detail: 'Solo se pueden editar registros de lotes en etapa Despacho Dieta',
+            life: 3000
+          });
+          return;
+        }
   
       // 3. Calcular nuevos valores:
       //    - Se resta la diferencia al total de cajas despachadas (puede aumentar o disminuir)

@@ -603,6 +603,7 @@ function NIB() {
             severity: "warn",
             detail: `El lote ${posibleLote} ya existe. Selecciónalo.`,
           });
+          console.log("YA EXISTE")
           return;
         }
 
@@ -663,11 +664,11 @@ function NIB() {
             observaciones: registro.observaciones,
           },
         ]);
-
+       
       if (insertError) {
         console.error("Error al insertar en Neonatos_Inoculados:", insertError);
         throw new Error(
-          insertError.message || "Error desconocido al guardar en Supabase"
+         "Error en Supabase: Mirar consola para ver error" || "Error desconocido al guardar en Supabase"
         );
       }
       const { error: updateError } = await supabase
@@ -702,6 +703,19 @@ function NIB() {
   //FIN de Guardar el registro de Neonatos Inoculados
 
   //Inicio de EDITAR TABLA
+
+  const handleKeyPress = (e) => {
+    const invalidChars = ['e', 'E', '+', '-'];
+    if (invalidChars.includes(e.key)) {
+      e.preventDefault();
+    }
+    
+    // Si es un campo decimal, permite un solo punto
+    if (e.key === '.' && e.target.value.includes('.')) {
+      e.preventDefault();
+    }
+  };
+
   const dateEditor = (options) => {
     const convertToInputFormat = (date) => {
       if (!date) return "";
@@ -750,6 +764,7 @@ function NIB() {
     return (
       <InputText
         type="number"
+onKeyDown={handleKeyPress}
         value={options.value}
         onChange={(e) => options.editorCallback(e.target.value)}
       />
@@ -759,7 +774,8 @@ function NIB() {
   const floatEditor = (options) => {
     return (
       <InputText
-        type="float"
+       type="number"
+onKeyDown={handleKeyPress}
         value={options.value}
         onChange={(e) => options.editorCallback(e.target.value)}
       />
@@ -1096,6 +1112,8 @@ function NIB() {
   );
   //FIN de EXPORTAR TABLA
 
+  
+
   return (
     <>
       <div className="tabla-container">
@@ -1365,7 +1383,8 @@ function NIB() {
             )} */}
           </label>
           <InputText
-            type="float"
+           type="number"
+onKeyDown={handleKeyPress}
             id="gm_colectados"
             value={registro.gm_colectados}
             onChange={(e) => onInputChange(e, "gm_colectados")}
@@ -1387,6 +1406,7 @@ function NIB() {
           </label>
           <InputText
             type="number"
+onKeyDown={handleKeyPress}
             id="cajas_inoculadas_destino"
             value={registro.cajas_inoculadas_destino}
             onChange={(e) => onInputChange(e, "cajas_inoculadas_destino")}
@@ -1402,7 +1422,8 @@ function NIB() {
             )}
           </label>
           <InputText
-            type="float"
+           type="number"
+onKeyDown={handleKeyPress}
             id="gm_neonato_caja"
             value={registro.gm_neonato_caja}
             onChange={(e) => onInputChange(e, "gm_neonato_caja")}
@@ -1418,7 +1439,8 @@ function NIB() {
             )}
           </label>
           <InputText
-            type="float"
+           type="number"
+onKeyDown={handleKeyPress}
             id="cantidad_dieta_caja"
             value={registro.cantidad_dieta_caja}
             onChange={(e) => onInputChange(e, "cantidad_dieta_caja")}
@@ -1434,7 +1456,8 @@ function NIB() {
             )}
           </label>
           <InputText
-            type="float"
+           type="number"
+onKeyDown={handleKeyPress}
             id="temp_ambiental"
             value={registro.temp_ambiental}
             onChange={(e) => onInputChange(e, "temp_ambiental")}
@@ -1450,7 +1473,8 @@ function NIB() {
             )}
           </label>
           <InputText
-            type="float"
+           type="number"
+onKeyDown={handleKeyPress}
             id="hum_ambiental"
             value={registro.hum_ambiental}
             onChange={(e) => onInputChange(e, "hum_ambiental")}

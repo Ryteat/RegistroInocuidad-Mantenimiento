@@ -407,19 +407,13 @@ function VisualizarLotes() {
                   field: "cajas_dieta_no_sembradas_rep",
                   header: "Cajas Dieta No Sembradas Rep",
                 },
-                {
-                  field: "g_neonatos_sembrados_caja_rep",
-                  header: "G Neonatos Sembrados Caja Rep",
-                },
+               
                 { field: "cajas_sembradas_pro", header: "Cajas Sembradas Pro" },
                 {
                   field: "cajas_dieta_no_sembradas_pro",
                   header: "Cajas Dieta No Sembradas Pro",
                 },
-                {
-                  field: "g_neonatos_sembrados_caja_pro",
-                  header: "G Neonatos Sembrados Caja Pro",
-                },
+                
                 { field: "tipo_control", header: "Tipo Control" },
                 { field: "observaciones", header: "Observaciones" },
                 { header: "Fecha Registro", field: "fec_registro" },
@@ -441,7 +435,8 @@ function VisualizarLotes() {
                 { field: "total_cajas", header: "Total de Cajas" },
                 { field: "responsable", header: "Responsable" },
                 { field: "observaciones", header: "Observaciones" },
-                { field: "registrado", header: "Registrado" },
+                { field: "fecha_registro", header: "Fecha Registro" },
+                { field: "hora_registro", header: "Hora Registro" },
               ]
             )}
 
@@ -452,12 +447,12 @@ function VisualizarLotes() {
               [
                 { field: "base_numero_lote", header: "Número de Lote" },
                 { field: "ingresoysalida", header: "Ingreso/Salida" },
-                { field: "tipo_registro", header: "Tipo de Registro" },
+                { field: "destino", header: "Destino" },
                 { field: "total_cajas", header: "Total de Cajas" },
                 { field: "responsable", header: "Responsable" },
                 { field: "observaciones", header: "Observaciones" },
-                { field: "fecha_registro", header: "Fecha Registro" },
-                { field: "hora_registro", header: "Hora Registro" },
+                { field: "fec_registro", header: "Fecha Registro" },
+                { field: "hor_registro", header: "Hora Registro" }, 
               ]
             )}
             {/* Control Rendimiento Cosecha y Frass */}
@@ -468,18 +463,14 @@ function VisualizarLotes() {
                 { field: "numero_lote", header: "Número Lote" },
                 { field: "tipo_produccion", header: "Tipo Producción" },
                 { field: "tipo_control", header: "Tipo Control" },
-                { field: "fec_siembra", header: "Fecha Siembra" },
+    
                 { field: "fec_cosecha", header: "Fecha Cosecha" },
                 { field: "cant_cajas_cosechadas", header: "Cajas Cosechadas" },
                 { field: "kg_larva_fresca", header: "Larva Fresca (KG)" },
                 { field: "cant_cajas_desechadas", header: "Cajas Desechadas" },
                 { field: "kg_total_frass", header: "Total Frass (KG)" },
                 { field: "kg_material_grueso", header: "Material Grueso (KG)" },
-                { field: "cant_sacos", header: "Sacos" },
-                {
-                  field: "fec_almacenaje_frass",
-                  header: "Fecha Almacenaje Frass",
-                },
+                
                 { field: "observaciones", header: "Observaciones" },
                 { header: "Fecha Registro", field: "fec_registro" },
                 { header: "Hora Registro", field: "hor_registro" },
@@ -500,7 +491,6 @@ function VisualizarLotes() {
                 { field: "fec_produccion", header: "Fecha Producción" },
                 { field: "hor_proceso", header: "Hora Proceso" },
                 { field: "kg_larva_fresca", header: "Kg Larva Fresca" },
-                { field: "cajas_totales", header: "Cajas Totales" },
                 { field: "kg_desecho", header: "Kg Desecho" },
                 { field: "hor_inicio", header: "Hora Inicio" },
                 { field: "hor_fin", header: "Hora Fin" },
@@ -519,12 +509,10 @@ function VisualizarLotes() {
                 { header: "Fecha Registro", field: "fecha_registro" },
                 { header: "Hora Registro", field: "hora_registro" },
                 { field: "tipo_control", header: "Tipo Control" },
-                { field: "fecha_siembra", header: "Fecha Siembra" },
                 { field: "fecha_produccion", header: "Fecha Producción" },
                 { field: "hora_proceso", header: "Hora Proceso" },
                 { field: "larva_fresca_kg", header: "Larva Fresca (kg)" },
-                { field: "cajas_totales", header: "Cajas Totales" },
-                { field: "desecho_kg", header: "Desecho (kg)" },
+                  { field: "desecho_kg", header: "Desecho (kg)" },
                 { field: "observaciones", header: "Observaciones" },
               ]
             )}

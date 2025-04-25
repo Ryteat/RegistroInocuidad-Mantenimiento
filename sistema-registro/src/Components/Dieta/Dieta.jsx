@@ -11,29 +11,29 @@ function Dieta() {
   // Matriz de botones organizados
   const botones = [
     {
-      titulo: 'Control Inventario',
-      subtitulo: 'Cáscara en Pila',
+      titulo: 'Control Inventario Cáscara en Pila',
+      // subtitulo: '',
       ruta: '/Dieta/ControlInventarioCascaraPila',
       cols: 1,
       className: 'boton-grid dieta-button'
     },
     {
-      titulo: 'Control Rendimiento',
-      subtitulo: 'Dieta y Siembra',
+      titulo: 'Control Rendimiento Dieta y Siembra',
+      // subtitulo: 'Dieta y Siembra',
       ruta: '/Dieta/ControlRendimientoDietaySiembra',
       cols: 1,
       className: 'boton-grid dieta-button'
     },
     {
-      titulo: 'Control Movimientos',
-      subtitulo: 'Cajas en Proceso',
+      titulo: 'Control Movimientos Cajas en Proceso',
+      // subtitulo: '',
       ruta: '/Dieta/ControlMovimientosCajasProceso',
       cols: 1,
       className: 'boton-grid dieta-button'
     },
     {
-      titulo: 'Control de Tiempos',
-      subtitulo: 'Tiempos Perdidos',
+      titulo: 'Control de Tiempos Perdidos',
+      // subtitulo: 'Tiempos Perdidos',
       ruta: '/ControlTiempos',
       cols: 1,
       className: 'boton-grid dieta-button'
@@ -61,7 +61,6 @@ function Dieta() {
                 onClick={() => navigate(boton.ruta)}
               >
                 <span className="button-main-text">{boton.titulo}</span>
-                {"-"}
                 {boton.subtitulo && <span className="button-subtext">{boton.subtitulo}</span>}
               </button>
             ))}

@@ -407,9 +407,11 @@ function ControlRendimientoCosechayFrass() {
       if (error) {
         console.error("Error en Supabase:", error);
         throw new Error(
-          error.message || "Error desconocido al guardar en Supabase"
+          "Error en Supabase: Mirar consola para ver error", error || "Error desconocido al guardar en Supabase"
         );
       }
+      // 
+
 
       // Actualizar Lotes
       const nuevasCajasCosecha =
@@ -419,8 +421,8 @@ function ControlRendimientoCosechayFrass() {
         .from("Lotes")
         .update({
           cant_cajas_cosecha: nuevasCajasCosecha,
-          etapa_actual: "Cosecha",
           fecha_cosecha: currentDate,
+
         })
         .eq("base_numero_lote", registro.base_numero_lote);
 
@@ -452,6 +454,18 @@ function ControlRendimientoCosechayFrass() {
       });
     }
   }, [registro, lotes, convertirFecha]);
+
+const handleKeyPress = (e) => {
+    const invalidChars = ['e', 'E', '+', '-'];
+    if (invalidChars.includes(e.key)) {
+      e.preventDefault();
+    }
+    
+    // Si es un campo decimal, permite un solo punto
+    if (e.key === '.' && e.target.value.includes('.')) {
+      e.preventDefault();
+    }
+  };
 
   const dateEditor = (options) => {
     const convertToInputFormat = (date) => {
@@ -491,6 +505,7 @@ function ControlRendimientoCosechayFrass() {
     return (
       <InputText
         type="number"
+onKeyDown={handleKeyPress}
         value={options.value}
         onChange={(e) => options.editorCallback(e.target.value)}
       />
@@ -981,6 +996,7 @@ function ControlRendimientoCosechayFrass() {
           </label>
           <InputText
             type="number"
+onKeyDown={handleKeyPress}
             id="cant_cajas_cosechadas"
             value={registro.cant_cajas_cosechadas}
             onChange={(e) => onInputChange(e, "cant_cajas_cosechadas")}
@@ -998,6 +1014,7 @@ function ControlRendimientoCosechayFrass() {
           </label>
           <InputText
             type="number"
+onKeyDown={handleKeyPress}
             id="kg_larva_fresca"
             value={registro.kg_larva_fresca}
             onChange={(e) => onInputChange(e, "kg_larva_fresca")}
@@ -1015,6 +1032,7 @@ function ControlRendimientoCosechayFrass() {
           </label>
           <InputText
             type="number"
+onKeyDown={handleKeyPress}
             id="cant_cajas_desechadas"
             value={registro.cant_cajas_desechadas}
             onChange={(e) => onInputChange(e, "cant_cajas_desechadas")}
@@ -1032,6 +1050,7 @@ function ControlRendimientoCosechayFrass() {
           </label>
           <InputText
             type="number"
+onKeyDown={handleKeyPress}
             id="kg_total_frass"
             value={registro.kg_total_frass}
             onChange={(e) => onInputChange(e, "kg_total_frass")}
@@ -1049,6 +1068,7 @@ function ControlRendimientoCosechayFrass() {
           </label>
           <InputText
             type="number"
+onKeyDown={handleKeyPress}
             id="kg_material_grueso"
             value={registro.kg_material_grueso}
             onChange={(e) => onInputChange(e, "kg_material_grueso")}
