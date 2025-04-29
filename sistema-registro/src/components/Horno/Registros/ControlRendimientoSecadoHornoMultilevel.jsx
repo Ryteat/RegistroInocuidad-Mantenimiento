@@ -305,7 +305,7 @@ function ControlRendimientoSecadoHornoMultilevel() {
       if (error) {
         console.error("Error en Supabase:", error);
         throw new Error(
-          error.message || "Error desconocido al guardar en Supabase"
+          "Error en Supabase: Mirar consola para ver error" || "Error desconocido al guardar en Supabase"
         );
       }
 
@@ -412,6 +412,7 @@ function ControlRendimientoSecadoHornoMultilevel() {
     return (
       <InputText
         type="number"
+onKeyDown={handleKeyPress}
         value={options.value}
         onChange={(e) => options.editorCallback(e.target.value)}
       />
@@ -468,6 +469,18 @@ function ControlRendimientoSecadoHornoMultilevel() {
     let _registro = { ...registro };
     _registro[name] = val;
     setRegistro(_registro);
+  };
+
+  const handleKeyPress = (e) => {
+    const invalidChars = ['e', 'E', '+', '-'];
+    if (invalidChars.includes(e.key)) {
+      e.preventDefault();
+    }
+    
+    // Si es un campo decimal, permite un solo punto
+    if (e.key === '.' && e.target.value.includes('.')) {
+      e.preventDefault();
+    }
   };
 
   const leftToolbarTemplate = () => {
@@ -735,7 +748,12 @@ function ControlRendimientoSecadoHornoMultilevel() {
             <Column field="fecha_registro" header="Fecha Registro" sortable />
             <Column field="hora_registro" header="Hora Registro" sortable />
             <Column field="observaciones" header="Observaciones" sortable />
-
+<Column
+              header="Herramientas"
+              rowEditor={allowEdit}
+              headerStyle={{ width: "10%", minWidth: "5rem" }}
+              bodyStyle={{ textAlign: "center" }}
+            ></Column>
           </DataTable>
         </div>
       </div>
@@ -831,6 +849,7 @@ function ControlRendimientoSecadoHornoMultilevel() {
           </label>
           <InputText
             type="number"
+            onKeyDown={handleKeyPress}
             id="larva_fresca_kg"
             value={registro.larva_fresca_kg}
             onChange={(e) => onInputChange(e, "larva_fresca_kg")}
@@ -848,6 +867,7 @@ function ControlRendimientoSecadoHornoMultilevel() {
           </label>
           <InputText
             type="number"
+onKeyDown={handleKeyPress}
             id="desecho_kg"
             value={registro.desecho_kg}
             onChange={(e) => onInputChange(e, "desecho_kg")}

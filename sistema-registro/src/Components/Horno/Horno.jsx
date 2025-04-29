@@ -11,43 +11,43 @@ function Horno() {
   // Matriz de botones organizados por categorías
   const botones = [
     {
-      titulo: 'Control de Rendimiento',
-      subtitulo: 'Secado Horno Multilevel',
+      titulo: 'Control de Rendimiento Secado Horno Multilevel',
+      // subtitulo: 'Secado Horno Multilevel',
       ruta: '/Horno/ControlRendimientoSecadoHornoMultilevel',
       cols: 2,
       className: 'boton-grid oven-button'
     },
     {
-      titulo: 'Control de Rendimiento',
-      subtitulo: 'Secado Horno Microondas',
+      titulo: 'Control de Rendimiento Secado Horno Microondas',
+      // subtitulo: 'Secado Horno Microondas',
       ruta: '/Horno/ControlRendimientoSecadoHornoMicroondas',
       cols: 2,
       className: 'boton-grid oven-button'
     },
     {
-      titulo: 'Control Operativo',
-      subtitulo: 'Horno Multilevel',
+      titulo: 'Control Operativo Horno Multilevel',
+      // subtitulo: 'Horno Multilevel',
       ruta: '/Horno/ControlOperativoHornoMultilevel',
       cols: 1,
       className: 'boton-grid oven-button'
     },
     {
-      titulo: 'Control Rendimiento',
-      subtitulo: 'Producto Terminado',
+      titulo: 'Control Rendimiento Producto Terminado',
+      // subtitulo: 'Producto Terminado',
       ruta: '/Horno/ControlRendimientoProductoTerminado',
       cols: 1,
       className: 'boton-grid oven-button'
     },
     {
-      titulo: 'Control de Tiempos',
-      subtitulo: 'Tiempos Perdidos',
+      titulo: 'Control de Tiempos Perdidos',
+      // subtitulo: 'Tiempos Perdidos',
       ruta: '/ControlTiempos',
       cols: 1,
       className: 'boton-grid oven-button'
     },
     {
-      titulo: 'Control Reempaque',
-      subtitulo: 'Producto Terminado',
+      titulo: 'Control Reempaque Producto Terminado',
+      // subtitulo: 'Producto Terminado',
       ruta: '/Horno/ControlReempaque',
       cols: 1,
       className: 'boton-grid oven-button'
@@ -75,7 +75,6 @@ function Horno() {
                 onClick={() => navigate(boton.ruta)}
               >
                 <span className="button-main-text">{boton.titulo}</span>
-                {"-"}
                 {boton.subtitulo && <span className="button-subtext">{boton.subtitulo}</span>}
               </button>
             ))}
