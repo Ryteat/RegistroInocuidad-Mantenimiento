@@ -219,9 +219,9 @@ const ControlDespachoLabPro = () => {
 
     // Validar los campos
     const isNumViajeInvalido =
-      registro.num_viaje < 0 || registro.num_viaje > 20;
+      registro.num_viaje > 0 || registro.num_viaje < 20;
     const isCantCajasInvalido =
-      registro.cant_cajas < 900 || registro.cant_cajas > 2200;
+    registro.cant_cajas > 500 || registro.cant_cajas < 2200;
 
     // Actualizar el estado de errores
     setErroresValidacion({
@@ -322,14 +322,14 @@ const ControlDespachoLabPro = () => {
             observaciones: registro.observaciones,
           },
         ]); //Cambiar aqui este insert y poner cada columna ya que las fechas se tienen que formatear
+
       if (error) {
         console.error("Error en Supabase:", error);
         throw new Error(
           error.message || "Error desconocido al guardar en Supabase"
         );
       }
-      // Actualizar la tabla Lotes con la nueva etapa_actual
-      let cajasDe1X1 = registro.cant_cajas / 2;
+      
 
       const totalCajas = registro.cant_cajas_despachoLabPro + cajasDe1X1;
       // Actualizar la tabla Lotes con la nueva etapa_actual
@@ -482,7 +482,7 @@ const ControlDespachoLabPro = () => {
       }
 
       // 3. Calcular NUEVAS CAJAS (¡ESTE ERA EL ERROR!)
-      const nuevasCajas = newData.cant_cajas / 2; // Dividir directamente el nuevo valor
+      const nuevasCajas = newData.cant_cajas; // Se quita la validación de divisióne entre 2
 
       if (nuevasCajas < 0) {
         throw new Error("La cantidad de cajas no puede ser negativa.");
