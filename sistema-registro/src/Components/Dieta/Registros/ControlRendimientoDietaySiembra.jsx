@@ -400,7 +400,7 @@ function ControLRendimientoDietaySiembra() {
       if (error) {
         console.error("Error en Supabase:", error);
         throw new Error(
-          error.message || "Error desconocido al guardar en Supabase"
+         "Error en Supabase: Mirar consola para ver error" || "Error desconocido al guardar en Supabase"
         );
       }
 
@@ -490,6 +490,7 @@ function ControLRendimientoDietaySiembra() {
     return (
       <InputText
         type="number"
+onKeyDown={handleKeyPress}
         value={options.value}
         onChange={(e) => options.editorCallback(e.target.value)}
       />
@@ -500,11 +501,24 @@ function ControLRendimientoDietaySiembra() {
     return (
       <InputText
         type="number"
+onKeyDown={handleKeyPress}
         step="0.01"
         value={options.value}
         onChange={(e) => options.editorCallback(e.target.value)}
       />
     );
+  };
+
+  const handleKeyPress = (e) => {
+    const invalidChars = ['e', 'E', '+', '-'];
+    if (invalidChars.includes(e.key)) {
+      e.preventDefault();
+    }
+    
+    // Si es un campo decimal, permite un solo punto
+    if (e.key === '.' && e.target.value.includes('.')) {
+      e.preventDefault();
+    }
   };
 
   const allowEdit = (rowData) => {
@@ -518,11 +532,29 @@ function ControLRendimientoDietaySiembra() {
 
       const { data: lote, error: loteError } = await supabase
         .from("Lotes")
-        .select("cant_cajas_dieta")
+        .select("cant_cajas_dieta, etapa_actual")
         .eq("base_numero_lote", oldData.base_numero_lote)
         .single();
 
-      if (loteError) throw loteError;
+        if (loteError || !lote) {
+          toast.current.show({
+            severity: 'error',
+            summary: 'Error',
+            detail: 'No se encontró el lote asociado' + loteError.message,
+            life: 3000
+          });
+          return;
+        }
+    
+        if (lote.etapa_actual !== 'Dieta') {
+          toast.current.show({
+            severity: 'error',
+            summary: 'Edición bloqueada',
+            detail: 'Solo se pueden editar registros de lotes en etapa Dieta',
+            life: 3000
+          });
+          return;
+        }
 
       const nuevasCajas = lote.cant_cajas_dieta - diferencia;
 
@@ -1077,6 +1109,7 @@ function ControLRendimientoDietaySiembra() {
           </label>
           <InputText
             type="number"
+onKeyDown={handleKeyPress}
             id="cantidad_tandas"
             value={registro.cantidad_tandas}
             onChange={(e) => onInputChange(e, "cantidad_tandas")}
@@ -1093,6 +1126,7 @@ function ControLRendimientoDietaySiembra() {
           </label>
           <InputText
             type="number"
+onKeyDown={handleKeyPress}
             required
             id="kg_dieta_caja"
             value={registro.kg_dieta_caja}
@@ -1108,6 +1142,7 @@ function ControLRendimientoDietaySiembra() {
           </label>
           <InputText
             type="number"
+onKeyDown={handleKeyPress}
             required
             id="kg_residuo_organico"
             value={registro.kg_residuo_organico}
@@ -1123,6 +1158,7 @@ function ControLRendimientoDietaySiembra() {
           </label>
           <InputText
             type="number"
+onKeyDown={handleKeyPress}
             id="kg_puntilla_arroz"
             value={registro.kg_puntilla_arroz}
             onChange={(e) => onInputChange(e, "kg_puntilla_arroz")}
@@ -1138,6 +1174,7 @@ function ControLRendimientoDietaySiembra() {
           </label>
           <InputText
             type="number"
+onKeyDown={handleKeyPress}
             id="kg_destilado_maiz"
             value={registro.kg_destilado_maiz}
             onChange={(e) => onInputChange(e, "kg_destilado_maiz")}
@@ -1153,6 +1190,7 @@ function ControLRendimientoDietaySiembra() {
           </label>
           <InputText
             type="number"
+onKeyDown={handleKeyPress}
             id="kg_melaza"
             value={registro.kg_melaza}
             onChange={(e) => onInputChange(e, "kg_melaza")}
@@ -1168,6 +1206,7 @@ function ControLRendimientoDietaySiembra() {
           </label>
           <InputText
             type="number"
+onKeyDown={handleKeyPress}
             id="g_espesante"
             value={registro.g_espesante}
             onChange={(e) => onInputChange(e, "g_espesante")}
@@ -1183,6 +1222,7 @@ function ControLRendimientoDietaySiembra() {
           </label>
           <InputText
             type="number"
+onKeyDown={handleKeyPress}
             id="lts_agua"
             value={registro.lts_agua}
             onChange={(e) => onInputChange(e, "lts_agua")}
@@ -1198,6 +1238,7 @@ function ControLRendimientoDietaySiembra() {
           </label>
           <InputText
             type="number"
+onKeyDown={handleKeyPress}
             id="g_pure_banano"
             value={registro.g_pure_banano}
             onChange={(e) => onInputChange(e, "g_pure_banano")}
@@ -1213,6 +1254,7 @@ function ControLRendimientoDietaySiembra() {
           </label>
           <InputText
             type="number"
+onKeyDown={handleKeyPress}
             id="kg_otro"
             value={registro.kg_otro}
             onChange={(e) => onInputChange(e, "kg_otro")}
@@ -1228,6 +1270,7 @@ function ControLRendimientoDietaySiembra() {
           </label>
           <InputText
             type="number"
+onKeyDown={handleKeyPress}
             id="kg_harina_soya"
             value={registro.kg_harina_soya}
             onChange={(e) => onInputChange(e, "kg_harina_soya")}
@@ -1257,6 +1300,7 @@ function ControLRendimientoDietaySiembra() {
           </label>
           <InputText
             type="number"
+onKeyDown={handleKeyPress}
             id="kg_total"
             value={registro.kg_total}
             onChange={(e) => onInputChange(e, "kg_total")}
@@ -1325,6 +1369,7 @@ function ControLRendimientoDietaySiembra() {
           </label>
           <InputText
             type="number"
+onKeyDown={handleKeyPress}
             id="cajas_procesadas_neonatos"
             value={registro.cajas_procesadas_neonatos}
             onChange={(e) => onInputChange(e, "cajas_procesadas_neonatos")}
@@ -1348,6 +1393,7 @@ function ControLRendimientoDietaySiembra() {
           </label>
           <InputText
             type="number"
+onKeyDown={handleKeyPress}
             id="cajas_sembradas_rep"
             value={registro.cajas_sembradas_rep}
             onChange={(e) => onInputChange(e, "cajas_sembradas_rep")}
@@ -1369,6 +1415,7 @@ function ControLRendimientoDietaySiembra() {
           </label>
           <InputText
             type="number"
+onKeyDown={handleKeyPress}
             id="cajas_dieta_no_sembradas_rep"
             value={registro.cajas_dieta_no_sembradas_rep}
             onChange={(e) => onInputChange(e, "cajas_dieta_no_sembradas_rep")}
@@ -1393,6 +1440,7 @@ function ControLRendimientoDietaySiembra() {
           </label>
           <InputText
             type="number"
+onKeyDown={handleKeyPress}
             id="cajas_sembradas_pro"
             value={registro.cajas_sembradas_pro}
             onChange={(e) => onInputChange(e, "cajas_sembradas_pro")}
@@ -1414,6 +1462,7 @@ function ControLRendimientoDietaySiembra() {
           </label>
           <InputText
             type="number"
+onKeyDown={handleKeyPress}
             id="cajas_dieta_no_sembradas_pro"
             value={registro.cajas_dieta_no_sembradas_pro}
             onChange={(e) => onInputChange(e, "cajas_dieta_no_sembradas_pro")}

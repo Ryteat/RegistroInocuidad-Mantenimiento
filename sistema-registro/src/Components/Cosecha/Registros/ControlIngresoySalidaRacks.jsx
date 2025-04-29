@@ -302,7 +302,7 @@ function ControlIngresoySalidaRacks() {
       if (error) {
         console.error("Error en Supabase:", error);
         throw new Error(
-          error.message || "Error desconocido al guardar en Supabase"
+          "Error en Supabase: Mirar consola para ver error" || "Error desconocido al guardar en Supabase"
         );
       }
 
@@ -511,6 +511,7 @@ function ControlIngresoySalidaRacks() {
     return (
       <InputText
         type="number"
+onKeyDown={handleKeyPress}
         value={options.value}
         onChange={(e) => options.editorCallback(e.target.value)}
       />
@@ -525,6 +526,18 @@ function ControlIngresoySalidaRacks() {
         onChange={(e) => options.editorCallback(e.target.value)}
       />
     );
+  };
+
+  const handleKeyPress = (e) => {
+    const invalidChars = ['e', 'E', '+', '-'];
+    if (invalidChars.includes(e.key)) {
+      e.preventDefault();
+    }
+    
+    // Si es un campo decimal, permite un solo punto
+    if (e.key === '.' && e.target.value.includes('.')) {
+      e.preventDefault();
+    }
   };
 
   const allowEdit = (rowData) => {
@@ -575,7 +588,6 @@ function ControlIngresoySalidaRacks() {
         .from("Lotes")
         .update({
           cant_cajas_racks_salida: nuevasCajasRacks,
-          etapa_actual: "Cosecha",
         })
         .eq("base_numero_lote", oldData.base_numero_lote);
 
@@ -869,7 +881,9 @@ function ControlIngresoySalidaRacks() {
               sortable
             />
             <Column field="ingresoysalida" header="Ingreso/Salida" sortable />
-            <Column field="total_cajas" header="Total Cajas" sortable />
+            <Column field="total_cajas" header="Total Cajas" 
+            // editor={(options) => numberEditor(options)}
+            sortable  />
             <Column
               field="responsable"
              
@@ -1026,6 +1040,7 @@ function ControlIngresoySalidaRacks() {
           </label>
           <InputText
             type="number"
+onKeyDown={handleKeyPress}
             id="total_cajas"
             value={registro.total_cajas}
             onChange={(e) => {

@@ -11,22 +11,22 @@ function Cosecha() {
   // Matriz de botones organizados
   const botones = [
     {
-      titulo: 'Control de Ingreso/Salida',
-      subtitulo: 'de Racks',
+      titulo: 'Control de Ingreso/Salida de Racks',
+      // subtitulo: 'de Racks',
       ruta: '/Cosecha/ControlIngresoySalidaRacks',
       cols: 2,
       className: 'boton-grid cosecha-button'
     },
     {
-      titulo: 'Control de Rendimiento',
-      subtitulo: 'Cosecha y Frass',
+      titulo: 'Control de Rendimiento Cosecha y Frass',
+      // subtitulo: 'Cosecha y Frass',
       ruta: '/Cosecha/ControlRendimientoCosechayFrass',
       cols: 1,
       className: 'boton-grid cosecha-button'
     },
     {
-      titulo: 'Control de Tiempos',
-      subtitulo: 'Tiempos Perdidos',
+      titulo: 'Control de Tiempos Perdidos',
+      // subtitulo: 'Tiempos Perdidos',
       ruta: '/ControlTiempos',
       cols: 1,
       className: 'boton-grid cosecha-button tiempo-button'
@@ -54,7 +54,6 @@ function Cosecha() {
                 onClick={() => navigate(boton.ruta)}
               >
                 <span className="button-main-text">{boton.titulo}</span>
-                {"-"}
                 {boton.subtitulo && <span className="button-subtext">{boton.subtitulo}</span>}
               </button>
             ))}

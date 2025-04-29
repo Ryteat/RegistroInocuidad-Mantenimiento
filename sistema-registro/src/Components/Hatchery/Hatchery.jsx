@@ -11,36 +11,36 @@ function Hatchery() {
   // Matriz de botones organizados
   const botones = [
     {
-      titulo: 'Ingreso de Pre-Pupas',
-      subtitulo: 'A Invernadero',
+      titulo: 'Ingreso de Pre-Pupas a Invernadero',
+      // subtitulo: 'A Invernadero',
       ruta: '/Hatchery/IngresoPPInvernadero',
       cols: 2,
       className: 'boton-grid hatchery-button'
     },
     {
-      titulo: 'Colecta de Eggies',
-      subtitulo: 'Del Invernadero',
+      titulo: 'Colecta de Eggies del Invernadero',
+      // subtitulo: '',
       ruta: '/Hatchery/ColectaInvernadero',
       cols: 1,
       className: 'boton-grid hatchery-button'
     },
     {
-      titulo: 'NIB',
-      subtitulo: 'Neonatos Inoculados',
+      titulo: 'NIB - Neonatos Inoculados',
+      // subtitulo: 'Neonatos Inoculados',
       ruta: '/Hatchery/NIB',
       cols: 1,
       className: 'boton-grid hatchery-button'
     },
     {
-      titulo: 'Control de Rendimiento',
-      subtitulo: 'Cosecha-Reproducción',
+      titulo: 'Control de Rendimiento Cosecha-Reproducción',
+      // subtitulo: '',
       ruta: '/Hatchery/ControlRendimientoCosechaReproduccion',
       cols: 1,
       className: 'boton-grid hatchery-button'
     },
     {
-      titulo: 'Control Despacho',
-      subtitulo: 'Laboratorio Producción',
+      titulo: 'Control Despacho Laboratorio Producción',
+      // subtitulo: '',
       ruta: '/Hatchery/ControlDespachoLabPro',
       cols: 1,
       className: 'boton-grid hatchery-button'
@@ -68,7 +68,6 @@ function Hatchery() {
                 onClick={() => navigate(boton.ruta)}
               >
                 <span className="button-main-text">{boton.titulo}</span>
-                {"-"}
                 {boton.subtitulo && <span className="button-subtext">{boton.subtitulo}</span>}
               </button>
             ))}

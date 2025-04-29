@@ -49,7 +49,7 @@ const ControlDespachoLabPro = () => {
   const toast = useRef(null);
   const dt = useRef(null);
   const [selectedRegistros, setSelectedRegistros] = useState([]);
-  const [globalFilter, setGlobalFilter] = useState(null);
+  const [globalFilter, setGlobalFilter] = useState("");
   const [submitted, setSubmitted] = useState(false);
   const [registroDialog, setRegistroDialog] = useState(false);
   const navigate = useNavigate();
@@ -133,7 +133,7 @@ const ControlDespachoLabPro = () => {
         // Aplicar filtro global
         if (lazyParams.globalFilter) {
           query = query.or(
-            `numero_lote.ilike.%${lazyParams.globalFilter}%,fec_registro.ilike.%${lazyParams.globalFilter}%`
+            `numero_lote.ilike.%${lazyParams.globalFilter}%,fecha_registro.ilike.%${lazyParams.globalFilter}%`
           );
         }
 
@@ -143,7 +143,7 @@ const ControlDespachoLabPro = () => {
         setRegistros(data || []);
         setTotalRecords(count || 0);
       } catch (err) {
-        console.error("Error en la conexión a la base de datos NIB", err);
+        console.error("Error en la conexión a la base de datos", err);
       } finally {
         setLoading(false);
       }
@@ -325,7 +325,7 @@ const ControlDespachoLabPro = () => {
       if (error) {
         console.error("Error en Supabase:", error);
         throw new Error(
-          error.message || "Error desconocido al guardar en Supabase"
+          "Error en Supabase: Mirar consola para ver error" || "Error desconocido al guardar en Supabase"
         );
       }
       // Actualizar la tabla Lotes con la nueva etapa_actual
@@ -418,6 +418,7 @@ const ControlDespachoLabPro = () => {
     return (
       <InputText
         type="number"
+onKeyDown={handleKeyPress}
         value={options.value}
         onChange={(e) => options.editorCallback(e.target.value)}
       />
@@ -459,6 +460,18 @@ const ControlDespachoLabPro = () => {
     );
   };
 
+  const handleKeyPress = (e) => {
+    const invalidChars = ['e', 'E', '+', '-'];
+    if (invalidChars.includes(e.key)) {
+      e.preventDefault();
+    }
+    
+    // Si es un campo decimal, permite un solo punto
+    if (e.key === '.' && e.target.value.includes('.')) {
+      e.preventDefault();
+    }
+  };
+
   const allowEdit = (rowData) => {
     return rowData.name !== "Blue Band";
   };
@@ -495,8 +508,7 @@ const ControlDespachoLabPro = () => {
           cant_cajas_despachoLabPro: nuevasCajas,
           cant_cajas_dieta: nuevasCajas,
           cant_cajas_despachodieta: nuevasCajas,
-          cant_cajas_cosecha: nuevasCajas,
-          cant_cajas_racks_salida: nuevasCajas,
+          // cant_cajas_cosecha: nuevasCajas,s
         })
         .eq("base_numero_lote", newData.base_numero_lote);
 
@@ -538,14 +550,15 @@ const ControlDespachoLabPro = () => {
   }, []);
 
   const header = (
-    <div className="flex flex-wrap gap-2 align-items-center justify-content-between">
-      <InputText
-        type="search"
-        onInput={(e) => setGlobalFilter(e.target.value)}
-        placeholder="Buscador Global..."
-      />
-    </div>
-  );
+      <div className="flex flex-wrap gap-2 align-items-center justify-content-between">
+        <InputText
+          type="search"
+          value={globalFilter}
+          onInput={onFilter}
+          placeholder="Buscar por Lote o Fecha de Registro"
+        />
+      </div>
+    );
 
   const openNew = () => {
     setRegistro(emptyRegister);
@@ -1014,6 +1027,7 @@ const ControlDespachoLabPro = () => {
           </label>
           <InputText
             type="number"
+onKeyDown={handleKeyPress}
             id="num_viaje"
             value={registro.num_viaje}
             onChange={(e) => onInputChange(e, "num_viaje")}
@@ -1033,6 +1047,7 @@ const ControlDespachoLabPro = () => {
           </label>
           <InputText
             type="number"
+onKeyDown={handleKeyPress}
             id="cant_cajas"
             value={registro.cant_cajas}
             onChange={(e) => onInputChange(e, "cant_cajas")}

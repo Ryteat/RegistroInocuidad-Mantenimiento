@@ -278,7 +278,7 @@ function ControlRendimientoSecadoHornoMultilevel() {
       if (error) {
         console.error("Error en Supabase:", error);
         throw new Error(
-          error.message || "Error desconocido al guardar en Supabase"
+          "Error en Supabase: Mirar consola para ver error" || "Error desconocido al guardar en Supabase"
         );
       }
 
@@ -363,6 +363,7 @@ function ControlRendimientoSecadoHornoMultilevel() {
     return (
       <InputText
         type="number"
+onKeyDown={handleKeyPress}
         value={options.value}
         onChange={(e) => options.editorCallback(e.target.value)}
       />
@@ -377,6 +378,18 @@ function ControlRendimientoSecadoHornoMultilevel() {
         onChange={(e) => options.editorCallback(e.target.value)}
       />
     );
+  };
+
+  const handleKeyPress = (e) => {
+    const invalidChars = ['e', 'E', '+', '-'];
+    if (invalidChars.includes(e.key)) {
+      e.preventDefault();
+    }
+    
+    // Si es un campo decimal, permite un solo punto
+    if (e.key === '.' && e.target.value.includes('.')) {
+      e.preventDefault();
+    }
   };
 
   const allowEdit = (rowData) => {
@@ -823,6 +836,7 @@ function ControlRendimientoSecadoHornoMultilevel() {
           </label>
           <InputText
             type="number"
+onKeyDown={handleKeyPress}
             id="kg_minuto"
             value={registro.kg_minuto}
             onChange={(e) => onInputChange(e, "kg_minuto")}
@@ -838,6 +852,7 @@ function ControlRendimientoSecadoHornoMultilevel() {
           </label>
           <InputText
             type="number"
+onKeyDown={handleKeyPress}
             id="velocidad_banda"
             value={registro.velocidad_banda}
             onChange={(e) => onInputChange(e, "velocidad_banda")}
@@ -852,6 +867,7 @@ function ControlRendimientoSecadoHornoMultilevel() {
           </label>
           <InputText
             type="number"
+onKeyDown={handleKeyPress}
             id="temp_coccion"
             value={registro.temp_coccion}
             onChange={(e) => onInputChange(e, "temp_coccion")}
@@ -866,6 +882,7 @@ function ControlRendimientoSecadoHornoMultilevel() {
           </label>
           <InputText
             type="number"
+onKeyDown={handleKeyPress}
             id="temp_agua"
             value={registro.temp_agua}
             onChange={(e) => onInputChange(e, "temp_agua")}
@@ -880,6 +897,7 @@ function ControlRendimientoSecadoHornoMultilevel() {
           </label>
           <InputText
             type="number"
+onKeyDown={handleKeyPress}
             id="velocidad_turbina"
             value={registro.velocidad_turbina}
             onChange={(e) => onInputChange(e, "velocidad_turbina")}
@@ -936,6 +954,7 @@ function ControlRendimientoSecadoHornoMultilevel() {
           </label>
           <InputText
             type="number"
+onKeyDown={handleKeyPress}
             id="kg_larva_fresca"
             value={registro.kg_larva_fresca}
             onChange={(e) => onInputChange(e, "kg_larva_fresca")}
@@ -950,6 +969,7 @@ function ControlRendimientoSecadoHornoMultilevel() {
           </label>
           <InputText
             type="number"
+onKeyDown={handleKeyPress}
             id="kg_desecho"
             value={registro.kg_desecho}
             onChange={(e) => onInputChange(e, "kg_desecho")}
