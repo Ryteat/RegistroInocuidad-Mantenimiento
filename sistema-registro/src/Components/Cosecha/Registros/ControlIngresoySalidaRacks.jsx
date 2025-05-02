@@ -331,14 +331,14 @@ function ControlIngresoySalidaRacks() {
         }
 
         // Validar que hay suficientes cajas disponibles en ingreso
-        if ((loteExistente.cant_cajas_racks_ingreso ?? 0) < totalCajasNum) {
+        /*if ((loteExistente.cant_cajas_racks_ingreso ?? 0) < totalCajasNum) {
           mostrarError(
             `Cajas disponibles para ingreso: ${
               loteExistente.cant_cajas_racks_ingreso ?? 0
             }`
           );
           return;
-        }
+        }*/
         // Actualización CORRECTA para ingresos
         const { error } = await supabase
           .from("Lotes")
@@ -1025,8 +1025,8 @@ onKeyDown={handleKeyPress}
           <br />
           <label htmlFor="total_cajas" className="font-bold">
             {registro.ingresoysalida === "Salida"
-              ? `Total cajas (0 - ${registro.cant_cajas_lote})`
-              : "Total cajas"}
+              ? `Total cajas `
+              : "Total cajas"} 
             {submitted && !registro.total_cajas && (
               <small className="p-error">Requerido.</small>
             )}

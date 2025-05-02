@@ -204,7 +204,7 @@ const RecepcionMateriasPrimas = () => {
     const isTotalCajasInvalido = isInvalid(
       registro.total_cajas,
       0,
-      registro.cant_cajas_despachodieta
+      5000
     );
 
     setErroresValidacion({
@@ -227,7 +227,7 @@ const RecepcionMateriasPrimas = () => {
       });
       return;
     }
-    if (
+    /*if (
       registro.cajas_procesadas_neonatos > registro.cant_cajas_despachodieta
     ) {
       toast.current.show({
@@ -237,7 +237,7 @@ const RecepcionMateriasPrimas = () => {
         life: 3000,
       });
       return;
-    }
+    }*/
 
     // Validación principal
     if (valoresFueraDeRango && !registro.observaciones) {
@@ -934,7 +934,7 @@ onKeyDown={handleKeyPress}
           <br />
 
           <label htmlFor="total_cajas" className="font-bold">
-            Cajas Totales (0 - {registro.cant_cajas_despachodieta}){" "}
+            Cajas Totales 
             {submitted && !registro.total_cajas && (
               <small className="p-error">Requerido.</small>
             )}

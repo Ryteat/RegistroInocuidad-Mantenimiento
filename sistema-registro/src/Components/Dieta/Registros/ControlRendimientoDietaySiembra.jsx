@@ -101,6 +101,59 @@ function ControLRendimientoDietaySiembra() {
     globalFilter: null,
   });
 
+  // Función para calcular el total automáticamente
+  const calcularTotal = useCallback(() => {
+    const componentes = [
+      'kg_residuo_organico',
+      'kg_puntilla_arroz',
+      'kg_destilado_maiz',
+      'kg_melaza',
+      'g_espesante',
+      'lts_agua',
+      'g_pure_banano',
+      'kg_otro',
+      'kg_harina_soya',
+      'dieta_hatchery'
+    ];
+
+    let total = 0;
+    componentes.forEach(comp => {
+      const valor = parseFloat(registro[comp]) || 0;
+      // Convertir gramos a kilogramos si es necesario
+      if (comp.startsWith('g_')) {
+        total += valor;
+      } else if (comp === 'lts_agua') {
+        // Asumimos que 1 litro de agua = 1 kg
+        total += valor;
+      } else {
+        total += valor;
+      }
+    });
+
+    return total.toFixed(2); // Redondear a 2 decimales
+  }, [registro]);
+
+  // Efecto para actualizar el total cuando cambian los componentes
+  useEffect(() => {
+    if (registroDialog) {
+      const nuevoTotal = calcularTotal();
+      setRegistro(prev => ({ ...prev, kg_total: nuevoTotal }));
+    }
+  }, [
+    registro.kg_residuo_organico,
+    registro.kg_puntilla_arroz,
+    registro.kg_destilado_maiz,
+    registro.kg_melaza,
+    registro.g_espesante,
+    registro.lts_agua,
+    registro.g_pure_banano,
+    registro.kg_otro,
+    registro.kg_harina_soya,
+    registro.dieta_hatchery,
+    registroDialog,
+    calcularTotal
+  ]);
+
   const convertirFecha = (fecha) =>
     fecha ? fecha.split("-").reverse().join("/") : "";
 
@@ -229,11 +282,6 @@ function ControLRendimientoDietaySiembra() {
       return value < min || value > max;
     }
 
-    // const isCajasProcesadasNeonatosInvalido = isInvalid(
-    //   registro.cajas_procesadas_neonatos,
-    //   0,
-    //   registro.cant_cajas_dieta
-    // );
     const isCajasSembradasRepInvalido = isInvalid(
       registro.cajas_sembradas_rep,
       0,
@@ -247,7 +295,7 @@ function ControLRendimientoDietaySiembra() {
     const isCajasSembradasProInvalido = isInvalid(
       registro.cajas_sembradas_pro,
       0,
-      registro.cant_cajas_dieta
+      5000
     );
     const isCajasDietaNoSembradasProInvalido = isInvalid(
       registro.cajas_dieta_no_sembradas_pro,
@@ -256,7 +304,6 @@ function ControLRendimientoDietaySiembra() {
     );
 
     setErroresValidacion({
-      // cajas_procesadas_neonatos: isCajasProcesadasNeonatosInvalido,
       cajas_sembradas_rep: isCajasSembradasRepInvalido,
       cajas_dieta_no_sembradas_rep: isCajasDietaNoSembradasRepInvalido,
       cajas_sembradas_pro: isCajasSembradasProInvalido,
@@ -264,7 +311,6 @@ function ControLRendimientoDietaySiembra() {
     });
 
     const valoresFueraDeRango =
-      // isCajasProcesadasNeonatosInvalido ||
       isCajasSembradasRepInvalido ||
       isCajasDietaNoSembradasRepInvalido ||
       isCajasSembradasProInvalido ||
@@ -292,24 +338,9 @@ function ControLRendimientoDietaySiembra() {
       return;
     }
 
-    if (
-      registro.cajas_sembradas_pro > registro.cant_cajas_dieta &&
-      !registro.observaciones // Solo bloquea si NO hay observaciones
-    ) {
-      setObservacionesObligatorio(true);
-      toast.current.show({
-        severity: "error",
-        summary: "Error",
-        detail: `No puedes procesar más cajas (${registro.cajas_sembradas_pro}) de las disponibles (${registro.cant_cajas_dieta}) sin una observación.`,
-        life: 3000,
-      });
-      return; // Solo retorna si no hay observaciones
-    }
-
     if (valoresFueraDeRango && !registro.observaciones) {
       setObservacionesObligatorio(true);
       const currentErrores = {
-        "Cajas Procesadas Neonatos": isCajasProcesadasNeonatosInvalido,
         "Cajas Sembradas Reproduccion": isCajasSembradasRepInvalido,
         "Cajas no Sembradas Reproduccion": isCajasDietaNoSembradasRepInvalido,
         "Cajas Sembradas Produccion": isCajasSembradasProInvalido,
@@ -331,7 +362,6 @@ function ControLRendimientoDietaySiembra() {
 
     setObservacionesObligatorio(false);
     setErroresValidacion({
-      // cajas_procesadas_neonatos: false,
       cajas_sembradas_rep: false,
       cajas_dieta_no_sembradas_rep: false,
       cajas_sembradas_pro: false,
@@ -361,7 +391,6 @@ function ControLRendimientoDietaySiembra() {
         });
         return;
       }
-
     }
       const { data, error } = await supabase
         .from("Control_Rendimiento_DietaySiembra")
@@ -403,9 +432,8 @@ function ControLRendimientoDietaySiembra() {
          "Error en Supabase: Mirar consola para ver error" || "Error desconocido al guardar en Supabase"
         );
       }
-
-      const nuevasCajas =
-        registro.cant_cajas_dieta - registro.cajas_sembradas_pro;
+      
+      const nuevasCajas = registro.cajas_sembradas_pro;
 
       const { error: updateError } = await supabase
         .from("Lotes")
@@ -490,7 +518,7 @@ function ControLRendimientoDietaySiembra() {
     return (
       <InputText
         type="number"
-onKeyDown={handleKeyPress}
+        onKeyDown={handleKeyPress}
         value={options.value}
         onChange={(e) => options.editorCallback(e.target.value)}
       />
@@ -501,7 +529,7 @@ onKeyDown={handleKeyPress}
     return (
       <InputText
         type="number"
-onKeyDown={handleKeyPress}
+        onKeyDown={handleKeyPress}
         step="0.01"
         value={options.value}
         onChange={(e) => options.editorCallback(e.target.value)}
@@ -676,9 +704,9 @@ onKeyDown={handleKeyPress}
     { field: "kg_puntilla_arroz", header: "Kg Puntilla Arroz" },
     { field: "kg_destilado_maiz", header: "Kg Destilado Maíz" },
     { field: "kg_melaza", header: "Kg Melaza" },
-    { field: "g_espesante", header: "G Espesante" },
+    { field: "g_espesante", header: "Kg Espesante" },
     { field: "lts_agua", header: "Lts Agua" },
-    { field: "g_pure_banano", header: "G Puré Banano" },
+    { field: "g_pure_banano", header: "Kg Puré Banano" },
     { field: "kg_otro", header: "Kg Otro" },
     { field: "kg_harina_soya", header: "Kg Soya" },
     { field: "dieta_hatchery", header: "Dieta Hatchery" },
@@ -907,7 +935,7 @@ onKeyDown={handleKeyPress}
             />
             <Column
               field="g_espesante"
-              header="G Espesante"
+              header="Kg Espesante"
               editor={(options) => floatEditor(options)}
               sortable
             />
@@ -919,7 +947,7 @@ onKeyDown={handleKeyPress}
             />
             <Column
               field="g_pure_banano"
-              header="G Puré Banano"
+              header="Kg Puré Banano"
               editor={(options) => floatEditor(options)}
               sortable
             />
@@ -944,8 +972,12 @@ onKeyDown={handleKeyPress}
             <Column
               field="kg_total"
               header="Kg Total"
-              editor={(options) => floatEditor(options)}
               sortable
+              body={(rowData) => (
+                <span style={{ fontWeight: 'bold', color: '#2c3e50' }}>
+                  {rowData.kg_total}
+                </span>
+              )}
             />
             <Column
               field="tipo_dieta"
@@ -1109,7 +1141,7 @@ onKeyDown={handleKeyPress}
           </label>
           <InputText
             type="number"
-onKeyDown={handleKeyPress}
+            onKeyDown={handleKeyPress}
             id="cantidad_tandas"
             value={registro.cantidad_tandas}
             onChange={(e) => onInputChange(e, "cantidad_tandas")}
@@ -1126,7 +1158,7 @@ onKeyDown={handleKeyPress}
           </label>
           <InputText
             type="number"
-onKeyDown={handleKeyPress}
+            onKeyDown={handleKeyPress}
             required
             id="kg_dieta_caja"
             value={registro.kg_dieta_caja}
@@ -1142,7 +1174,7 @@ onKeyDown={handleKeyPress}
           </label>
           <InputText
             type="number"
-onKeyDown={handleKeyPress}
+            onKeyDown={handleKeyPress}
             required
             id="kg_residuo_organico"
             value={registro.kg_residuo_organico}
@@ -1158,7 +1190,7 @@ onKeyDown={handleKeyPress}
           </label>
           <InputText
             type="number"
-onKeyDown={handleKeyPress}
+            onKeyDown={handleKeyPress}
             id="kg_puntilla_arroz"
             value={registro.kg_puntilla_arroz}
             onChange={(e) => onInputChange(e, "kg_puntilla_arroz")}
@@ -1174,7 +1206,7 @@ onKeyDown={handleKeyPress}
           </label>
           <InputText
             type="number"
-onKeyDown={handleKeyPress}
+            onKeyDown={handleKeyPress}
             id="kg_destilado_maiz"
             value={registro.kg_destilado_maiz}
             onChange={(e) => onInputChange(e, "kg_destilado_maiz")}
@@ -1190,7 +1222,7 @@ onKeyDown={handleKeyPress}
           </label>
           <InputText
             type="number"
-onKeyDown={handleKeyPress}
+            onKeyDown={handleKeyPress}
             id="kg_melaza"
             value={registro.kg_melaza}
             onChange={(e) => onInputChange(e, "kg_melaza")}
@@ -1199,14 +1231,14 @@ onKeyDown={handleKeyPress}
           <br />
 
           <label htmlFor="g_espesante" className="font-bold">
-            G Espesante{" "}
+            Kg Espesante{" "}
             {submitted && !registro.g_espesante && (
               <small className="p-error">Requerido.</small>
             )}
           </label>
           <InputText
             type="number"
-onKeyDown={handleKeyPress}
+            onKeyDown={handleKeyPress}
             id="g_espesante"
             value={registro.g_espesante}
             onChange={(e) => onInputChange(e, "g_espesante")}
@@ -1222,7 +1254,7 @@ onKeyDown={handleKeyPress}
           </label>
           <InputText
             type="number"
-onKeyDown={handleKeyPress}
+            onKeyDown={handleKeyPress}
             id="lts_agua"
             value={registro.lts_agua}
             onChange={(e) => onInputChange(e, "lts_agua")}
@@ -1231,14 +1263,14 @@ onKeyDown={handleKeyPress}
           <br />
 
           <label htmlFor="g_pure_banano" className="font-bold">
-            G Pure Banano{" "}
+            Kg Pure Banano{" "}
             {submitted && !registro.g_pure_banano && (
               <small className="p-error">Requerido.</small>
             )}
           </label>
           <InputText
             type="number"
-onKeyDown={handleKeyPress}
+            onKeyDown={handleKeyPress}
             id="g_pure_banano"
             value={registro.g_pure_banano}
             onChange={(e) => onInputChange(e, "g_pure_banano")}
@@ -1254,7 +1286,7 @@ onKeyDown={handleKeyPress}
           </label>
           <InputText
             type="number"
-onKeyDown={handleKeyPress}
+            onKeyDown={handleKeyPress}
             id="kg_otro"
             value={registro.kg_otro}
             onChange={(e) => onInputChange(e, "kg_otro")}
@@ -1270,7 +1302,7 @@ onKeyDown={handleKeyPress}
           </label>
           <InputText
             type="number"
-onKeyDown={handleKeyPress}
+            onKeyDown={handleKeyPress}
             id="kg_harina_soya"
             value={registro.kg_harina_soya}
             onChange={(e) => onInputChange(e, "kg_harina_soya")}
@@ -1300,11 +1332,13 @@ onKeyDown={handleKeyPress}
           </label>
           <InputText
             type="number"
-onKeyDown={handleKeyPress}
+            onKeyDown={handleKeyPress}
             id="kg_total"
             value={registro.kg_total}
             onChange={(e) => onInputChange(e, "kg_total")}
             required
+            readOnly
+            style={{ fontWeight: 'bold', backgroundColor: '#f0f0f0' }}
           />
           <br />
 
@@ -1369,7 +1403,7 @@ onKeyDown={handleKeyPress}
           </label>
           <InputText
             type="number"
-onKeyDown={handleKeyPress}
+            onKeyDown={handleKeyPress}
             id="cajas_procesadas_neonatos"
             value={registro.cajas_procesadas_neonatos}
             onChange={(e) => onInputChange(e, "cajas_procesadas_neonatos")}
@@ -1393,7 +1427,7 @@ onKeyDown={handleKeyPress}
           </label>
           <InputText
             type="number"
-onKeyDown={handleKeyPress}
+            onKeyDown={handleKeyPress}
             id="cajas_sembradas_rep"
             value={registro.cajas_sembradas_rep}
             onChange={(e) => onInputChange(e, "cajas_sembradas_rep")}
@@ -1415,7 +1449,7 @@ onKeyDown={handleKeyPress}
           </label>
           <InputText
             type="number"
-onKeyDown={handleKeyPress}
+            onKeyDown={handleKeyPress}
             id="cajas_dieta_no_sembradas_rep"
             value={registro.cajas_dieta_no_sembradas_rep}
             onChange={(e) => onInputChange(e, "cajas_dieta_no_sembradas_rep")}
@@ -1440,7 +1474,7 @@ onKeyDown={handleKeyPress}
           </label>
           <InputText
             type="number"
-onKeyDown={handleKeyPress}
+            onKeyDown={handleKeyPress}
             id="cajas_sembradas_pro"
             value={registro.cajas_sembradas_pro}
             onChange={(e) => onInputChange(e, "cajas_sembradas_pro")}
@@ -1462,7 +1496,7 @@ onKeyDown={handleKeyPress}
           </label>
           <InputText
             type="number"
-onKeyDown={handleKeyPress}
+            onKeyDown={handleKeyPress}
             id="cajas_dieta_no_sembradas_pro"
             value={registro.cajas_dieta_no_sembradas_pro}
             onChange={(e) => onInputChange(e, "cajas_dieta_no_sembradas_pro")}

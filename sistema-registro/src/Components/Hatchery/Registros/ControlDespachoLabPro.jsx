@@ -156,7 +156,7 @@ const ControlDespachoLabPro = () => {
       const { data, error } = await supabase
         .from("Lotes")
         .select()
-        .in("etapa_actual", ["Hatchery"])
+        //.in("etapa_actual", ["Hatchery"])
         .order("fecha_registro", { ascending: false });
       if (error) throw error;
       setLotes(data || []);
@@ -219,9 +219,9 @@ const ControlDespachoLabPro = () => {
 
     // Validar los campos
     const isNumViajeInvalido =
-      registro.num_viaje > 0 || registro.num_viaje < 20;
+      registro.num_viaje <= 1 && registro.num_viaje >= 20;
     const isCantCajasInvalido =
-    registro.cant_cajas > 500 || registro.cant_cajas < 2200;
+    registro.cant_cajas <= 500 && registro.cant_cajas >= 2200;
 
     // Actualizar el estado de errores
     setErroresValidacion({
@@ -331,7 +331,7 @@ const ControlDespachoLabPro = () => {
       }
       
 
-      const totalCajas = registro.cant_cajas_despachoLabPro + cajasDe1X1;
+      const totalCajas = registro.cant_cajas_despachoLabPro ;
       // Actualizar la tabla Lotes con la nueva etapa_actual
 
       const { error: updateError } = await supabase
@@ -495,7 +495,7 @@ onKeyDown={handleKeyPress}
       }
 
       // 3. Calcular NUEVAS CAJAS (¡ESTE ERA EL ERROR!)
-      const nuevasCajas = newData.cant_cajas; // Se quita la validación de divisióne entre 2
+      const nuevasCajas = newData.cant_cajas; // Se quita la validación de división entre 2
 
       if (nuevasCajas < 0) {
         throw new Error("La cantidad de cajas no puede ser negativa.");
@@ -508,7 +508,6 @@ onKeyDown={handleKeyPress}
           cant_cajas_despachoLabPro: nuevasCajas,
           cant_cajas_dieta: nuevasCajas,
           cant_cajas_despachodieta: nuevasCajas,
-          // cant_cajas_cosecha: nuevasCajas,s
         })
         .eq("base_numero_lote", newData.base_numero_lote);
 
@@ -532,7 +531,6 @@ onKeyDown={handleKeyPress}
       toast.current.show({
         severity: "success",
         summary: "Actualizado",
-        detail: "¡Cajas convertidas a 1x1 correctamente!",
         life: 3000,
       });
     } catch (err) {

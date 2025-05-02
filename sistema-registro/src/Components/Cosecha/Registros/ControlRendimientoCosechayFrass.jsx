@@ -221,7 +221,7 @@ function ControlRendimientoCosechayFrass() {
     // Validar los campos con el nuevo rango dinámico
     const isCantCajasCosechadasInvalido =
       registro.cant_cajas_cosechadas < 0 ||
-      registro.cant_cajas_cosechadas > registro.cant_cajas_lote;
+      registro.cant_cajas_cosechadas > 5000;
     const isKgLarvaFrescaInvalido =
       registro.kg_larva_fresca < 0 || registro.kg_larva_fresca > 12000;
     const isCantCajasDesechadasInvalido = registro.cant_cajas_desechadas < 0; // Corregido: debe ser < 0
@@ -270,7 +270,7 @@ function ControlRendimientoCosechayFrass() {
       toast.current.show({
         severity: "error",
         summary: "Error",
-        detail: `Cajas Cosechadas debe estar entre 0 y ${registro.cant_cajas_lote}`,
+        detail: `Cajas Cosechadas debe estar entre 0 y 5000`,
         life: 3000,
       });
       return; // Detener el proceso si hay un error
@@ -323,7 +323,7 @@ function ControlRendimientoCosechayFrass() {
         .map((key) => {
           switch (key) {
             case "cant_cajas_cosechadas":
-              return `Cajas Cosechadas (0 - ${registro.cant_cajas_lote})`;
+              return `Cajas Cosechadas `;
             case "kg_larva_fresca":
               return "Larva Fresca (0 - 12000 KG)";
             case "cant_cajas_desechadas":
@@ -986,17 +986,11 @@ onKeyDown={handleKeyPress}
           />
           <br />
           <label htmlFor="cant_cajas_cosechadas" className="font-bold">
-            Cajas Cosechadas (0 - {registro.cant_cajas_lote}){" "}
-            
-            {erroresValidacion.cant_cajas_cosechadas && (
-              <small className="p-error">
-                {`Cantidad Cajas Procesadas Fuera de rango 500 a ${registro.cant_cajas_lote}`}
-              </small>
-            )}
+            Cajas Cosechadas 
           </label>
           <InputText
             type="number"
-onKeyDown={handleKeyPress}
+            onKeyDown={handleKeyPress}
             id="cant_cajas_cosechadas"
             value={registro.cant_cajas_cosechadas}
             onChange={(e) => onInputChange(e, "cant_cajas_cosechadas")}
