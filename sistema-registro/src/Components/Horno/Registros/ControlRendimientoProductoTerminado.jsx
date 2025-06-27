@@ -6,7 +6,7 @@ import React, {
   useMemo,
 } from "react";
 import { useNavigate } from "react-router-dom";
-import "./ControlRendimientoProductoTerminado.css"; // Importa el CSS
+import "./ControlRendimientoProductoTerminado.css";
 import supabase from "../../../supabaseClient";
 import "primereact/resources/themes/lara-light-indigo/theme.css";
 import "primeicons/primeicons.css";
@@ -30,7 +30,6 @@ const ControlRendimientoProductoTerminado = () => {
     base_codigo_sku: "",
     numero_sku: "",
     lote: [],
-
     fecha_produccion: "",
     hora: "",
     cant_bolsas: "",
@@ -39,7 +38,6 @@ const ControlRendimientoProductoTerminado = () => {
     fecha_registro: "",
     hora_registro: "",
     observaciones: "",
-
     cons_cartonnormal: "",
     dese_cartonnormal: "",
     cons_cartonreforzado: "",
@@ -62,11 +60,8 @@ const ControlRendimientoProductoTerminado = () => {
     dese_bolsagrande: "",
     cons_gazaplastica: "",
     dese_gazaplastica: "",
-
-    // operario_empaque: "",
-    // encargado_bodega: "",
-    // encargado_planta: "",
     estado: "",
+    unidad_empaque: ""
   };
 
   const [registros, setRegistros] = useState([]);
@@ -80,9 +75,7 @@ const ControlRendimientoProductoTerminado = () => {
   const navigate = useNavigate();
   const [lotes, setLotes] = useState([]);
   const [skus, setSKUs] = useState([]);
-  const [fechaSKU, setFechaSKU] = useState(""); 
-
-  // Nuevos estados para lazy loading
+  const [fechaSKU, setFechaSKU] = useState("");
   const [loading, setLoading] = useState(false);
   const [totalRecords, setTotalRecords] = useState(0);
   const [lazyParams, setLazyParams] = useState({
@@ -94,9 +87,10 @@ const ControlRendimientoProductoTerminado = () => {
     filters: {},
     globalFilter: null,
   });
-  const estados = ["Producto Terminado", "En Espera"];
 
-  //Inicio de Sorting y Filtro global por lazy load
+  const estados = ["Producto Terminado", "En Espera", "Reempacado", "Reprocesado", "Salida"];
+  const unidad_empaque = ["Kg", "Libras", "Unidades"];
+
   // Manejar sorting
   const onSort = useCallback((event) => {
     setLazyParams((prev) => ({
@@ -116,7 +110,6 @@ const ControlRendimientoProductoTerminado = () => {
       first: 0,
     }));
   }, []);
-  //FIN de Sorting y Filtro global por lazy load
 
   const fetchRegistros = useCallback(
     async (start = 0, limit = 10) => {
@@ -126,17 +119,13 @@ const ControlRendimientoProductoTerminado = () => {
           .from("Control_Rendimiento_Producto_Terminado")
           .select("*", { count: "exact" })
           .range(start, start + limit - 1);
-        // Ordenar por defecto por fecha descendente (más nuevos primero)
-        // .order("fec_registro", { ascending: false });
 
-        // Aplicar sorting
         if (lazyParams.sortField) {
           query = query.order(lazyParams.sortField, {
             ascending: lazyParams.sortOrder === 1,
           });
         }
 
-        // Aplicar filtro global
         if (lazyParams.globalFilter) {
           query = query.or(
             `numero_sku.ilike.%${lazyParams.globalFilter}%,fecha_registro.ilike.%${lazyParams.globalFilter}%`
@@ -149,30 +138,40 @@ const ControlRendimientoProductoTerminado = () => {
         setRegistros(data || []);
         setTotalRecords(count || 0);
       } catch (err) {
-        console.error(
-          "Error en la conexión a la base de datos Secado Horno Multilevel",
-          err
-        );
+        console.error("Error al obtener registros:", err);
+        toast.current.show({
+          severity: "error",
+          summary: "Error",
+          detail: "No se pudieron cargar los registros",
+          life: 3000,
+        });
       } finally {
         setLoading(false);
       }
     },
     [lazyParams.sortField, lazyParams.sortOrder, lazyParams.globalFilter]
   );
+
   const fetchLotes = useCallback(async () => {
     try {
       const { data, error } = await supabase
         .from("Lotes")
         .select()
-        .or("etapa_actual.ilike.%Horno%,etapa_actual.ilike.%ProductoTerminado%")
         .order("fecha_registro", { ascending: false });
 
       if (error) throw error;
-      setLotes(data || []); // Eliminar la 's' extraña aquí
+      setLotes(data || []);
     } catch (err) {
-      console.log("Error en la conexión a la base de datos Lotes", err);
+      console.error("Error al obtener lotes:", err);
+      toast.current.show({
+        severity: "error",
+        summary: "Error",
+        detail: "No se pudieron cargar los lotes",
+        life: 3000,
+      });
     }
   }, []);
+
   const fetchSKU = async () => {
     try {
       const { data, error } = await supabase
@@ -183,9 +182,16 @@ const ControlRendimientoProductoTerminado = () => {
       if (error) throw error;
       setSKUs(data || []);
     } catch (err) {
-      console.log("Error obteniendo SKUs", err);
+      console.error("Error al obtener SKUs:", err);
+      toast.current.show({
+        severity: "error",
+        summary: "Error",
+        detail: "No se pudieron cargar los SKUs",
+        life: 3000,
+      });
     }
   };
+
   useEffect(() => {
     fetchRegistros(lazyParams.first, lazyParams.rows);
     fetchLotes();
@@ -199,7 +205,6 @@ const ControlRendimientoProductoTerminado = () => {
     lazyParams.globalFilter,
   ]);
 
-  // Manejar cambio de página y lazy loading
   const onPage = useCallback(
     (event) => {
       setLazyParams({
@@ -212,8 +217,16 @@ const ControlRendimientoProductoTerminado = () => {
     [lazyParams]
   );
 
-  const convertirFecha = (fecha) =>
-    fecha ? fecha.split("-").reverse().join("/") : "";
+  const convertirFecha = (fecha) => {
+    if (!fecha) return "";
+    try {
+      const [year, month, day] = fecha.split("-");
+      return `${day}/${month}/${year}`;
+    } catch (error) {
+      console.error("Error al convertir fecha:", error);
+      return "";
+    }
+  };
 
   const formatDateTime = (date, format = "DD-MM-YYYY hh:mm A") => {
     const fmt = new Intl.DateTimeFormat("en-US", {
@@ -237,58 +250,65 @@ const ControlRendimientoProductoTerminado = () => {
   };
 
   function generarFormatoJuliano(fechaSKU) {
-    // Dividir la fecha en día, mes y año
-    const [dia, mes, año] = fechaSKU.split("/").map(Number);
+    // Validación adicional para asegurar que fechaSKU existe y es string
+    if (!fechaSKU || typeof fechaSKU !== 'string') {
+      throw new Error("Fecha SKU no válida o no proporcionada");
+    }
 
-    // Crear fechas en UTC para evitar problemas con husos horarios
-    const fecha = new Date(Date.UTC(año, mes - 1, dia));
-    const inicioAño = new Date(Date.UTC(año, 0, 1)); // 1 de enero del mismo año
+    // Dividir la fecha y validar que tenga 3 partes
+    const partesFecha = fechaSKU.split("/");
+    if (partesFecha.length !== 3) {
+      throw new Error("Formato de fecha debe ser DD/MM/YYYY");
+    }
 
-    // Calcular diferencia en milisegundos y convertir a días
-    const diferencia = fecha - inicioAño;
-    const diaJuliano = Math.floor(diferencia / (1000 * 60 * 60 * 24)) + 1; // +1 porque el año empieza en día 1
+    // Convertir a números y validar
+    const [dia, mes, año] = partesFecha.map(part => {
+      const num = parseInt(part, 10);
+      if (isNaN(num)) {
+        throw new Error("La fecha contiene valores no numéricos");
+      }
+      return num;
+    });
 
-    // Formatear componentes
-    const diaJulianoFormateado = diaJuliano.toString().padStart(3, "0"); // 3 dígitos con ceros a la izquierda
-    const año2Digitos = año.toString().slice(-2); // Últimos 2 dígitos del año
+    // Validar rangos de fecha
+    if (dia < 1 || dia > 31 || mes < 1 || mes > 12 || año < 1000) {
+      throw new Error("Valores de fecha fuera de rango");
+    }
 
-    return `PR${diaJulianoFormateado}${año2Digitos}`;
+    try {
+      const fecha = new Date(Date.UTC(año, mes - 1, dia));
+      const inicioAño = new Date(Date.UTC(año, 0, 1));
+      
+      // Validar que la fecha es válida
+      if (isNaN(fecha.getTime()) || isNaN(inicioAño.getTime())) {
+        throw new Error("Fecha inválida");
+      }
+
+      const diferencia = fecha - inicioAño;
+      const diaJuliano = Math.floor(diferencia / (1000 * 60 * 60 * 24)) + 1;
+      const diaJulianoFormateado = diaJuliano.toString().padStart(3, "0");
+      const año2Digitos = año.toString().slice(-2);
+
+      return `PR${diaJulianoFormateado}${año2Digitos}`;
+    } catch (error) {
+      console.error("Error al generar formato juliano:", error);
+      throw new Error("Error al procesar la fecha");
+    }
   }
+
   const saveRegistro = useCallback(async () => {
     setSubmitted(true);
+    
+    // Validación simplificada de campos requeridos
     if (
       !registro.fecha_produccion ||
       !registro.estado ||
+      !registro.unidad_empaque ||
       !registro.hora ||
-      !registro.lote ||
+      registro.lote.length === 0 ||
       !registro.cant_bolsas ||
       !registro.presentacion ||
-      !registro.operario ||
-      !registro.cons_cartonnormal ||
-      !registro.dese_cartonnormal ||
-      !registro.cons_cartonreforzado ||
-      !registro.dese_cartonreforzado ||
-      !registro.cons_bolsaempaque ||
-      !registro.dese_bolsaempaque ||
-      !registro.cons_cinta ||
-      !registro.dese_cinta ||
-      !registro.cons_tinta ||
-      !registro.dese_tinta ||
-      !registro.cons_diluyente ||
-      !registro.dese_diluyente ||
-      !registro.cons_jumbopeq ||
-      !registro.dese_jumbopeq ||
-      !registro.cons_jumbogrande ||
-      !registro.dese_jumbogrande ||
-      !registro.cons_bolsapeq ||
-      !registro.dese_bolsapeq ||
-      !registro.cons_bolsagrande ||
-      !registro.dese_bolsagrande ||
-      !registro.cons_gazaplastica ||
-      !registro.dese_gazaplastica 
-      // !registro.operario_empaque ||
-      // !registro.encargado_bodega ||
-      // !registro.encargado_planta
+      !registro.operario
     ) {
       toast.current.show({
         severity: "error",
@@ -298,25 +318,22 @@ const ControlRendimientoProductoTerminado = () => {
       });
       return;
     }
-    // Verificar si se seleccionó al menos un lote
-    if(registro.lote.length === 0){
-      toast.current.show({
-        severity: "error",
-        summary: "Error",
-        detail: "Debes seleccionar al menos un lote",
-        life: 3000,
-      });
-      return;
-    }
 
-    try {     
+    try {
       const currentDate = formatDateTime(new Date(), "DD/MM/YYYY");
-      const posibleSKU = generarFormatoJuliano(convertirFecha(fechaSKU));
       const currentTime = formatDateTime(new Date(), "hh:mm A");
       let baseCodigoSKUToInsert = registro.base_codigo_sku;
-      // Si el valor es "nuevo", crear un lote
+
+      // Si el valor es "nuevo", crear un SKU
       if (registro.base_codigo_sku === "Nuevo SKU") {
-        // Verificar si el lote ya existe
+        // Validar que fechaSKU existe
+        if (!fechaSKU) {
+          throw new Error("Debes proporcionar una fecha para generar el SKU");
+        }
+
+        const fechaConvertida = convertirFecha(fechaSKU);
+        const posibleSKU = generarFormatoJuliano(fechaConvertida);
+        
         if (skus.some((sku) => sku.base_codigo_sku === posibleSKU)) {
           toast.current.show({
             severity: "warn",
@@ -326,26 +343,19 @@ const ControlRendimientoProductoTerminado = () => {
           return;
         }
 
-        // Crear nuevo lote
         const { data, error } = await supabase.rpc("generar_sku_base", {
-          p_fecha_sku: convertirFecha(fechaSKU),
+          p_fecha_sku: fechaConvertida,
           p_fecha_registro: currentDate,
           p_hora_registro: currentTime,
         });
 
         if (error) {
-          toast.current.show({
-            severity: "error",
-            detail: "Error al crear sku. " + error.message,
-          });
-          return;
+          throw new Error("Error al crear SKU: " + error.message);
         }
-      
-        // Actualizar el valor local y el estado
+        
         baseCodigoSKUToInsert = data;
         setRegistro({ ...registro, base_codigo_sku: data });
       } else {
-        // Verificar si el lote existe
         const { data: skuExistente, error: skuError } = await supabase
           .from("SKU")
           .select("base_codigo_sku")
@@ -353,15 +363,11 @@ const ControlRendimientoProductoTerminado = () => {
           .single();
 
         if (skuError || !skuExistente) {
-          toast.current.show({
-            severity: "error",
-            detail: `El SKU ${registro.base_codigo_sku} no existe.`,
-          });
-          return;
+          throw new Error(`El SKU ${registro.base_codigo_sku} no existe.`);
         }
       }
 
-      // 2. Insertar relaciones en sku_lotes
+      // Insertar relaciones en sku_lotes
       const lotesIdssku_lotes = registro.lote.map((l) => l.base_numero_lote);
       const relacionesInsert = lotesIdssku_lotes.map((loteId) => ({
         sku_base: baseCodigoSKUToInsert,
@@ -373,24 +379,22 @@ const ControlRendimientoProductoTerminado = () => {
         .insert(relacionesInsert);
 
       if (relacionesError) {
-        throw new Error(
-          "Error al guardar relaciones SKU-Lotes: " + relacionesError.message
-        );
+        throw new Error("Error al guardar relaciones SKU-Lotes: " + relacionesError.message);
       }
 
-      // 2. Convertir lotes a string
+      // Convertir lotes a string
       const lotesString = registro.lote
         .map((l) => l.base_numero_lote)
         .join(", ");
-        
 
-      // 3. Insertar registro (sin incluir SKU)
+      // Insertar registro principal
       const { data, error } = await supabase
         .from("Control_Rendimiento_Producto_Terminado")
         .insert([
           {
             estado: registro.estado,
-            base_codigo_sku: baseCodigoSKUToInsert, // Solo enviamos la base
+            unidad_empaque: registro.unidad_empaque,
+            base_codigo_sku: baseCodigoSKUToInsert,
             fecha_produccion: convertirFecha(registro.fecha_produccion),
             hora: registro.hora,
             lote: lotesString,
@@ -400,53 +404,47 @@ const ControlRendimientoProductoTerminado = () => {
             fecha_registro: currentDate,
             hora_registro: currentTime,
             observaciones: registro.observaciones,
-            cons_cartonnormal: registro.cons_cartonnormal,
-            dese_cartonnormal: registro.dese_cartonnormal,
-            cons_cartonreforzado: registro.cons_cartonreforzado,
-            dese_cartonreforzado: registro.dese_cartonreforzado,
-            cons_bolsaempaque: registro.cons_bolsaempaque,
-            dese_bolsaempaque: registro.dese_bolsaempaque,
-            cons_cinta: registro.cons_cinta,
-            dese_cinta: registro.dese_cinta,
-            cons_tinta: registro.cons_tinta,
-            dese_tinta: registro.dese_tinta,
-            cons_diluyente: registro.cons_diluyente,
-            dese_diluyente: registro.dese_diluyente,
-            cons_jumbopeq: registro.cons_jumbopeq,
-            dese_jumbopeq: registro.dese_jumbopeq,
-            cons_jumbogrande: registro.cons_jumbogrande,
-            dese_jumbogrande: registro.dese_jumbogrande,
-            cons_bolsapeq: registro.cons_bolsapeq,
-            dese_bolsapeq: registro.dese_bolsapeq,
-            cons_bolsagrande: registro.cons_bolsagrande,
-            dese_bolsagrande: registro.dese_bolsagrande,
-            cons_gazaplastica: registro.cons_gazaplastica,
-            dese_gazaplastica: registro.dese_gazaplastica,
-            operario_empaque: registro.operario_empaque,
-            encargado_bodega: registro.encargado_bodega,
-            encargado_planta: registro.encargado_planta,
+            cons_cartonnormal: registro.cons_cartonnormal || 0,
+            dese_cartonnormal: registro.dese_cartonnormal || 0,
+            cons_cartonreforzado: registro.cons_cartonreforzado || 0,
+            dese_cartonreforzado: registro.dese_cartonreforzado || 0,
+            cons_bolsaempaque: registro.cons_bolsaempaque || 0,
+            dese_bolsaempaque: registro.dese_bolsaempaque || 0,
+            cons_cinta: registro.cons_cinta || 0,
+            dese_cinta: registro.dese_cinta || 0,
+            cons_tinta: registro.cons_tinta || 0,
+            dese_tinta: registro.dese_tinta || 0,
+            cons_diluyente: registro.cons_diluyente || 0,
+            dese_diluyente: registro.dese_diluyente || 0,
+            cons_jumbopeq: registro.cons_jumbopeq || 0,
+            dese_jumbopeq: registro.dese_jumbopeq || 0,
+            cons_jumbogrande: registro.cons_jumbogrande || 0,
+            dese_jumbogrande: registro.dese_jumbogrande || 0,
+            cons_bolsapeq: registro.cons_bolsapeq || 0,
+            dese_bolsapeq: registro.dese_bolsapeq || 0,
+            cons_bolsagrande: registro.cons_bolsagrande || 0,
+            dese_bolsagrande: registro.dese_bolsagrande || 0,
+            cons_gazaplastica: registro.cons_gazaplastica || 0,
+            dese_gazaplastica: registro.dese_gazaplastica || 0,
           },
         ]);
 
       if (error) {
-        throw new Error(
-          "Error al guardar en Control Rendimiento: " + error.message
-        );
+        throw new Error("Error al guardar registro: " + error.message);
       }
+
       // Actualizar estado de los lotes seleccionados
       const lotesIds = registro.lote.map((l) => l.base_numero_lote);
       const { error: updateError } = await supabase
         .from("Lotes")
         .update({
-          etapa_actual: "ProductoTerminado",
+          //etapa_actual: "ProductoTerminado",
           fecha_empaque: currentDate,
         })
         .in("base_numero_lote", lotesIds);
 
       if (updateError) {
-        throw new Error(
-          "Error al actualizar estado de los lotes: " + updateError.message
-        );
+        throw new Error("Error al actualizar lotes: " + updateError.message);
       }
 
       toast.current.show({
@@ -460,6 +458,7 @@ const ControlRendimientoProductoTerminado = () => {
       setRegistro(emptyRegister);
       setRegistroDialog(false);
       setSubmitted(false);
+      setFechaSKU("");
 
       // Actualizar datos
       fetchRegistros();
@@ -474,8 +473,9 @@ const ControlRendimientoProductoTerminado = () => {
         life: 3000,
       });
     }
-  }, [registro, lotes]);
+  }, [registro, lotes, skus, fechaSKU]);
 
+  // Resto de funciones auxiliares (dateEditor, timeEditor, etc.)
   const dateEditor = (options) => {
     const convertToInputFormat = (date) => {
       if (!date) return "";
@@ -533,7 +533,8 @@ const ControlRendimientoProductoTerminado = () => {
   const floatEditor = (options) => {
     return (
       <InputText
-        type="float"
+        type="number"
+        step="0.01"
         value={options.value}
         onChange={(e) => options.editorCallback(e.target.value)}
       />
@@ -577,15 +578,26 @@ const ControlRendimientoProductoTerminado = () => {
         .update(updatedData)
         .eq("id", id);
 
-      if (error) return console.error("Error al actualizar:", error.message);
+      if (error) throw error;
 
       setRegistros((prev) =>
         prev.map((n) => (n.id === id ? { ...n, ...newData } : n))
       );
+      toast.current.show({
+        severity: "success",
+        summary: "Éxito",
+        detail: "Registro actualizado",
+        life: 3000,
+      });
     } catch (err) {
-      console.error("Error inesperado:", err);
+      console.error("Error al actualizar:", err);
+      toast.current.show({
+        severity: "error",
+        summary: "Error",
+        detail: "Error al actualizar el registro",
+        life: 3000,
+      });
     }
-    fetchRegistros();
   };
 
   const onInputChange = (e, name) => {
@@ -662,21 +674,18 @@ const ControlRendimientoProductoTerminado = () => {
   );
 
   const cols = [
-    {field: "estado", header: "Estado"},
+    { field: "estado", header: "Estado" },
+    { field: "unidad_empaque", header: "unidad_empaque" },
     { field: "base_codigo_sku", header: "Codigo SKU" },
     { field: "numero_sku", header: "SKU Generado" },
     { field: "lote", header: "Lotes" },
     { field: "fecha_produccion", header: "Fecha Producción" },
     { field: "hora", header: "Hora" },
-
     { field: "cant_bolsas", header: "Cantidad Bolsas/Unidad Empaque" },
     { field: "presentacion", header: "Presentación" },
-    { field: "SKU", header: "SKU" },
     { field: "operario", header: "Operario" },
-
     { field: "observaciones", header: "Observaciones" },
     { field: "registrado", header: "Registrado" },
-
     { field: "cons_cartonnormal", header: "Consumo Cartón Normal" },
     { field: "dese_cartonnormal", header: "Desecho Cartón Normal" },
     { field: "cons_cartonreforzado", header: "Consumo Cartón Reforzado" },
@@ -698,6 +707,7 @@ const ControlRendimientoProductoTerminado = () => {
     { field: "cons_bolsagrande", header: "Consumo Bolsa Grande" },
     { field: "dese_bolsagrande", header: "Desecho Bolsa Grande" },
     { field: "cons_gazaplastica", header: "Consumo Gasa Plástica" },
+    { field: "dese_gazaplastica", header: "Desecho Gasa Plástica" },
   ];
 
   const exportColumns = cols.map((col) => ({
@@ -867,41 +877,25 @@ const ControlRendimientoProductoTerminado = () => {
               sortable
               style={{ minWidth: "12rem" }}
             ></Column>
-
             <Column
               field="base_codigo_sku"
               header="Base SKU"
               sortable
               style={{ minWidth: "10rem" }}
             ></Column>
-            {/* <Column
-              field="operario_empaque"
-              header="Operario Empaque"
-              editor={(options) => textEditor(options)}
-            ></Column> */}
-            {/* <Column
-              field="encargado_bodega"
-              header="Encargado Bodega"
-              editor={(options) => textEditor(options)}
-            ></Column> */}
-            {/* <Column
-              field="encargado_planta"
-              header="Encargado Planta"
-              editor={(options) => textEditor(options)}
-            ></Column> */}
             <Column
-                          field="estado"
-                          header="Estado"
-                          editor={(options) =>
-                            dropdownEditor({
-                              ...options,
-                              options: estados.map((estado) => ({
-                                label: estado,
-                                value: estado,
-                              })),
-                            })
-                          }
-                        ></Column>
+              field="estado"
+              header="Estado"
+              editor={(options) =>
+                dropdownEditor({
+                  ...options,
+                  options: estados.map((estado) => ({
+                    label: estado,
+                    value: estado,
+                  })),
+                })
+              }
+            ></Column>
             <Column
               field="fecha_produccion"
               header="Fecha Producción"
@@ -921,6 +915,19 @@ const ControlRendimientoProductoTerminado = () => {
               field="presentacion"
               header="Presentación"
               editor={(options) => numberEditor(options)}
+            ></Column>
+            <Column
+              field="unidad_empaque"
+              header="Unidad Empaque"
+              editor={(options) =>
+                dropdownEditor({
+                  ...options,
+                  options: unidad_empaque.map((unidad_empaque) => ({
+                    label: unidad_empaque,
+                    value: unidad_empaque,
+                  })),
+                })
+              }
             ></Column>
             <Column
               field="cant_bolsas"
@@ -1073,97 +1080,54 @@ const ControlRendimientoProductoTerminado = () => {
               <small className="p-error">Requerido.</small>
             )}
           </label>
-
           <Dropdown
-           filter
+            filter
             value={registro.base_codigo_sku}
             onChange={(e) => {
               setRegistro({ ...registro, base_codigo_sku: e.value });
             }}
             options={[
-              // Opción "Nuevo Lote" con valor "nuevo"
               { base_codigo_sku: "Nuevo SKU" },
               ...(skus || []),
             ]}
-            optionLabel="base_codigo_sku" // Mostrar el campo "label" en el dropdown
-            optionValue="base_codigo_sku" // Guardar el valor de "base_numero_lote"
-            placeholder="Selecciona un Número de lote"
+            optionLabel="base_codigo_sku"
+            optionValue="base_codigo_sku"
+            placeholder="Selecciona un Código SKU"
             className="w-full md:w-14rem"
           />
           {registro.base_codigo_sku === "Nuevo SKU" && (
-                      <>
-                        <label htmlFor="fechaSKU" className="font-bold">
-                        Fecha Código SKU Manual{" "}
-                          {submitted && (
-                            <small className="p-error">Requerido.</small>
-                          )}
-                        </label>
-                        <InputText
-            type="date"
-            id="fechaSKU"
-            value={fechaSKU}
-            onChange={(e) => setFechaSKU(e.target.value)}
-          />
-                      </>
-                    )}
+            <>
+              <label htmlFor="fechaSKU" className="font-bold">
+                Fecha Código SKU Manual{" "}
+                {submitted && !fechaSKU && (
+                  <small className="p-error">Requerido.</small>
+                )}
+              </label>
+              <InputText
+                type="date"
+                id="fechaSKU"
+                value={fechaSKU}
+                onChange={(e) => setFechaSKU(e.target.value)}
+                required={registro.base_codigo_sku === "Nuevo SKU"}
+              />
+            </>
+          )}
           <br />
-           <label htmlFor="estado" className="font-bold">
-                      Estado{" "}
-                      {submitted && !registro.estado && (
-                        <small className="p-error">Requerido.</small>
-                      )}
-                    </label>
-                    <Dropdown
-                      id="estado"
-                      value={registro.estado}
-                      options={estados}
-                      onChange={(e) => onInputChange(e, "estado")}
-                      placeholder="Selecciona un Estado"
-                      required
-                    />
-          <br />
-         {/* <Divider />
-           <h3>
-            <strong>Encargados:</strong>
-          </h3>
-          <Divider />
-
-          <label htmlFor="operario_empaque" className="font-bold">
-            Operario Empaque{" "}
-            {submitted && !registro.operario_empaque && (
+          <label htmlFor="estado" className="font-bold">
+            Estado{" "}
+            {submitted && !registro.estado && (
               <small className="p-error">Requerido.</small>
             )}
           </label>
-          <InputText
-            id="operario_empaque"
-            value={registro.operario_empaque}
-            onChange={(e) => onInputChange(e, "operario_empaque")}
+          <Dropdown
+            id="estado"
+            value={registro.estado}
+            options={estados}
+            onChange={(e) => onInputChange(e, "estado")}
+            placeholder="Selecciona un Estado"
+            required
           />
           <br />
-          <label htmlFor="encargado_bodega" className="font-bold">
-            Encargado Bodega{" "}
-            {submitted && !registro.encargado_bodega && (
-              <small className="p-error">Requerido.</small>
-            )}
-          </label>
-          <InputText
-            id="encargado_bodega"
-            value={registro.encargado_bodega}
-            onChange={(e) => onInputChange(e, "encargado_bodega")}
-          />
-          <br />
-          <label htmlFor="encargado_planta" className="font-bold">
-            Encargado Planta{" "}
-            {submitted && !registro.encargado_planta && (
-              <small className="p-error">Requerido.</small>
-            )}
-          </label>
-          <InputText
-            id="encargado_planta"
-            value={registro.encargado_planta}
-            onChange={(e) => onInputChange(e, "encargado_planta")}
-          />
-          <br /> */}
           <Divider />
           <h3>
             <strong>Datos Producción:</strong>
@@ -1181,9 +1145,7 @@ const ControlRendimientoProductoTerminado = () => {
             value={registro.fecha_produccion}
             onChange={(e) => onInputChange(e, "fecha_produccion")}
           />
-
           <br />
-
           <label htmlFor="hora" className="font-bold">
             Hora{" "}
             {submitted && !registro.hora && (
@@ -1196,9 +1158,7 @@ const ControlRendimientoProductoTerminado = () => {
             value={registro.hora}
             onChange={(e) => onInputChange(e, "hora")}
           />
-
           <br />
-
           <label htmlFor="lote" className="font-bold">
             Lotes{" "}
             {submitted && registro.lote.length === 0 && (
@@ -1211,13 +1171,16 @@ const ControlRendimientoProductoTerminado = () => {
               onInputChange({ target: { value: e.value } }, "lote")
             }
             options={lotes}
-            optionLabel="base_numero_lote" // Asegúrate que este campo existe en tus lotes
+            optionLabel="base_numero_lote"
             placeholder="Seleccione Lotes"
             maxSelectedLabels={3}
             className="w-full"
+            filter
+            filterBy="base_numero_lote"
+            filterPlaceholder="Buscar lotes..."
+            showFilterClear
           />
           <br />
-
           <label htmlFor="presentacion" className="font-bold">
             Presentación{" "}
             {submitted && !registro.presentacion && (
@@ -1230,8 +1193,22 @@ const ControlRendimientoProductoTerminado = () => {
             value={registro.presentacion}
             onChange={(e) => onInputChange(e, "presentacion")}
           />
+          <label htmlFor="unidad_empaque" className="font-bold">
+            Unidad de Empaque{" "}
+            {submitted && !registro.unidad_empaque && (
+              <small className="p-error">Requerido.</small>
+            )}
+          </label>
+          <Dropdown
+            id="unidad_empaque"
+            value={registro.unidad_empaque}
+            options={unidad_empaque}
+            onChange={(e) => onInputChange(e, "unidad_empaque")}
+            placeholder="Selecciona la unidad de empaque"
+            required
+          />
           <br />
-
+          <br />
           <label htmlFor="cant_bolsas" className="font-bold">
             Cantidad Bolsas/Unidad Empaque{" "}
             {submitted && !registro.cant_bolsas && (
@@ -1244,23 +1221,7 @@ const ControlRendimientoProductoTerminado = () => {
             value={registro.cant_bolsas}
             onChange={(e) => onInputChange(e, "cant_bolsas")}
           />
-
-          {/* <br /> */}
-
-          {/* <label htmlFor="SKU" className="font-bold">
-            SKU{" "}
-            {submitted && !registro.SKU && (
-              <small className="p-error">Requerido.</small>
-            )}
-          </label>
-          <InputText
-            id="SKU"
-            value={registro.SKU}
-            onChange={(e) => onInputChange(e, "SKU")}
-          /> */}
-
           <br />
-
           <label htmlFor="operario" className="font-bold">
             Operario{" "}
             {submitted && !registro.operario && (
@@ -1272,7 +1233,6 @@ const ControlRendimientoProductoTerminado = () => {
             value={registro.operario}
             onChange={(e) => onInputChange(e, "operario")}
           />
-
           <br />
           <Divider />
           <h3>
@@ -1280,10 +1240,7 @@ const ControlRendimientoProductoTerminado = () => {
           </h3>
           <Divider />
           <label htmlFor="cons_cartonnormal" className="font-bold">
-            Consumo Cartón Normal{" "}
-            {submitted && !registro.cons_cartonnormal && (
-              <small className="p-error">Requerido.</small>
-            )}
+            Consumo Cartón Normal
           </label>
           <InputText
             type="number"
@@ -1291,14 +1248,9 @@ const ControlRendimientoProductoTerminado = () => {
             value={registro.cons_cartonnormal}
             onChange={(e) => onInputChange(e, "cons_cartonnormal")}
           />
-
           <br />
-
           <label htmlFor="dese_cartonnormal" className="font-bold">
-            Desecho Cartón Normal{" "}
-            {submitted && !registro.dese_cartonnormal && (
-              <small className="p-error">Requerido.</small>
-            )}
+            Desecho Cartón Normal
           </label>
           <InputText
             type="number"
@@ -1306,14 +1258,9 @@ const ControlRendimientoProductoTerminado = () => {
             value={registro.dese_cartonnormal}
             onChange={(e) => onInputChange(e, "dese_cartonnormal")}
           />
-
           <br />
-
           <label htmlFor="cons_cartonreforzado" className="font-bold">
-            Consumo Cartón Reforzado{" "}
-            {submitted && !registro.cons_cartonreforzado && (
-              <small className="p-error">Requerido.</small>
-            )}
+            Consumo Cartón Reforzado
           </label>
           <InputText
             type="number"
@@ -1321,14 +1268,9 @@ const ControlRendimientoProductoTerminado = () => {
             value={registro.cons_cartonreforzado}
             onChange={(e) => onInputChange(e, "cons_cartonreforzado")}
           />
-
           <br />
-
           <label htmlFor="dese_cartonreforzado" className="font-bold">
-            Desecho Cartón Reforzado{" "}
-            {submitted && !registro.dese_cartonreforzado && (
-              <small className="p-error">Requerido.</small>
-            )}
+            Desecho Cartón Reforzado
           </label>
           <InputText
             type="number"
@@ -1336,14 +1278,9 @@ const ControlRendimientoProductoTerminado = () => {
             value={registro.dese_cartonreforzado}
             onChange={(e) => onInputChange(e, "dese_cartonreforzado")}
           />
-
           <br />
-
           <label htmlFor="cons_bolsaempaque" className="font-bold">
-            Consumo Bolsa Empaque{" "}
-            {submitted && !registro.cons_bolsaempaque && (
-              <small className="p-error">Requerido.</small>
-            )}
+            Consumo Bolsa Empaque
           </label>
           <InputText
             type="number"
@@ -1351,14 +1288,9 @@ const ControlRendimientoProductoTerminado = () => {
             value={registro.cons_bolsaempaque}
             onChange={(e) => onInputChange(e, "cons_bolsaempaque")}
           />
-
           <br />
-
           <label htmlFor="dese_bolsaempaque" className="font-bold">
-            Desecho Bolsa Empaque{" "}
-            {submitted && !registro.dese_bolsaempaque && (
-              <small className="p-error">Requerido.</small>
-            )}
+            Desecho Bolsa Empaque
           </label>
           <InputText
             type="number"
@@ -1366,14 +1298,9 @@ const ControlRendimientoProductoTerminado = () => {
             value={registro.dese_bolsaempaque}
             onChange={(e) => onInputChange(e, "dese_bolsaempaque")}
           />
-
           <br />
-
           <label htmlFor="cons_cinta" className="font-bold">
-            Consumo Cinta{" "}
-            {submitted && !registro.cons_cinta && (
-              <small className="p-error">Requerido.</small>
-            )}
+            Consumo Cinta
           </label>
           <InputText
             type="number"
@@ -1381,14 +1308,9 @@ const ControlRendimientoProductoTerminado = () => {
             value={registro.cons_cinta}
             onChange={(e) => onInputChange(e, "cons_cinta")}
           />
-
           <br />
-
           <label htmlFor="dese_cinta" className="font-bold">
-            Desecho Cinta{" "}
-            {submitted && !registro.dese_cinta && (
-              <small className="p-error">Requerido.</small>
-            )}
+            Desecho Cinta
           </label>
           <InputText
             type="number"
@@ -1396,14 +1318,9 @@ const ControlRendimientoProductoTerminado = () => {
             value={registro.dese_cinta}
             onChange={(e) => onInputChange(e, "dese_cinta")}
           />
-
           <br />
-
           <label htmlFor="cons_tinta" className="font-bold">
-            Consumo Tinta{" "}
-            {submitted && !registro.cons_tinta && (
-              <small className="p-error">Requerido.</small>
-            )}
+            Consumo Tinta
           </label>
           <InputText
             type="number"
@@ -1411,14 +1328,9 @@ const ControlRendimientoProductoTerminado = () => {
             value={registro.cons_tinta}
             onChange={(e) => onInputChange(e, "cons_tinta")}
           />
-
           <br />
-
           <label htmlFor="dese_tinta" className="font-bold">
-            Desecho Tinta{" "}
-            {submitted && !registro.dese_tinta && (
-              <small className="p-error">Requerido.</small>
-            )}
+            Desecho Tinta
           </label>
           <InputText
             type="number"
@@ -1426,14 +1338,9 @@ const ControlRendimientoProductoTerminado = () => {
             value={registro.dese_tinta}
             onChange={(e) => onInputChange(e, "dese_tinta")}
           />
-
           <br />
-
           <label htmlFor="cons_diluyente" className="font-bold">
-            Consumo Diluyente{" "}
-            {submitted && !registro.cons_diluyente && (
-              <small className="p-error">Requerido.</small>
-            )}
+            Consumo Diluyente
           </label>
           <InputText
             type="number"
@@ -1441,14 +1348,9 @@ const ControlRendimientoProductoTerminado = () => {
             value={registro.cons_diluyente}
             onChange={(e) => onInputChange(e, "cons_diluyente")}
           />
-
           <br />
-
           <label htmlFor="dese_diluyente" className="font-bold">
-            Desecho Diluyente{" "}
-            {submitted && !registro.dese_diluyente && (
-              <small className="p-error">Requerido.</small>
-            )}
+            Desecho Diluyente
           </label>
           <InputText
             type="number"
@@ -1456,14 +1358,9 @@ const ControlRendimientoProductoTerminado = () => {
             value={registro.dese_diluyente}
             onChange={(e) => onInputChange(e, "dese_diluyente")}
           />
-
           <br />
-
           <label htmlFor="cons_jumbopeq" className="font-bold">
-            Consumo Jumbo Pequeño{" "}
-            {submitted && !registro.cons_jumbopeq && (
-              <small className="p-error">Requerido.</small>
-            )}
+            Consumo Jumbo Pequeño
           </label>
           <InputText
             type="number"
@@ -1471,14 +1368,9 @@ const ControlRendimientoProductoTerminado = () => {
             value={registro.cons_jumbopeq}
             onChange={(e) => onInputChange(e, "cons_jumbopeq")}
           />
-
           <br />
-
           <label htmlFor="dese_jumbopeq" className="font-bold">
-            Desecho Jumbo Pequeño{" "}
-            {submitted && !registro.dese_jumbopeq && (
-              <small className="p-error">Requerido.</small>
-            )}
+            Desecho Jumbo Pequeño
           </label>
           <InputText
             type="number"
@@ -1486,14 +1378,9 @@ const ControlRendimientoProductoTerminado = () => {
             value={registro.dese_jumbopeq}
             onChange={(e) => onInputChange(e, "dese_jumbopeq")}
           />
-
           <br />
-
           <label htmlFor="cons_jumbogrande" className="font-bold">
-            Consumo Jumbo Grande{" "}
-            {submitted && !registro.cons_jumbogrande && (
-              <small className="p-error">Requerido.</small>
-            )}
+            Consumo Jumbo Grande
           </label>
           <InputText
             type="number"
@@ -1501,14 +1388,9 @@ const ControlRendimientoProductoTerminado = () => {
             value={registro.cons_jumbogrande}
             onChange={(e) => onInputChange(e, "cons_jumbogrande")}
           />
-
           <br />
-
           <label htmlFor="dese_jumbogrande" className="font-bold">
-            Desecho Jumbo Grande{" "}
-            {submitted && !registro.dese_jumbogrande && (
-              <small className="p-error">Requerido.</small>
-            )}
+            Desecho Jumbo Grande
           </label>
           <InputText
             type="number"
@@ -1516,14 +1398,9 @@ const ControlRendimientoProductoTerminado = () => {
             value={registro.dese_jumbogrande}
             onChange={(e) => onInputChange(e, "dese_jumbogrande")}
           />
-
           <br />
-
           <label htmlFor="cons_bolsapeq" className="font-bold">
-            Consumo Bolsa Pequeña{" "}
-            {submitted && !registro.cons_bolsapeq && (
-              <small className="p-error">Requerido.</small>
-            )}
+            Consumo Bolsa Pequeña
           </label>
           <InputText
             type="number"
@@ -1531,14 +1408,9 @@ const ControlRendimientoProductoTerminado = () => {
             value={registro.cons_bolsapeq}
             onChange={(e) => onInputChange(e, "cons_bolsapeq")}
           />
-
           <br />
-
           <label htmlFor="dese_bolsapeq" className="font-bold">
-            Desecho Bolsa Pequeña{" "}
-            {submitted && !registro.dese_bolsapeq && (
-              <small className="p-error">Requerido.</small>
-            )}
+            Desecho Bolsa Pequeña
           </label>
           <InputText
             type="number"
@@ -1546,14 +1418,9 @@ const ControlRendimientoProductoTerminado = () => {
             value={registro.dese_bolsapeq}
             onChange={(e) => onInputChange(e, "dese_bolsapeq")}
           />
-
           <br />
-
           <label htmlFor="cons_bolsagrande" className="font-bold">
-            Consumo Bolsa Grande{" "}
-            {submitted && !registro.cons_bolsagrande && (
-              <small className="p-error">Requerido.</small>
-            )}
+            Consumo Bolsa Grande
           </label>
           <InputText
             type="number"
@@ -1561,14 +1428,9 @@ const ControlRendimientoProductoTerminado = () => {
             value={registro.cons_bolsagrande}
             onChange={(e) => onInputChange(e, "cons_bolsagrande")}
           />
-
           <br />
-
           <label htmlFor="dese_bolsagrande" className="font-bold">
-            Desecho Bolsa Grande{" "}
-            {submitted && !registro.dese_bolsagrande && (
-              <small className="p-error">Requerido.</small>
-            )}
+            Desecho Bolsa Grande
           </label>
           <InputText
             type="number"
@@ -1576,14 +1438,9 @@ const ControlRendimientoProductoTerminado = () => {
             value={registro.dese_bolsagrande}
             onChange={(e) => onInputChange(e, "dese_bolsagrande")}
           />
-
           <br />
-
           <label htmlFor="cons_gazaplastica" className="font-bold">
-            Consumo Gasa Plástica{" "}
-            {submitted && !registro.cons_gazaplastica && (
-              <small className="p-error">Requerido.</small>
-            )}
+            Consumo Gasa Plástica
           </label>
           <InputText
             type="number"
@@ -1591,14 +1448,9 @@ const ControlRendimientoProductoTerminado = () => {
             value={registro.cons_gazaplastica}
             onChange={(e) => onInputChange(e, "cons_gazaplastica")}
           />
-
           <br />
-
           <label htmlFor="dese_gazaplastica" className="font-bold">
-            Desecho Gasa Plástica{" "}
-            {submitted && !registro.dese_gazaplastica && (
-              <small className="p-error">Requerido.</small>
-            )}
+            Desecho Gasa Plástica
           </label>
           <InputText
             type="number"
@@ -1606,12 +1458,9 @@ const ControlRendimientoProductoTerminado = () => {
             value={registro.dese_gazaplastica}
             onChange={(e) => onInputChange(e, "dese_gazaplastica")}
           />
-
           <br />
-          
-
           <label htmlFor="observaciones" className="font-bold">
-            Observaciones{" "}
+            Observaciones
           </label>
           <InputText
             id="observaciones"
@@ -1624,4 +1473,5 @@ const ControlRendimientoProductoTerminado = () => {
     </>
   );
 };
+
 export default ControlRendimientoProductoTerminado;

@@ -12,11 +12,11 @@ import logo2 from "../../../assets/mosca.png";
 import "./NIB.css";
 
 //Imports de Supabase
-import supabase from "../../../supabaseClient"; //Importa la variable supabase del archivo supabaseClient.js que sirve para conectarse con la base de datos y que funcione como API
+import supabase from "../../../supabaseClient";
 
 //PRIME REACT
-import "primereact/resources/themes/bootstrap4-light-blue/theme.css"; //theme
-import "primeicons/primeicons.css"; //icons
+import "primereact/resources/themes/bootstrap4-light-blue/theme.css";
+import "primeicons/primeicons.css";
 
 //PRIME REACT COMPONENTS
 import { DataTable } from "primereact/datatable";
@@ -29,6 +29,7 @@ import { InputIcon } from "primereact/inputicon";
 import { Dialog } from "primereact/dialog";
 import { InputText } from "primereact/inputtext";
 import { Dropdown } from "primereact/dropdown";
+import { InputNumber } from "primereact/inputnumber";
 
 //Imports de exportar
 import * as XLSX from "xlsx";
@@ -37,9 +38,18 @@ import "jspdf-autotable";
 import { Document, Paragraph, TextRun, HeadingLevel, Packer } from "docx";
 
 function NIB() {
+  // Función para generar el número de lote basado en la fecha actual
+  const generarNumeroLote = useCallback(() => {
+    const today = new Date();
+    const day = String(today.getDate()).padStart(2, '0');
+    const month = String(today.getMonth() + 1).padStart(2, '0');
+    const year = today.getFullYear();
+    return `${day}${month}${year}`;
+  }, []);
+
   //Variable de registro vacio
   let emptyRegister = {
-    base_numero_lote: "",
+    base_numero_lote: generarNumeroLote(),
     numero_lote: "",
     embudo: "",
     gm_colectados: "",
@@ -93,8 +103,7 @@ function NIB() {
   const [submitted, setSubmitted] = useState(false);
   const [registroDialog, setRegistroDialog] = useState(false);
 
-  const [observacionesObligatorio, setObservacionesObligatorio] =
-    useState(false);
+  const [observacionesObligatorio, setObservacionesObligatorio] = useState(false);
   const [erroresValidacion, setErroresValidacion] = useState({
     embudo: false,
     gm_colectados: false,
@@ -114,11 +123,10 @@ function NIB() {
     globalFilter: null,
   });
 
-  //Inicio de IMPRIMIR TICKET
-  // Dentro de tu componente NIB
+  // IMPRIMIR TICKET
   const [impresionDialog, setImpresionDialog] = useState(false);
-  const [selectedLote, setSelectedLote] = useState(""); // Nuevo estado solo para UI
-  const [selectedDestino, setSelectedDestino] = useState(""); // Nuevo estado solo para UI
+  const [selectedLote, setSelectedLote] = useState("");
+  const [selectedDestino, setSelectedDestino] = useState("");
   const datosImpresionRef = useRef({
     fecha_colecta: "",
     lote: "",
@@ -127,7 +135,6 @@ function NIB() {
     destino: "",
   });
 
-  // Memoizar lotes
   const opcionesLotes = useMemo(
     () =>
       lotes.map((lote) => ({
@@ -137,22 +144,19 @@ function NIB() {
     [lotes]
   );
 
-  // Handler de cambios optimizado
   const handleChange = useCallback((field, value) => {
     datosImpresionRef.current[field] = value;
     if (field === "lote") {
-      setSelectedLote(value); // Actualiza el estado UI cuando cambia el lote
-    }else if (field === "destino") {
-      setSelectedDestino(value); // Actualiza el estado UI cuando cambia el destino
+      setSelectedLote(value);
+    } else if (field === "destino") {
+      setSelectedDestino(value);
     }
   }, []);
 
-  // Resetear al cerrar
   const handleCloseDialog = useCallback(() => {
     setImpresionDialog(false);
-    setSelectedLote(""); // Limpiar selección
-    setSelectedDestino(""); // Limpiar selección
-    // Opcional: Resetear otros campos
+    setSelectedLote("");
+    setSelectedDestino("");
     datosImpresionRef.current = {
       fecha_colecta: "",
       lote: "",
@@ -162,7 +166,6 @@ function NIB() {
     };
   }, []);
 
-  // Generar Word
   const generarWord = useCallback(async () => {
     const datos = datosImpresionRef.current;
 
@@ -182,7 +185,6 @@ function NIB() {
       return;
     }
 
-    // Crear el documento Word
     const doc = new Document({
       sections: [
         {
@@ -193,19 +195,17 @@ function NIB() {
                 new TextRun({
                   text: "N.I.B",
                   bold: true,
-                  size: 36, // Tamaño 24 para el título
+                  size: 36,
                 }),
               ],
               alignment: "center",
-              spacing: { after: 200 }, // Mayor espacio después del título
+              spacing: { after: 200 },
             }),
             new Paragraph({
               children: [
                 new TextRun({
-                  text: `Fecha Colecta: ${
-                    convertirFecha(datos.fecha_colecta) || "N/A"
-                  }`,
-                  size: 24, // Tamaño 12 para el contenido
+                  text: `Fecha Colecta: ${convertirFecha(datos.fecha_colecta) || "N/A"}`,
+                  size: 24,
                 }),
               ],
               alignment: "center",
@@ -224,9 +224,7 @@ function NIB() {
             new Paragraph({
               children: [
                 new TextRun({
-                  text: `Fecha Siembra: ${
-                    convertirFecha(datos.fecha_siembra) || "N/A"
-                  }`,
+                  text: `Fecha Siembra: ${convertirFecha(datos.fecha_siembra) || "N/A"}`,
                   size: 24,
                 }),
               ],
@@ -259,7 +257,6 @@ function NIB() {
     });
 
     try {
-      // Generar el blob y descargar
       const blob = await Packer.toBlob(doc);
       const url = URL.createObjectURL(blob);
       const link = document.createElement("a");
@@ -271,7 +268,7 @@ function NIB() {
       URL.revokeObjectURL(url);
 
       setImpresionDialog(false);
-      handleCloseDialog(); // Limpiar selección
+      handleCloseDialog();
     } catch (error) {
       console.error("Error al generar Word:", error);
       alert("Ocurrió un error al generar el documento");
@@ -360,7 +357,7 @@ function NIB() {
               <label>Destino</label>
               <Dropdown
                 value={selectedDestino}
-                options={["Producción","Hatchery"]}
+                options={["Producción", "Hatchery"]}
                 onChange={(e) => {
                   handleChange("destino", e.value);
                   setSelectedDestino(e.value);
@@ -373,19 +370,10 @@ function NIB() {
         </div>
       </Dialog>
     ),
-    [
-      impresionDialog,
-      opcionesLotes,
-      generarWord,
-      selectedLote,
-      selectedDestino,
-      handleCloseDialog,
-    ]
+    [impresionDialog, opcionesLotes, generarWord, selectedLote, selectedDestino, handleCloseDialog]
   );
-  //FIN de IMPRIMIR TICKET
 
-  //Inicio de Sorting y Filtro global por lazy load
-  // Manejar sorting
+  // Lazy loading
   const onSort = useCallback((event) => {
     setLazyParams((prev) => ({
       ...prev,
@@ -394,7 +382,6 @@ function NIB() {
     }));
   }, []);
 
-  // Manejar filtro global
   const onFilter = useCallback((e) => {
     const value = e.target.value;
     setGlobalFilter(value);
@@ -404,10 +391,8 @@ function NIB() {
       first: 0,
     }));
   }, []);
-  //FIN de Sorting y Filtro global por lazy load
 
-  //Inicio de FETCHs REGISTROS
-  // Memoizar funciones de fetching
+  // FETCHs REGISTROS
   const fetchNeonatos = useCallback(
     async (start = 0, limit = 10) => {
       setLoading(true);
@@ -415,18 +400,14 @@ function NIB() {
         let query = supabase
           .from("Neonatos_Inoculados")
           .select("*", { count: "exact" })
-          .range(start, start + limit - 1)
-          // Ordenar por defecto por fecha descendente (más nuevos primero)
-          // .order("fec_registro", { ascending: false });
+          .range(start, start + limit - 1);
 
-        // Aplicar sorting
         if (lazyParams.sortField) {
           query = query.order(lazyParams.sortField, {
             ascending: lazyParams.sortOrder === 1,
           });
         }
 
-        // Aplicar filtro global
         if (lazyParams.globalFilter) {
           query = query.or(
             `numero_lote.ilike.%${lazyParams.globalFilter}%,operario.ilike.%${lazyParams.globalFilter}%,fec_registro.ilike.%${lazyParams.globalFilter}%`
@@ -472,7 +453,6 @@ function NIB() {
     lazyParams.globalFilter,
   ]);
 
-  // Manejar cambio de página y lazy loading
   const onPage = useCallback(
     (event) => {
       setLazyParams({
@@ -484,13 +464,11 @@ function NIB() {
     },
     [lazyParams]
   );
-  //Fin de FETCH REGISTROS
 
-  //Inicio de Formatear la FECHA DE REGISTRO de formato YYYY-MM-DD a DD/MM/YYYY
+  // Formatear fechas
   const convertirFecha = (fecha) =>
     fecha ? fecha.split("-").reverse().join("/") : "";
 
-  // Formatear la fecha y hora para obtener actual
   const formatDateTime = (date, format = "DD-MM-YYYY hh:mm A") => {
     const fmt = new Intl.DateTimeFormat("en-US", {
       day: "2-digit",
@@ -511,32 +489,24 @@ function NIB() {
       .replace("mm", fmt.minute)
       .replace("A", fmt.dayPeriod || "AM");
   };
-  //Fin de Formatear la FECHA DE REGISTRO de formato YYYY-MM-DD a DD/MM/YYYY
 
-  //Inicio de Guardar el registro de Neonatos Inoculados
+  // Guardar registro
   const saveNeonatoInoculado = useCallback(async () => {
     setSubmitted(true);
 
     // Validar los campos
     const isEmbudoInvalido = registro.embudo < 1 || registro.embudo > 10;
-    // const isGmColectadosInvalido = neonato.gm_colectados < 1 || neonato.gm_colectados > 100;
     const isCajasInoculadasDestinoInvalido =
       registro.cajas_inoculadas_destino < 100 ||
       registro.cajas_inoculadas_destino > 500;
-    // POR SI LO PIDEN MAS ADELANTE const isGmNeonatoCajaInvalido = neonato.gm_neonato_caja < 1 || neonato.gm_neonato_caja > 100;
 
-    // Actualizar el estado de errores
     setErroresValidacion({
       embudo: isEmbudoInvalido,
-      // gm_colectados: false,
       cajas_inoculadas_destino: isCajasInoculadasDestinoInvalido,
     });
     const valoresFueraDeRango =
-      isEmbudoInvalido ||
-      // isGmColectadosInvalido ||
-      isCajasInoculadasDestinoInvalido;
+      isEmbudoInvalido || isCajasInoculadasDestinoInvalido;
 
-    // Validaciones previas...
     if (
       !registro.embudo ||
       !registro.gm_colectados ||
@@ -556,12 +526,10 @@ function NIB() {
       return;
     }
 
-    // Validación principal
     if (valoresFueraDeRango && !registro.observaciones) {
       setObservacionesObligatorio(true);
       const currentErrores = {
         "Número de Embudo": isEmbudoInvalido,
-        // gm_colectados: false,
         "Cajas Inoculadas": isCajasInoculadasDestinoInvalido,
       };
 
@@ -581,40 +549,37 @@ function NIB() {
     setObservacionesObligatorio(false);
     setErroresValidacion({
       embudo: false,
-      // gm_colectados: false,
       cajas_inoculadas_destino: false,
     });
 
     try {
       const currentDate = formatDateTime(new Date(), "DD/MM/YYYY");
-      const posibleLote = formatDateTime(new Date(), "DDMMYYYY");
       const currentTime = formatDateTime(new Date(), "hh:mm A");
-      let baseNumeroLoteToInsert = registro.base_numero_lote;
-      console.log("Valor seleccionado en dropdown:", registro.base_numero_lote);
-      console.log(
-        "Valor a insertar en Neonatos_Inoculados:",
-        baseNumeroLoteToInsert
-      );
-      // Si el valor es "nuevo", crear un lote
-      if (registro.base_numero_lote === "Nuevo Lote") {
-        // Verificar si el lote ya existe
-        if (lotes.some((lote) => lote.base_numero_lote === posibleLote)) {
-          toast.current.show({
-            severity: "warn",
-            detail: `El lote ${posibleLote} ya existe. Selecciónalo.`,
-          });
-          console.log("YA EXISTE")
-          return;
-        }
+      
+      // Verificar si el lote ya existe
+      const { data: existingLot, error: lotError } = await supabase
+        .from('Lotes')
+        .select('base_numero_lote')
+        .eq('base_numero_lote', registro.base_numero_lote)
+        .single();
 
-        // Crear nuevo lote
-        const { data, error } = await supabase.rpc("crear_nuevo_lote", {
+      if (existingLot && !lotError) {
+        // El lote ya existe, solo procedemos con la inserción
+        toast.current.show({
+          severity: 'info',
+          summary: 'Información',
+          detail: `Usando lote existente ${registro.base_numero_lote}`,
+          life: 3000
+        });
+      } else {
+        // El lote no existe, crear uno nuevo
+        const { data: newLot, error: createError } = await supabase.rpc("crear_nuevo_lote", {
           p_fecha_registro: currentDate,
           p_hora_registro: currentTime,
           p_destino: "PR",
         });
 
-        if (error) {
+        if (createError) {
           toast.current.show({
             severity: "error",
             detail: "Error al crear lote.",
@@ -622,24 +587,8 @@ function NIB() {
           return;
         }
 
-        // Actualizar el valor local y el estado
-        baseNumeroLoteToInsert = data;
-        setRegistro({ ...registro, base_numero_lote: data });
-      } else {
-        // Verificar si el lote existe
-        const { data: loteExistente, error: loteError } = await supabase
-          .from("Lotes")
-          .select("base_numero_lote")
-          .eq("base_numero_lote", registro.base_numero_lote)
-          .single();
-
-        if (loteError || !loteExistente) {
-          toast.current.show({
-            severity: "error",
-            detail: `El lote ${registro.base_numero_lote} no existe.`,
-          });
-          return;
-        }
+        // Actualizar el valor del lote en el estado
+        setRegistro(prev => ({ ...prev, base_numero_lote: newLot }));
       }
 
       // Insertar en Neonatos_Inoculados
@@ -647,7 +596,7 @@ function NIB() {
         .from("Neonatos_Inoculados")
         .insert([
           {
-            base_numero_lote: baseNumeroLoteToInsert,
+            base_numero_lote: registro.base_numero_lote,
             numero_lote: registro.numero_lote,
             embudo: registro.embudo,
             gm_colectados: registro.gm_colectados,
@@ -671,6 +620,7 @@ function NIB() {
          "Error en Supabase: Mirar consola para ver error" || "Error desconocido al guardar en Supabase"
         );
       }
+
       const { error: updateError } = await supabase
         .from("Lotes")
         .update({
@@ -685,7 +635,6 @@ function NIB() {
         life: 3000,
       });
 
-      // Limpia el estado
       setRegistro(emptyRegister);
       setRegistroDialog(false);
       setSubmitted(false);
@@ -700,17 +649,14 @@ function NIB() {
       });
     }
   }, [registro, lotes, convertirFecha]);
-  //FIN de Guardar el registro de Neonatos Inoculados
 
-  //Inicio de EDITAR TABLA
-
+  // EDITAR TABLA
   const handleKeyPress = (e) => {
     const invalidChars = ['e', 'E', '+', '-'];
     if (invalidChars.includes(e.key)) {
       e.preventDefault();
     }
     
-    // Si es un campo decimal, permite un solo punto
     if (e.key === '.' && e.target.value.includes('.')) {
       e.preventDefault();
     }
@@ -764,7 +710,7 @@ function NIB() {
     return (
       <InputText
         type="number"
-onKeyDown={handleKeyPress}
+        onKeyDown={handleKeyPress}
         value={options.value}
         onChange={(e) => options.editorCallback(e.target.value)}
       />
@@ -774,8 +720,8 @@ onKeyDown={handleKeyPress}
   const floatEditor = (options) => {
     return (
       <InputText
-       type="number"
-onKeyDown={handleKeyPress}
+        type="number"
+        onKeyDown={handleKeyPress}
         value={options.value}
         onChange={(e) => options.editorCallback(e.target.value)}
       />
@@ -815,7 +761,6 @@ onKeyDown={handleKeyPress}
     const { id, base_numero_lote, ...updatedData } = newData;
     
     try {
-      // Verificar la etapa del lote
       const { data: lote, error: loteError } = await supabase
         .from('Lotes')
         .select('etapa_actual')
@@ -842,7 +787,6 @@ onKeyDown={handleKeyPress}
         return;
       }
   
-      // Si pasa la validación, realizar la actualización
       const { error } = await supabase
         .from("Neonatos_Inoculados")
         .update(updatedData)
@@ -880,22 +824,8 @@ onKeyDown={handleKeyPress}
       });
     }
   };
-  //FIN de EDITAR TABLA
 
-  //Inicio de Validaciones de los campos
-  const onInputChange = useCallback((e, name) => {
-    setRegistro((prev) => ({ ...prev, [name]: e.target.value }));
-  }, []);
-  // const onInputChange = (e, name) => {
-  //   let val = e.target.value;
-  //   let _registro = { ...registro };
-  //   _registro[name] = val;
-  //   setRegistro(_registro);
-  // };
-  //FIN de Validaciones de los campos
-
-
-  //Inicio de EXPORTAR TABLA
+  // EXPORTAR TABLA
   const exportPdf = useCallback(() => {
     if (selectedRegistros.length === 0) {
       toast.current.show({
@@ -959,7 +889,7 @@ onKeyDown={handleKeyPress}
     }
 
     doc.save("Neonatos Inoculados.pdf");
-  }, [selectedRegistros]); // Añadir selectedRegistros como dependencia
+  }, [selectedRegistros]);
 
   const exportXlsx = useCallback(() => {
     if (selectedRegistros.length === 0) {
@@ -994,18 +924,14 @@ onKeyDown={handleKeyPress}
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, "Registros");
     XLSX.writeFile(wb, "Neonatos Inoculados.xlsx");
-  }, [selectedRegistros]); // Añadir selectedRegistros como dependencia
+  }, [selectedRegistros]);
 
-  // Mapeo de columnas para jsPDF-Autotable
   const exportColumns = cols.map((col) => ({
-    title: col.header, // Título del encabezado
-    dataKey: col.field, // Llave de datos
+    title: col.header,
+    dataKey: col.field,
   }));
 
-  // Fin de EXPORTAR TABLA
-
-  //Inicio de Botones de la tabla
-  // Memoizar plantillas de toolbar
+  // BOTONES DE LA TABLA
   const leftToolbarTemplate = useMemo(
     () => () =>
       (
@@ -1045,7 +971,7 @@ onKeyDown={handleKeyPress}
           />
         </div>
       ),
-    [exportPdf, exportXlsx] // Añadir las funciones como dependencias
+    [exportPdf, exportXlsx]
   );
 
   const header = (
@@ -1060,7 +986,7 @@ onKeyDown={handleKeyPress}
   );
 
   const openNew = () => {
-    setRegistro(emptyRegister);
+    setRegistro({ ...emptyRegister, base_numero_lote: generarNumeroLote() });
     setSubmitted(false);
     setRegistroDialog(true);
   };
@@ -1085,9 +1011,8 @@ onKeyDown={handleKeyPress}
       />
     </React.Fragment>
   );
-  //FIN de Botones de la tabla
 
-  // Memoizar columnas de la tabla
+  // COLUMNAS DE LA TABLA
   const columns = useMemo(
     () => [
       <Column key="selection" selectionMode="multiple" exportable={false} />,
@@ -1110,9 +1035,11 @@ onKeyDown={handleKeyPress}
     ],
     []
   );
-  //FIN de EXPORTAR TABLA
 
-  
+  // HANDLERS
+  const onInputChange = useCallback((e, name) => {
+    setRegistro((prev) => ({ ...prev, [name]: e.target.value }));
+  }, []);
 
   return (
     <>
@@ -1177,7 +1104,6 @@ onKeyDown={handleKeyPress}
             <Column
               field="numero_lote"
               header="Número Lote"
-              // editor={(options) => textEditor(options)}
               sortable
               style={{ minWidth: "10rem" }}
             ></Column>
@@ -1191,7 +1117,6 @@ onKeyDown={handleKeyPress}
             <Column
               field="hor_colecta"
               header="Hora Colecta"
-              // editor={(options) => dateEditor(options)}
               sortable
               style={{ minWidth: "10rem" }}
             ></Column>
@@ -1247,7 +1172,6 @@ onKeyDown={handleKeyPress}
             <Column
               field="operario"
               header="Operario"
-              // editor={(options) => textEditor(options)}
               sortable
               style={{ minWidth: "14rem" }}
             ></Column>
@@ -1261,14 +1185,12 @@ onKeyDown={handleKeyPress}
             <Column
               field="fec_registro"
               header="Fecha Registro"
-              // editor={(options) => textEditor(options)}
               sortable
               style={{ minWidth: "14rem" }}
             ></Column>
             <Column
               field="hor_registro"
               header="Hora Registro"
-              // editor={(options) => textEditor(options)}
               sortable
               style={{ minWidth: "14rem" }}
             ></Column>
@@ -1278,7 +1200,6 @@ onKeyDown={handleKeyPress}
               headerStyle={{ width: "10%", minWidth: "5rem" }}
               bodyStyle={{ textAlign: "center" }}
             ></Column>
-            {/* {columns} */}
           </DataTable>
         </div>
       </div>
@@ -1301,23 +1222,42 @@ onKeyDown={handleKeyPress}
             )}
           </label>
 
+          <div className="p-inputgroup">
+            <InputText
+              value={registro.base_numero_lote}
+              onChange={(e) => {
+                setRegistro({ ...registro, base_numero_lote: e.target.value });
+              }}
+              placeholder="Número de lote"
+              disabled
+            />
+            <Button
+              icon="pi pi-refresh"
+              tooltip="Generar nuevo lote"
+              onClick={() => {
+                const nuevoLote = generarNumeroLote();
+                setRegistro({ ...registro, base_numero_lote: nuevoLote });
+              }}
+            />
+          </div>
+
+          <small className="p-text-secondary">
+            Lote generado automáticamente para hoy. Si desea usar uno existente:
+          </small>
+
           <Dropdown
             value={registro.base_numero_lote}
             filter
             onChange={(e) => {
               setRegistro({ ...registro, base_numero_lote: e.value });
             }}
-            options={[
-              // Opción "Nuevo Lote" con valor "nuevo"
-              { base_numero_lote: "Nuevo Lote" },
-              ...(lotes || []),
-            ]}
-            optionLabel="base_numero_lote" // Mostrar el campo "label" en el dropdown
-            optionValue="base_numero_lote" // Guardar el valor de "base_numero_lote"
-            placeholder="Selecciona un Número de lote"
-            className="w-full md:w-14rem"
-            autoFocus
+            options={lotes || []}
+            optionLabel="base_numero_lote"
+            optionValue="base_numero_lote"
+            placeholder="Selecciona un lote existente"
+            className="w-full md:w-14rem mt-2"
           />
+
           <br />
           <label htmlFor="fec_colecta" className="font-bold">
             Fecha Colecta{" "}
@@ -1334,7 +1274,7 @@ onKeyDown={handleKeyPress}
           />
           <br />
           <label htmlFor="hor_colecta" className="font-bold">
-            Fecha Colecta{" "}
+            Hora Colecta{" "}
             {submitted && !registro.hor_colecta && (
               <small className="p-error">Requerido.</small>
             )}
@@ -1345,7 +1285,6 @@ onKeyDown={handleKeyPress}
             value={registro.hor_colecta}
             onChange={(e) => onInputChange(e, "hor_colecta")}
             required
-            
           />
 
           <br />
@@ -1376,20 +1315,14 @@ onKeyDown={handleKeyPress}
             {submitted && !registro.gm_colectados && (
               <small className="p-error">Requerido.</small>
             )}
-            {/* {erroresValidacion.gm_colectados && (
-              <small className="p-error">
-                Gramos Colectados depende de cada caja.
-              </small>
-            )} */}
           </label>
           <InputText
-           type="number"
-onKeyDown={handleKeyPress}
+            type="number"
+            onKeyDown={handleKeyPress}
             id="gm_colectados"
             value={registro.gm_colectados}
             onChange={(e) => onInputChange(e, "gm_colectados")}
             required
-            
           />
 
           <br />
@@ -1406,12 +1339,11 @@ onKeyDown={handleKeyPress}
           </label>
           <InputText
             type="number"
-onKeyDown={handleKeyPress}
+            onKeyDown={handleKeyPress}
             id="cajas_inoculadas_destino"
             value={registro.cajas_inoculadas_destino}
             onChange={(e) => onInputChange(e, "cajas_inoculadas_destino")}
             required
-            
           />
 
           <br />
@@ -1422,13 +1354,12 @@ onKeyDown={handleKeyPress}
             )}
           </label>
           <InputText
-           type="number"
-onKeyDown={handleKeyPress}
+            type="number"
+            onKeyDown={handleKeyPress}
             id="gm_neonato_caja"
             value={registro.gm_neonato_caja}
             onChange={(e) => onInputChange(e, "gm_neonato_caja")}
             required
-            
           />
 
           <br />
@@ -1439,13 +1370,12 @@ onKeyDown={handleKeyPress}
             )}
           </label>
           <InputText
-           type="number"
-onKeyDown={handleKeyPress}
+            type="number"
+            onKeyDown={handleKeyPress}
             id="cantidad_dieta_caja"
             value={registro.cantidad_dieta_caja}
             onChange={(e) => onInputChange(e, "cantidad_dieta_caja")}
             required
-           
           />
 
           <br />
@@ -1456,13 +1386,12 @@ onKeyDown={handleKeyPress}
             )}
           </label>
           <InputText
-           type="number"
-onKeyDown={handleKeyPress}
+            type="number"
+            onKeyDown={handleKeyPress}
             id="temp_ambiental"
             value={registro.temp_ambiental}
             onChange={(e) => onInputChange(e, "temp_ambiental")}
             required
-           
           />
 
           <br />
@@ -1473,13 +1402,12 @@ onKeyDown={handleKeyPress}
             )}
           </label>
           <InputText
-           type="number"
-onKeyDown={handleKeyPress}
+            type="number"
+            onKeyDown={handleKeyPress}
             id="hum_ambiental"
             value={registro.hum_ambiental}
             onChange={(e) => onInputChange(e, "hum_ambiental")}
             required
-          
           />
 
           <br />
@@ -1494,7 +1422,6 @@ onKeyDown={handleKeyPress}
             value={registro.operario}
             onChange={(e) => onInputChange(e, "operario")}
             required
-          
           />
           <label htmlFor="observaciones" className="font-bold">
             Observaciones{" "}
@@ -1506,8 +1433,6 @@ onKeyDown={handleKeyPress}
             id="observaciones"
             value={registro.observaciones}
             onChange={(e) => onInputChange(e, "observaciones")}
-            required
-            
           />
         </div>
       </Dialog>
@@ -1516,4 +1441,5 @@ onKeyDown={handleKeyPress}
     </>
   );
 }
+
 export default NIB;

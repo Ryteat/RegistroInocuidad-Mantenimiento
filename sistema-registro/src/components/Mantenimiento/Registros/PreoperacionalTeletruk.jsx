@@ -21,6 +21,7 @@ function ReportePreoperacionalTeletruk() {
     hora_registro: "",
     semana: "",
     operario: "",
+    horometro: "",
     limpieza_general: "",
     estado_general: "",
     estructura_proteccion: "",
@@ -110,9 +111,7 @@ function ReportePreoperacionalTeletruk() {
     'sistema_control_movimientos'
   ];
 
-  
-
-  const camposObligatorios = ['operario', ...camposInspeccion];
+  const camposObligatorios = ['operario', 'horometro', ...camposInspeccion];
 
   const [reportes, setReportes] = useState([]);
   const [reporte, setReporte] = useState(emptyReport);
@@ -230,12 +229,13 @@ function ReportePreoperacionalTeletruk() {
 
     const doc = new jsPDF();
     doc.autoTable({
-      head: [["Fecha", "Hora", "Semana", "Operario", "Observaciones"]],
+      head: [["Fecha", "Hora", "Semana", "Operario", "Horómetro", "Observaciones"]],
       body: selectedReportes.map(reporte => [
         formatFecha(reporte.fecha_registro),
         reporte.hora_registro,
         reporte.semana,
         reporte.operario,
+        reporte.horometro,
         reporte.observaciones
       ])
     });
@@ -321,6 +321,7 @@ function ReportePreoperacionalTeletruk() {
 
   const dynamicColumns = [
     { field: "operario", header: "Operario", editor: textEditor, sortable: true },
+    { field: "horometro", header: "Horómetro", editor: textEditor, sortable: true },
     ...camposInspeccion.map((field) => ({
       field: field,
       header: field.replace(/_/g, " ").toUpperCase(),
@@ -424,6 +425,17 @@ function ReportePreoperacionalTeletruk() {
             />
           </div>
 
+          <div className="field col-6">
+            <label className="font-bold">
+              HORÓMETRO*
+              {submitted && !reporte.horometro && <small className="p-error"> Requerido</small>}
+            </label>
+            <InputText
+              value={reporte.horometro}
+              onChange={(e) => onInputChange(e, "horometro")}
+            />
+          </div>
+
           <div className="col-12 font-bold text-xl mt-5 mb-3">Inspección Preoperacional</div>
           
           {camposInspeccion.map((field) => (
@@ -435,7 +447,6 @@ function ReportePreoperacionalTeletruk() {
                 )}
                 </label>
 
-              {/* Agregar notas explicativas aquí */}
               <small className="campo-note">
                 {notasCampos[field] || "Verificar estado del componente"}
                 </small>

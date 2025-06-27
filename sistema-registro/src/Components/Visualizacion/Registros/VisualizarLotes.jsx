@@ -308,12 +308,7 @@ function VisualizarLotes() {
         <Column field="fecha_registro" header="Fecha Registro"  sortable/>
         <Column field="hora_registro" header="Hora Registro" />
         <Column field="etapa_actual" header="Etapa Actual" />
-        <Column field="cant_cajas_despachoLabPro" header="Total Cajas" sortable/>
-        <Column field="cant_cajas_dieta" header="Cajas Faltantes en Dieta" sortable/>
-        <Column field="cant_cajas_despachodieta" header="Cajas Faltantes a despachar Dieta" sortable/>
-        <Column field="cant_cajas_racks_ingreso" header="Cajas Faltantes a subir Racks" sortable/>
-        <Column field="cant_cajas_racks_salida" header="Cajas Faltantes a bajar Racks" sortable/>
-        <Column field="cant_cajas_cosecha" header="Cajas Faltantes a cosechar" sortable/>
+
       </DataTable>
 
       <Dialog

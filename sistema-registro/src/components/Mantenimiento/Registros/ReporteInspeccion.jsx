@@ -24,6 +24,7 @@ function ReporteInspeccion() {
     modelo: "",
     serie: "",
     turno: "",
+    horometro: "",
     aditamientos_especiales: "",
     aceite_motor: "",
     sistema_combustible: "",
@@ -59,7 +60,8 @@ function ReporteInspeccion() {
     "unidad",
     "modelo",
     "serie",
-    "turno"
+    "turno",
+    "horometro"
   ];
 
   const labelsPersonalizados = {
@@ -68,6 +70,7 @@ function ReporteInspeccion() {
     modelo: "Modelo del Montacargas",
     serie: "Número de Serie",
     turno: "Turno de Trabajo",
+    horometro: "Horómetro",
     aceite_motor: "Nivel de Aceite del Motor",
     sistema_combustible: "Sistema de Combustible",
     radiador: "Radiador",
@@ -92,6 +95,7 @@ function ReporteInspeccion() {
     modelo: "Modelo específico del montacargas (ej: FG-25)",
     serie: "Número de serie del fabricante",
     turno: "",
+    horometro: "Ingrese el valor actual del horómetro",
     aceite_motor: "Verificar nivel entre marcas mínimo/máximo",
     sistema_combustible: "Revisar fugas (repórtelas inmediatamente)",
     radiador: "Chequear nivel de refrigerante con motor frío",
@@ -235,13 +239,14 @@ function ReporteInspeccion() {
 
     const doc = new jsPDF();
     doc.autoTable({
-      head: [["Fecha", "Hora", "Operador", "Unidad", "Modelo", "Observaciones"]],
+      head: [["Fecha", "Hora", "Operador", "Unidad", "Modelo", "Horómetro", "Observaciones"]],
       body: selectedReportes.map(reporte => [
         formatFecha(reporte.fecha_registro),
         reporte.hora_registro,
         reporte.nombre_operador,
         reporte.unidad,
         reporte.modelo,
+        reporte.horometro,
         reporte.observaciones
       ])
     });
@@ -293,7 +298,7 @@ function ReporteInspeccion() {
 
     try {
       const { error } = await supabase
-        .from("Reporte_Inspeccion_Montacargas_Combustion_Interna")
+        .from("Reporte_Inspeccion_Montacargas_Combustion_Interna(diario)")
         .update(newData)
         .eq("id", newData.id);
 
@@ -346,9 +351,15 @@ function ReporteInspeccion() {
       body: (rowData) => rowData.turno,
       sortable: true 
     },
+    { 
+      field: "horometro", 
+      header: "Horómetro", 
+      editor: textEditor, 
+      sortable: true 
+    },
     ...camposInspeccion.map((field) => ({
       field: field,
-      header: field.replace(/_/g, " ").toUpperCase(),
+      header: labelsPersonalizados[field] || field.replace(/_/g, " "),
       editor: dropdownEditor,
       body: (rowData) => (rowData[field] === "B" ? "Bien" : "Mal"),
       sortable: true
@@ -369,15 +380,6 @@ function ReporteInspeccion() {
           Bienvenido al sistema de Reporte de Inspección de Montacargas.
           Aquí puedes gestionar los reportes diarios de inspección.
         </p>
-      </div>
-
-      <div className="buttons-container">
-        <button onClick={() => navigate(-1)} className="return-button">
-          Volver
-        </button>
-        <button onClick={() => navigate(-2)} className="menu-button">
-          Menú principal
-        </button>
       </div>
 
       <div className="buttons-container">
@@ -449,7 +451,7 @@ function ReporteInspeccion() {
           {["nombre_operador", "unidad", "modelo", "serie"].map((field) => (
             <div className="field col-6" key={field}>
               <label className="font-bold">
-                {field.replace(/_/g, " ").toUpperCase()}*
+                {labelsPersonalizados[field]}*
                 {submitted && !reporte[field] && (
                   <small className="p-error"> Requerido</small>
                 )}
@@ -463,7 +465,7 @@ function ReporteInspeccion() {
 
           <div className="field col-6">
             <label className="font-bold">
-              TURNO*
+              {labelsPersonalizados.turno}*
               {submitted && !reporte.turno && <small className="p-error"> Requerido</small>}
             </label>
             <Dropdown
@@ -474,7 +476,20 @@ function ReporteInspeccion() {
             />
           </div>
 
+          
+
           <div className="col-12 font-bold text-xl mt-5 mb-3">Inspección Diaria</div>
+
+          <div className="field col-6">
+            <label className="font-bold">
+              {labelsPersonalizados.horometro}*
+              {submitted && !reporte.horometro && <small className="p-error"> Requerido</small>}
+            </label>
+            <InputText
+              value={reporte.horometro}
+              onChange={(e) => onInputChange(e, "horometro")}
+            />
+          </div>
           
           {camposInspeccion.map((field) => (
             <div className="field col-6" key={field}>
@@ -497,7 +512,7 @@ function ReporteInspeccion() {
 
           <div className="field col-12">
             <label className="font-bold">
-              OBSERVACIONES
+              {labelsPersonalizados.observaciones}
               {camposInspeccion.some(f => reporte[f] === "M") && " *"}
               {submitted && camposInspeccion.some(f => reporte[f] === "M") && !reporte.observaciones?.trim() && (
                 <small className="p-error"> Campo requerido cuando existen elementos en Mal estado</small>
@@ -524,3 +539,5 @@ function ReporteInspeccion() {
 }
 
 export default ReporteInspeccion;
+
+

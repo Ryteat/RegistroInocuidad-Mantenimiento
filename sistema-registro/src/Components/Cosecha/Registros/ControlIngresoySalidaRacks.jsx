@@ -154,13 +154,13 @@ function ControlIngresoySalidaRacks() {
       const { data, error } = await supabase
         .from("Lotes")
         .select()
-        .or(
+        /*.or(
           "etapa_actual.ilike.%DespachoDieta%," +
           "etapa_actual.ilike.%Engorde%," +
           "etapa_actual.ilike.%Cosecha%," +
           "etapa_actual.ilike.%Horno%"
-        )
-        .not("etapa_actual", "ilike", "%ProductoTerminado%")
+        )*/
+        //.not("etapa_actual", "ilike", "%ProductoTerminado%")
         .order("fecha_registro", { ascending: false });
       if (error) throw error;
       setLotes(data || []); // Actualiza el estado con los datos obtenidos
@@ -398,9 +398,7 @@ function ControlIngresoySalidaRacks() {
                 (loteExistente.cant_cajas_horno ?? 0) + totalCajasNum,
               cant_cajas_cosecha:
                 (loteExistente.cant_cajas_cosecha ?? 0) + totalCajasNum,
-              etapa_actual:
-                registro.etapas_actualizar?.join(", ") ||
-                loteExistente.etapa_actual,
+              etapa_actual: "Cosecha y Horno",
             })
             .eq("base_numero_lote", registro.base_numero_lote);
 
@@ -1072,7 +1070,7 @@ onKeyDown={handleKeyPress}
               </label>
               <MultiSelect
                 value={registro.etapas_actualizar}
-                options={["Cosecha", "Horno"]}
+                options={["Cosecha y Horno", "Reproducción", "Salida (frass/vacías)"]}
                 onChange={(e) =>
                   setRegistro({ ...registro, etapas_actualizar: e.value })
                 }

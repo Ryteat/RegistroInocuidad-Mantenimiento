@@ -3,10 +3,9 @@ import React, {
   useState,
   useRef,
   useCallback,
-  useMemo,
 } from "react";
 import { useNavigate } from "react-router-dom";
-import "./ControlMovimientosCajasProceso.css"; // Importa el CSS
+import "./ControlMovimientosCajasProceso.css";
 import supabase from "../../../supabaseClient";
 import "primereact/resources/themes/lara-light-indigo/theme.css";
 import "primeicons/primeicons.css";
@@ -31,12 +30,14 @@ const RecepcionMateriasPrimas = () => {
     cantidad_tarimas: "",
     total_cajas: "",
     responsable: "",
+    turno: "",
     fecha_registro: "",
     hora_registro: "",
     observaciones: "",
     cant_cajas_despachodieta: 0,
-    _originalCajas: 0, // Nuevo campo para almacenar el valor original
+    _originalCajas: 0,
   };
+
   const [registros, setRegistros] = useState([]);
   const [registro, setRegistro] = useState(emptyRegister);
   const toast = useRef(null);
@@ -48,13 +49,11 @@ const RecepcionMateriasPrimas = () => {
   const navigate = useNavigate();
   const [lotes, setLotes] = useState([]);
 
-  const [observacionesObligatorio, setObservacionesObligatorio] =
-    useState(false);
+  const [observacionesObligatorio, setObservacionesObligatorio] = useState(false);
   const [erroresValidacion, setErroresValidacion] = useState({
     total_cajas: false,
   });
 
-  // Nuevos estados para lazy loading
   const [loading, setLoading] = useState(false);
   const [totalRecords, setTotalRecords] = useState(0);
   const [lazyParams, setLazyParams] = useState({
@@ -67,8 +66,9 @@ const RecepcionMateriasPrimas = () => {
     globalFilter: null,
   });
 
-  //Inicio de Sorting y Filtro global por lazy load
-  // Manejar sorting
+  const tipoDieta = ["Producción", "Reproducción", "Prueba producción", "Prueba reproducción"];
+  const turnos = ["1", "2", "3"];
+
   const onSort = useCallback((event) => {
     setLazyParams((prev) => ({
       ...prev,
@@ -77,7 +77,6 @@ const RecepcionMateriasPrimas = () => {
     }));
   }, []);
 
-  // Manejar filtro global
   const onFilter = useCallback((e) => {
     const value = e.target.value;
     setGlobalFilter(value);
@@ -87,9 +86,6 @@ const RecepcionMateriasPrimas = () => {
       first: 0,
     }));
   }, []);
-  //FIN de Sorting y Filtro global por lazy load
-
-  const tipoDieta = ["Producción", "Reproducción"];
 
   const fetchRegistros = useCallback(
     async (start = 0, limit = 10) => {
@@ -99,17 +95,13 @@ const RecepcionMateriasPrimas = () => {
           .from("Control_Movimiento_Cajas_Proceso")
           .select("*", { count: "exact" })
           .range(start, start + limit - 1);
-        // Ordenar por defecto por fecha descendente (más nuevos primero)
-        // .order("fec_registro", { ascending: false });
 
-        // Aplicar sorting
         if (lazyParams.sortField) {
           query = query.order(lazyParams.sortField, {
             ascending: lazyParams.sortOrder === 1,
           });
         }
 
-        // Aplicar filtro global
         if (lazyParams.globalFilter) {
           query = query.or(
             `numero_lote.ilike.%${lazyParams.globalFilter}%,fecha_registro.ilike.%${lazyParams.globalFilter}%`
@@ -132,15 +124,15 @@ const RecepcionMateriasPrimas = () => {
     },
     [lazyParams.sortField, lazyParams.sortOrder, lazyParams.globalFilter]
   );
+
   const fetchLotes = useCallback(async () => {
     try {
       const { data, error } = await supabase
         .from("Lotes")
-        .select() // Si solo necesitas el campo base_numero_lote, podrías especificarlo: .select("base_numero_lote")
-        .in("etapa_actual", ["Dieta", "DespachoDieta"]) // Filtra registros con etapa_actual igual a 'hatchery' o 'dieta'
+        .select()
         .order("fecha_registro", { ascending: false });
       if (error) throw error;
-      setLotes(data || []); // Actualiza el estado con los datos obtenidos
+      setLotes(data || []);
     } catch (err) {
       console.log("Error en la conexión a la base de datos Lotes", err);
     }
@@ -158,7 +150,6 @@ const RecepcionMateriasPrimas = () => {
     lazyParams.globalFilter,
   ]);
 
-  // Manejar cambio de página y lazy loading
   const onPage = useCallback(
     (event) => {
       setLazyParams({
@@ -201,11 +192,7 @@ const RecepcionMateriasPrimas = () => {
       return value < min || value > max;
     }
 
-    const isTotalCajasInvalido = isInvalid(
-      registro.total_cajas,
-      0,
-      5000
-    );
+    const isTotalCajasInvalido = isInvalid(registro.total_cajas, 0, 5000);
 
     setErroresValidacion({
       total_cajas: isTotalCajasInvalido,
@@ -217,7 +204,8 @@ const RecepcionMateriasPrimas = () => {
       !registro.tipo_dieta ||
       !registro.cantidad_tarimas ||
       !registro.total_cajas ||
-      !registro.responsable
+      !registro.responsable ||
+      !registro.turno
     ) {
       toast.current.show({
         severity: "error",
@@ -227,19 +215,7 @@ const RecepcionMateriasPrimas = () => {
       });
       return;
     }
-    /*if (
-      registro.cajas_procesadas_neonatos > registro.cant_cajas_despachodieta
-    ) {
-      toast.current.show({
-        severity: "error",
-        summary: "Error",
-        detail: `No puedes procesar más cajas (${registro.cajas_procesadas_neonatos}) de las disponibles en el lote (${registro.cant_cajas_despachodieta})`,
-        life: 3000,
-      });
-      return;
-    }*/
 
-    // Validación principal
     if (valoresFueraDeRango && !registro.observaciones) {
       setObservacionesObligatorio(true);
       const currentErrores = {
@@ -265,18 +241,15 @@ const RecepcionMateriasPrimas = () => {
     });
 
     try {
-      const currentDate = formatDateTime(new Date(), "DD/MM/YYYY"); // Fecha actual
-      const currentTime = formatDateTime(new Date(), "hh:mm A"); // Hora actual
+      const currentDate = formatDateTime(new Date(), "DD/MM/YYYY");
+      const currentTime = formatDateTime(new Date(), "hh:mm A");
     
-      // Verificar si el lote seleccionado existe y traer los campos necesarios
       const { data: loteExistente, error: loteError } = await supabase
         .from("Lotes")
         .select("base_numero_lote, cant_cajas_racks_ingreso, cant_cajas_despachodieta")
         .eq("base_numero_lote", registro.base_numero_lote)
         .single();
         
-      console.log(loteExistente);
-    
       if (loteError || !loteExistente) {
         toast.current.show({
           severity: "error",
@@ -287,7 +260,6 @@ const RecepcionMateriasPrimas = () => {
         return;
       }
     
-      // Insertar en Control_Movimiento_Cajas_Proceso
       const { data, error } = await supabase
         .from("Control_Movimiento_Cajas_Proceso")
         .insert([
@@ -298,6 +270,7 @@ const RecepcionMateriasPrimas = () => {
             cantidad_tarimas: registro.cantidad_tarimas,
             total_cajas: registro.total_cajas,
             responsable: registro.responsable,
+            turno: registro.turno,
             fecha_registro: currentDate,
             hora_registro: currentTime,
             observaciones: registro.observaciones,
@@ -311,18 +284,14 @@ const RecepcionMateriasPrimas = () => {
         );
       }
     
-      // Convertir a números para evitar problemas con null o strings
       const cajasIngresoActuales = Number(loteExistente.cant_cajas_racks_ingreso || 0);
       const totalCajas = Number(registro.total_cajas || 0);
-      // Suponiendo que cant_cajas_despachodieta es el valor que se va a disminuir
       const cajasDespachoActuales = Number(loteExistente.cant_cajas_despachodieta || 0);
       const nuevasCajasDespachodieta = cajasDespachoActuales - totalCajas;
     
-      // Actualizar la tabla Lotes sumando las cajas totales a las cajas ya ingresadas
       const { error: updateError } = await supabase
         .from("Lotes")
         .update({
-          // Suma acumulada para cant_cajas_racks_ingreso
           cant_cajas_racks_ingreso: cajasIngresoActuales + totalCajas,
           cant_cajas_racks_salida: cajasIngresoActuales + totalCajas,
           cant_cajas_despachodieta: nuevasCajasDespachodieta,
@@ -356,8 +325,7 @@ const RecepcionMateriasPrimas = () => {
         life: 3000,
       });
     }
-    
-  }, [registro, lotes, convertirFecha]);
+  }, [registro, lotes]);
 
   const dateEditor = (options) => {
     const convertToInputFormat = (date) => {
@@ -407,7 +375,7 @@ const RecepcionMateriasPrimas = () => {
     return (
       <InputText
         type="number"
-onKeyDown={handleKeyPress}
+        onKeyDown={handleKeyPress}
         value={options.value}
         onChange={(e) => options.editorCallback(e.target.value)}
       />
@@ -424,38 +392,12 @@ onKeyDown={handleKeyPress}
     );
   };
 
-  const checkboxEditor = (options) => {
-    return (
-      <input
-        type="checkbox"
-        checked={options.value}
-        onChange={(e) => options.editorCallback(e.target.checked)}
-      />
-    );
-  };
-
-  const dropdownEditor = (options) => {
-    return (
-      <select
-        value={options.value}
-        onChange={(e) => options.editorCallback(e.target.value)}
-      >
-        {options.options.map((opt) => (
-          <option key={opt.value} value={opt.value}>
-            {opt.label}
-          </option>
-        ))}
-      </select>
-    );
-  };
-
   const handleKeyPress = (e) => {
     const invalidChars = ['e', 'E', '+', '-'];
     if (invalidChars.includes(e.key)) {
       e.preventDefault();
     }
     
-    // Si es un campo decimal, permite un solo punto
     if (e.key === '.' && e.target.value.includes('.')) {
       e.preventDefault();
     }
@@ -467,55 +409,50 @@ onKeyDown={handleKeyPress}
 
   const onRowEditComplete = async ({ newData, data: oldData }) => {
     try {
-      // 1. Calcular la diferencia de cajas entre el nuevo y el registro anterior
       const diferencia = newData.total_cajas - oldData.total_cajas;
   
-      // 2. Obtener el lote actual, seleccionando ambos campos necesarios
       const { data: lote, error: loteError } = await supabase
         .from("Lotes")
         .select("cant_cajas_despachodieta, cant_cajas_racks_ingreso, etapa_actual")
         .eq("base_numero_lote", oldData.base_numero_lote)
         .single();
   
-        if (loteError || !lote) {
-          toast.current.show({
-            severity: 'error',
-            summary: 'Error',
-            detail: 'No se encontró el lote asociado',
-            life: 3000
-          });
-          return;
-        }
+      if (loteError || !lote) {
+        toast.current.show({
+          severity: 'error',
+          summary: 'Error',
+          detail: 'No se encontró el lote asociado',
+          life: 3000
+        });
+        return;
+      }
     
-        if (lote.etapa_actual !== 'DespachoDieta') {
-          toast.current.show({
-            severity: 'error',
-            summary: 'Edición bloqueada',
-            detail: 'Solo se pueden editar registros de lotes en etapa Despacho Dieta',
-            life: 3000
-          });
-          return;
-        }
+      if (lote.etapa_actual !== 'DespachoDieta') {
+        toast.current.show({
+          severity: 'error',
+          summary: 'Edición bloqueada',
+          detail: 'Solo se pueden editar registros de lotes en etapa Despacho Dieta',
+          life: 3000
+        });
+        return;
+      }
   
-      // 3. Calcular nuevos valores:
-      //    - Se resta la diferencia al total de cajas despachadas (puede aumentar o disminuir)
-      //    - Se suma la diferencia al total de cajas en racks ingreso
       const nuevasCajasDespachoDieta = lote.cant_cajas_despachodieta - diferencia;
       const nuevasCajasRacksIngreso = lote.cant_cajas_racks_ingreso + diferencia;
-      console.log(nuevasCajasRacksIngreso)
-      // Validar que el nuevo valor de cajas despachadas no sea negativo
+      
       if (nuevasCajasDespachoDieta < 0) {
         throw new Error("Cantidad de cajas no puede ser negativa");
       }
   
-      // 4. Actualizar la tabla Control_Movimiento_Cajas_Proceso con los nuevos datos
       const { error: updateError } = await supabase
         .from("Control_Movimiento_Cajas_Proceso")
-        .update(newData)
+        .update({
+          ...newData,
+          turno: newData.turno
+        })
         .eq("id", newData.id);
       if (updateError) throw updateError;
   
-      // 5. Actualizar el lote con los nuevos valores en ambas columnas
       const { error: loteUpdateError } = await supabase
         .from("Lotes")
         .update({
@@ -525,7 +462,6 @@ onKeyDown={handleKeyPress}
         .eq("base_numero_lote", oldData.base_numero_lote);
       if (loteUpdateError) throw loteUpdateError;
   
-      // 6. Actualizar el estado local con los nuevos datos
       setRegistros((prev) =>
         prev.map((item) => (item.id === newData.id ? newData : item))
       );
@@ -579,15 +515,15 @@ onKeyDown={handleKeyPress}
   };
 
   const header = (
-       <div className="flex flex-wrap gap-2 align-items-center justify-content-between">
-         <InputText
-           type="search"
-           value={globalFilter}
-           onInput={onFilter}
-           placeholder="Buscar por Lote u Fecha de Registro"
-         />
-       </div>
-     );
+    <div className="flex flex-wrap gap-2 align-items-center justify-content-between">
+      <InputText
+        type="search"
+        value={globalFilter}
+        onInput={onFilter}
+        placeholder="Buscar por Lote u Fecha de Registro"
+      />
+    </div>
+  );
 
   const openNew = () => {
     setRegistro(emptyRegister);
@@ -619,6 +555,7 @@ onKeyDown={handleKeyPress}
     { field: "cantidad_tarimas", header: "Cantidad de Tarimas" },
     { field: "total_cajas", header: "Total de Cajas" },
     { field: "responsable", header: "Responsable" },
+    { field: "turno", header: "Turno" },
     { field: "observaciones", header: "Observaciones" },
     { field: "registrado", header: "Registrado" },
   ];
@@ -761,15 +698,15 @@ onKeyDown={handleKeyPress}
             right={rightToolbarTemplate}
           ></Toolbar>
           <DataTable
-           onSort={onSort}
-           sortField={lazyParams.sortField}
-           sortOrder={lazyParams.sortOrder}
-           lazy
-           first={lazyParams.first}
-           rows={lazyParams.rows}
-           totalRecords={totalRecords}
-           onPage={onPage}
-           loading={loading}
+            onSort={onSort}
+            sortField={lazyParams.sortField}
+            sortOrder={lazyParams.sortOrder}
+            lazy
+            first={lazyParams.first}
+            rows={lazyParams.rows}
+            totalRecords={totalRecords}
+            onPage={onPage}
+            loading={loading}
             showGridlines
             editMode="row"
             onRowEditComplete={onRowEditComplete}
@@ -786,7 +723,7 @@ onKeyDown={handleKeyPress}
           >
             <Column selectionMode="multiple" exportable={false}></Column>
             <Column
-              field="numero_lote"
+              field="base_numero_lote"
               header="Número Lote"
               sortable
               style={{ minWidth: "10rem" }}
@@ -795,41 +732,45 @@ onKeyDown={handleKeyPress}
               field="coordinador_planta"
               header="Coordinador de Planta"
               editor={(options) => textEditor(options)}
+              sortable
             ></Column>
             <Column
               field="tipo_dieta"
               header="Tipo de Dieta"
-              editor={(options) =>
-                dropdownEditor({
-                  ...options,
-                  options: tipoDieta.map((dieta) => ({
-                    label: dieta,
-                    value: dieta,
-                  })),
-                })
-              }
+              editor={(options) => textEditor(options)}
+              sortable
             ></Column>
             <Column
               field="cantidad_tarimas"
               header="Cantidad de Tarimas"
               editor={(options) => numberEditor(options)}
+              sortable
             ></Column>
             <Column
               field="total_cajas"
               header="Total de Cajas"
               editor={(options) => numberEditor(options)}
+              sortable
             ></Column>
             <Column
               field="responsable"
               header="Responsable"
               editor={(options) => textEditor(options)}
+              sortable
             ></Column>
-            <Column field="fecha_registro" header="Fecha de Registro"></Column>
-            <Column field="hora_registro" header="Hora de Registro"></Column>
+            <Column
+              field="turno"
+              header="Turno"
+              editor={(options) => textEditor(options)}
+              sortable
+            ></Column>
+            <Column field="fecha_registro" header="Fecha de Registro" sortable></Column>
+            <Column field="hora_registro" header="Hora de Registro" sortable></Column>
             <Column
               field="observaciones"
               header="Observaciones"
               editor={(options) => textEditor(options)}
+              sortable
             ></Column>
             <Column
               header="Herramientas"
@@ -876,14 +817,14 @@ onKeyDown={handleKeyPress}
                 if (!error && loteActual) {
                   setRegistro({
                     ...registro,
-                    base_numero_lote: e.value, // Usar e.value en lugar del objeto completo
+                    base_numero_lote: e.value,
                     cant_cajas_despachodieta:
                       loteActual.cant_cajas_despachodieta || 0,
                   });
                 }
               }
             }}
-            options={lotes.map((l) => l.base_numero_lote)} // Pasar solo los valores
+            options={lotes.map((l) => l.base_numero_lote)}
             placeholder="Selecciona un Número de lote"
             className="w-full md:w-14rem"
           />
@@ -898,6 +839,7 @@ onKeyDown={handleKeyPress}
             id="coordinador_planta"
             value={registro.coordinador_planta}
             onChange={(e) => onInputChange(e, "coordinador_planta")}
+            required
           />
 
           <br />
@@ -929,12 +871,13 @@ onKeyDown={handleKeyPress}
             id="cantidad_tarimas"
             value={registro.cantidad_tarimas}
             onChange={(e) => onInputChange(e, "cantidad_tarimas")}
+            required
           />
 
           <br />
 
           <label htmlFor="total_cajas" className="font-bold">
-            Cajas Totales 
+            Cajas Totales{" "}
             {submitted && !registro.total_cajas && (
               <small className="p-error">Requerido.</small>
             )}
@@ -948,6 +891,7 @@ onKeyDown={handleKeyPress}
             id="total_cajas"
             value={registro.total_cajas}
             onChange={(e) => onInputChange(e, "total_cajas")}
+            required
           />
 
           <br />
@@ -962,8 +906,25 @@ onKeyDown={handleKeyPress}
             id="responsable"
             value={registro.responsable}
             onChange={(e) => onInputChange(e, "responsable")}
+            required
           />
 
+          <br />
+
+          <label htmlFor="turno" className="font-bold">
+            Turno{" "}
+            {submitted && !registro.turno && (
+              <small className="p-error">Requerido.</small>
+            )}
+          </label>
+          <Dropdown
+            id="turno"
+            value={registro.turno}
+            options={turnos}
+            onChange={(e) => onInputChange(e, "turno")}
+            placeholder="Seleccione un turno"
+            required
+          />
           <br />
 
           <label htmlFor="observaciones" className="font-bold">
@@ -983,4 +944,5 @@ onKeyDown={handleKeyPress}
     </>
   );
 };
+
 export default RecepcionMateriasPrimas;

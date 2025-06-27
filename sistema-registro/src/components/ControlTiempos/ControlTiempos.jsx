@@ -26,8 +26,9 @@ function ControlTiempos() {
     clase_paro: "",
     detalle_paro: "",
     cant_horas_paro: "",
-    hora_registro: "", // Nueva columna
-    observaciones: "", // Nueva columna
+    hora_registro: "",
+    observaciones: "",
+    operario: ""
   };
 
   const [registros, setRegistros] = useState([]);
@@ -40,8 +41,8 @@ function ControlTiempos() {
   const [registroDialog, setRegistroDialog] = useState(false);
   const navigate = useNavigate();
   
-    const convertirFecha = (fecha) =>
-      fecha ? fecha.split("-").reverse().join("/") : "";
+  const convertirFecha = (fecha) =>
+    fecha ? fecha.split("-").reverse().join("/") : "";
 
   const areasParo = [
     "Horno Multilevel",
@@ -60,7 +61,7 @@ function ControlTiempos() {
     "F: Calidad: defecto o fallos de producto.",
     "G: Salud ocupacional: riesgos, evacuación, seguridad u accidentes.",
     "H: Arranque y calentamiento de linea.",
-    "I: Producción: se termina de procesar materi prima.",
+    "I: Producción: se termina de procesar materia prima.",
     "J: Equipo mal armado.",
     "K: Recurso humano: reunión con personal.",
     "L: Tiempo de alimentación.",
@@ -71,7 +72,7 @@ function ControlTiempos() {
     "P: Falta de 5DOLS para siembra.",
     "Q: En espera de liberación de tanda.",
     "R: Por falta de dieta en tolva para dosificar cajas.",
-  ]; // Opciones para la clase de paro
+  ];
 
   const fetchRegistros = async () => {
     try {
@@ -109,7 +110,6 @@ function ControlTiempos() {
       .replace("A", fmt.dayPeriod || "AM");
   };
 
-  // Función para calcular la diferencia en horas y minutos
   const calcularHorasParo = (horaParo, horaArranque) => {
     if (!horaParo || !horaArranque) return "";
 
@@ -120,7 +120,6 @@ function ControlTiempos() {
     const horas = Math.floor(diferenciaMinutos / 60);
     const minutos = diferenciaMinutos % 60;
 
-    // Formatear la salida como "## horas y ## minutos"
     return `${horas} horas y ${minutos} minutos`;
   };
 
@@ -131,7 +130,8 @@ function ControlTiempos() {
       !registro.hora_arranque ||
       !registro.area_paro ||
       !registro.clase_paro ||
-      !registro.detalle_paro
+      !registro.detalle_paro ||
+      !registro.operario
     ) {
       toast.current.show({
         severity: "error",
@@ -142,16 +142,10 @@ function ControlTiempos() {
       return;
     }
 
-    
-
-    // Calcular la cantidad de horas paro
-    // const horasParo = calcularHorasParo(registro.hora_paro, registro.hora_arranque);
-
     try {
-      const currentDate = formatDateTime(new Date(), "DD/MM/YYYY"); // Fecha actual
-      const currentTime = formatDateTime(new Date(), "hh:mm A"); // Hora actual
+      const currentDate = formatDateTime(new Date(), "DD/MM/YYYY");
+      const currentTime = formatDateTime(new Date(), "hh:mm A");
 
-      // const { id, ...registroSinId } = registroConHoras;
       const { data, error } = await supabase
         .from("Control_de_tiempos")
         .insert([{
@@ -163,8 +157,8 @@ function ControlTiempos() {
           observaciones: registro.observaciones,
           cant_horas_paro: calcularHorasParo(registro.hora_paro, registro.hora_arranque),
           hora_registro: currentTime,
-          fecha_registro: currentDate
-
+          fecha_registro: currentDate,
+          operario: registro.operario
         }]);
       if (error) {
         console.error("Error en Supabase:", error);
@@ -191,7 +185,6 @@ function ControlTiempos() {
       });
     }
   };
-
 
   const dateEditor = (options) => {
     const convertToInputFormat = (date) => {
@@ -287,7 +280,6 @@ function ControlTiempos() {
     let _registro = { ...registro };
     _registro[name] = val;
 
-    // Si se cambia hora_paro o hora_arranque, recalcular cant_horas_paro
     if (name === "hora_paro" || name === "hora_arranque") {
       _registro.cant_horas_paro = calcularHorasParo(_registro.hora_paro, _registro.hora_arranque);
     }
@@ -361,102 +353,103 @@ function ControlTiempos() {
   );
 
   const cols = [
-      {field: "hora_paro", header: "Hora Paro"},
-      {field: "hora_arranque", header: "Hora Arranque"},
-      {field: "cant_horas_paro", header: "Cantidad Horas Paro"},
-      {field: "area_paro", header: "Área Paro"},
-      {field: "clase_paro", header: "Clase Paro"},
-      {field: "detalle_paro", header: "Detalle Paro"},
-      {field: "observaciones", header: "Otras observaciones"},
-      {field: "registrado", header: "Registrado"}
-    ];
-    
-      const exportColumns = cols.map((col) => ({
-        title: col.header,
-        dataKey: col.field,
-      }));
-    
-      const exportPdf = () => {
-        if (selectedRegistros.length === 0) {
-          toast.current.show({
-            severity: "warn",
-            summary: "Advertencia",
-            detail: "No hay filas seleccionadas para exportar.",
-            life: 3000,
-          });
-          return;
-        }
-    
-        const doc = new jsPDF();
-        doc.setFontSize(18);
-        doc.text("Registros de Control Rendimiento Cosecha y Frass", 14, 22);
-    
-        const exportData = selectedRegistros.map(({ fecha_registro, hora_registro, ...row }) => ({
-          ...row,
-          registrado: `${fecha_registro || ""} ${hora_registro || ""}`,
-        }));
-    
-        const columnsPerPage = 5;
-        const maxHeightPerColumn = 10;
-        const rowHeight = exportColumns.length * maxHeightPerColumn + 10;
-        let currentY = 30;
-    
-        const headerColor = [41, 128, 185];
-        const textColor = [0, 0, 0];
-    
-        for (let i = 0; i < exportData.length; i++) {
-          if (currentY + rowHeight > doc.internal.pageSize.height) {
-            doc.addPage();
-            currentY = 30;
-          }
-    
-          const row = exportData[i];
-          const startX = 14;
-    
-          exportColumns.forEach(({ title, dataKey }, index) => {
-            const value = row[dataKey];
-            doc.setFillColor(...headerColor);
-            doc.rect(startX, currentY + (index * maxHeightPerColumn), 180, maxHeightPerColumn, 'F');
-            doc.setTextColor(255);
-            doc.text(title, startX + 2, currentY + (index * maxHeightPerColumn) + 7);
-            doc.setTextColor(...textColor);
-            doc.text(`${value}`, startX + 90, currentY + (index * maxHeightPerColumn) + 7);
-          });
-    
-          currentY += rowHeight;
-        }
-    
-        doc.save("Control de Tiempos.pdf");
-      };
+    {field: "hora_paro", header: "Hora Paro"},
+    {field: "hora_arranque", header: "Hora Arranque"},
+    {field: "cant_horas_paro", header: "Cantidad Horas Paro"},
+    {field: "area_paro", header: "Área Paro"},
+    {field: "clase_paro", header: "Clase Paro"},
+    {field: "detalle_paro", header: "Detalle Paro"},
+    {field: "operario", header: "Operario"},
+    {field: "observaciones", header: "Otras observaciones"},
+    {field: "registrado", header: "Registrado"}
+  ];
   
-    const exportXlsx = () => {
-        if (selectedRegistros.length === 0) {
-          toast.current.show({
-            severity: "warn",
-            summary: "Advertencia",
-            detail: "No hay filas seleccionadas para exportar.",
-            life: 3000,
-          });
-          return;
-        }
-    
-        const headers = cols.map(col => col.header);
-        const exportData = selectedRegistros.map(({ fecha_registro, hora_registro, ...registro }) => ({
-          ...registro,
-          registrado: `${fecha_registro || ""} ${hora_registro || ""}`,
-        }));
-    
-        const rows = exportData.map(registro => cols.map(col => registro[col.field]));
-    
-        const dataToExport = [headers, ...rows];
-        const ws = XLSX.utils.aoa_to_sheet(dataToExport);
-    
-        ws["!cols"] = cols.map(col => ({ width: Math.max(col.header.length, 10) }));
-    
-        const wb = XLSX.utils.book_new();
-        XLSX.utils.book_append_sheet(wb, ws, "Registros");
-        XLSX.writeFile(wb, "Control de Tiempos.xlsx");
-      };
+  const exportColumns = cols.map((col) => ({
+    title: col.header,
+    dataKey: col.field,
+  }));
+
+  const exportPdf = () => {
+    if (selectedRegistros.length === 0) {
+      toast.current.show({
+        severity: "warn",
+        summary: "Advertencia",
+        detail: "No hay filas seleccionadas para exportar.",
+        life: 3000,
+      });
+      return;
+    }
+
+    const doc = new jsPDF();
+    doc.setFontSize(18);
+    doc.text("Registros de Control Rendimiento Cosecha y Frass", 14, 22);
+
+    const exportData = selectedRegistros.map(({ fecha_registro, hora_registro, ...row }) => ({
+      ...row,
+      registrado: `${fecha_registro || ""} ${hora_registro || ""}`,
+    }));
+
+    const columnsPerPage = 5;
+    const maxHeightPerColumn = 10;
+    const rowHeight = exportColumns.length * maxHeightPerColumn + 10;
+    let currentY = 30;
+
+    const headerColor = [41, 128, 185];
+    const textColor = [0, 0, 0];
+
+    for (let i = 0; i < exportData.length; i++) {
+      if (currentY + rowHeight > doc.internal.pageSize.height) {
+        doc.addPage();
+        currentY = 30;
+      }
+
+      const row = exportData[i];
+      const startX = 14;
+
+      exportColumns.forEach(({ title, dataKey }, index) => {
+        const value = row[dataKey];
+        doc.setFillColor(...headerColor);
+        doc.rect(startX, currentY + (index * maxHeightPerColumn), 180, maxHeightPerColumn, 'F');
+        doc.setTextColor(255);
+        doc.text(title, startX + 2, currentY + (index * maxHeightPerColumn) + 7);
+        doc.setTextColor(...textColor);
+        doc.text(`${value}`, startX + 90, currentY + (index * maxHeightPerColumn) + 7);
+      });
+
+      currentY += rowHeight;
+    }
+
+    doc.save("Control de Tiempos.pdf");
+  };
+
+  const exportXlsx = () => {
+    if (selectedRegistros.length === 0) {
+      toast.current.show({
+        severity: "warn",
+        summary: "Advertencia",
+        detail: "No hay filas seleccionadas para exportar.",
+        life: 3000,
+      });
+      return;
+    }
+
+    const headers = cols.map(col => col.header);
+    const exportData = selectedRegistros.map(({ fecha_registro, hora_registro, ...registro }) => ({
+      ...registro,
+      registrado: `${fecha_registro || ""} ${hora_registro || ""}`,
+    }));
+
+    const rows = exportData.map(registro => cols.map(col => registro[col.field]));
+
+    const dataToExport = [headers, ...rows];
+    const ws = XLSX.utils.aoa_to_sheet(dataToExport);
+
+    ws["!cols"] = cols.map(col => ({ width: Math.max(col.header.length, 10) }));
+
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "Registros");
+    XLSX.writeFile(wb, "Control de Tiempos.xlsx");
+  };
 
   return (
     <>
@@ -489,8 +482,8 @@ function ControlTiempos() {
             right={rightToolbarTemplate}
           ></Toolbar>
           <DataTable
-          editMode="row"
-          onRowEditComplete={onRowEditComplete}
+            editMode="row"
+            onRowEditComplete={onRowEditComplete}
             ref={dt}
             value={registros}
             selection={selectedRegistros}
@@ -513,12 +506,13 @@ function ControlTiempos() {
             <Column field="clase_paro" header="Clase Paro" editor={(options) => textEditor(options)} sortable />
             <Column field="detalle_paro" header="Detalle Paro" editor={(options) => textEditor(options)} sortable />
             <Column field="observaciones" header="Otras observaciones" editor={(options) => textEditor(options)} sortable />
+            <Column field="operario" header="Operario" editor={(options) => textEditor(options)} sortable />
             <Column
-                                      header="Herramientas"
-                                      rowEditor={allowEdit}
-                                      headerStyle={{ width: "10%", minWidth: "5rem" }}
-                                      bodyStyle={{ textAlign: "center" }}
-                        ></Column>
+              header="Herramientas"
+              rowEditor={allowEdit}
+              headerStyle={{ width: "10%", minWidth: "5rem" }}
+              bodyStyle={{ textAlign: "center" }}
+            ></Column>
           </DataTable>
         </div>
       </div>
@@ -601,6 +595,19 @@ function ControlTiempos() {
             id="detalle_paro"
             value={registro.detalle_paro}
             onChange={(e) => onInputChange(e, "detalle_paro")}
+            required
+          />
+          <br />
+          <label htmlFor="operario" className="font-bold">
+            Operario{" "}
+            {submitted && !registro.operario && (
+              <small className="p-error">Requerido.</small>
+            )}
+          </label>
+          <InputText
+            id="operario"
+            value={registro.operario}
+            onChange={(e) => onInputChange(e, "operario")}
             required
           />
           <br />

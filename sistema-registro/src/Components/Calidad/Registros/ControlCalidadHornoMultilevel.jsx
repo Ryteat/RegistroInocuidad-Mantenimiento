@@ -499,7 +499,7 @@ function ControlCalidadHornoMultilevel() {
     { field: "hora_inicio_hor", header: "Hora Inicio Horno" },
     { field: "hora_fin_hor", header: "Hora Fin Horno" },
 
-    { field: "num_muestra_emp", header: "Número Muestra Empaque" },
+    { field: "num_muestra_emp", header: "Número muestra epaque" },
     { field: "temp_ambiental_emp", header: "Temperatura Ambiental Empaque" },
     { field: "hum_ambiental_emp", header: "Humedad Ambiental Empaque" },
     { field: "temp_producto_emp", header: "Temperatura Producto Empaque" },
@@ -515,7 +515,7 @@ function ControlCalidadHornoMultilevel() {
     { field: "unid_empacadas_emp", header: "Unidades Empacadas" },
     { field: "unid_retenidas_emp", header: "Unidades Retenidas" },
     { field: "unid_incompletas_emp", header: "Unidades Incompletas" },
-    { field: "num_lote_emp", header: "Número Lote Empaque" },
+    { field: "num_lote_emp", header: "SKU" },
     
     { field: "observaciones", header: "Observaciones" },
     { field: "registrado", header: "Registrado" },
@@ -884,7 +884,7 @@ function ControlCalidadHornoMultilevel() {
             ></Column>
             <Column
               field="num_lote_emp"
-              header="Número Lote Empaque"
+              header="SKU"
               editor={(options) => textEditor(options)}
             ></Column>
             <Column field="fec_registro" header="Fecha Registro"></Column>
@@ -1364,7 +1364,7 @@ function ControlCalidadHornoMultilevel() {
           />
           <br />
           <label htmlFor="num_lote_emp" className="font-bold">
-            Número Lote Empaque{" "}
+            SKU{" "}
             {submitted && !registro.num_lote_emp && (
               <small className="p-error">Requerido.</small>
             )}

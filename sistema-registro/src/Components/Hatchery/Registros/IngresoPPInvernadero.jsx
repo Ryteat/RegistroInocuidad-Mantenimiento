@@ -1,14 +1,14 @@
 import React, { useEffect, useState, useRef } from "react";
 import { useNavigate } from "react-router-dom";
-import "./IngresoPPInvernadero.css"; //Estilos de la tabla
+import "./IngresoPPInvernadero.css";
 
-import supabase from "../../../supabaseClient"; //Importa la variable supabase del archivo supabaseClient.js que sirve para conectarse con la base de datos y que funcione como API
+import supabase from "../../../supabaseClient";
 
-//PRIME REACT
-import "primereact/resources/themes/bootstrap4-light-blue/theme.css"; //theme
-import "primeicons/primeicons.css"; //icons
+// PRIME REACT
+import "primereact/resources/themes/bootstrap4-light-blue/theme.css";
+import "primeicons/primeicons.css";
 
-//PRIME REACT COMPONENTS
+// PRIME REACT COMPONENTS
 import { DataTable } from "primereact/datatable";
 import { Column } from "primereact/column";
 import { Toast } from "primereact/toast";
@@ -20,43 +20,40 @@ import { Dialog } from "primereact/dialog";
 import { InputText } from "primereact/inputtext";
 import { Dropdown } from "primereact/dropdown";
 
-import { act } from "react";
 import * as XLSX from "xlsx";
 import logo2 from "../../../assets/mosca.png";
 import jsPDF from "jspdf";
 import "jspdf-autotable";
 
 function IngresoPPInvernadero() {
-  //Variable de registro vacio
+  // Variable de registro vacio
   const emptyRegister = {
     fec_ingreso_pp: "",
     lote_cosecha_pp: "",
-    nave: "", // propiedad para la nave
+    nave: "",
     cantidad_ur: "",
     kg_pp_modulo: "",
-    kg_pp_ur: "",
     cantidad_pp_modulo: "",
     kg_pp_redsea: "",
     fec_cam_camas: "",
     observaciones: "",
-    // ... otras propiedades según corresponda
   };
 
-  const [IngresoPPs, setIngresoPPs] = useState([]); //Variable de estado que guarda los datos de la tabla Usuarios
-  const [pupa, setPupa] = useState(emptyRegister); //Variable de estado que guarda los datos de un usuario
+  const [IngresoPPs, setIngresoPPs] = useState([]);
+  const [pupa, setPupa] = useState(emptyRegister);
+  const toast = useRef(null);
+  const dt = useRef(null);
+  const [selectedIngresoPPs, setSelectedIngresoPPs] = useState([]);
+  const [globalFilter, setGlobalFilter] = useState(null);
+  const [submitted, setSubmitted] = useState(false);
+  const [pupaDialog, setPupaDialog] = useState(false);
+  const [deletePPDialog, setDeletePPDialog] = useState(false);
+  const [deleteIngresoPPsDialog, setDeleteIngresoPPsDialog] = useState(false);
+  const navigate = useNavigate();
+  const [observacionesObligatorio, setObservacionesObligatorio] = useState(false);
+  const [fechaRegistro, setFechaRegistro] = useState("");
 
-  const toast = useRef(null); //Variable de referencia para mostrar mensajes emergentes
-  const dt = useRef(null); //Variable de referencia para la tabla
-  const [selectedIngresoPPs, setSelectedIngresoPPs] = useState([]); //Variable de estado que guarda los usuarios seleccionados
-  const [globalFilter, setGlobalFilter] = useState(null); //Variable de estado que guarda el filtro de busqueda
-  const [submitted, setSubmitted] = useState(false); //Variable de estado que guarda si se ha enviado un formulario
-  const [pupaDialog, setPupaDialog] = useState(false); //Variable de estado que guarda si se muestra el dialogo de usuario
-  const [deletePPDialog, setDeletePPDialog] = useState(false); //Variable de estado que guarda si se muestra el dialogo de eliminar usuario
-  const [deleteIngresoPPsDialog, setDeleteIngresoPPsDialog] = useState(false); //Variable de estado que guarda si se muestra el dialogo de eliminar usuarios
-  const navigate = useNavigate(); //Variable de navegación
-  const [observacionesObligatorio, setObservacionesObligatorio] =
-    useState(false);
-  const [fechaRegistro, setFechaRegistro] = useState(""); //Variable de estado que guarda la fecha de registro actual
+  // Estado para errores de validación
   const [erroresValidacion, setErroresValidacion] = useState({
     cantidad_ur: false,
     kg_pp_modulo: false,
@@ -64,48 +61,41 @@ function IngresoPPInvernadero() {
     kg_pp_redsea: false,
   });
 
-  const [selectedCantidadUR, setSelectedCantidadUR] = useState(null);
-  const [selectedKgPPModulo, setSelectedKgPPModulo] = useState(null);
-  const [selectedCantidadPPModulo, setSelectedCantidadPPModulo] = useState(null);
-  const [selectedKgPPRedSea, setSelectedKgPPRedSea] = useState(null);
-
-  const razonesObservaciones = [
-    { name: "Por Humedad", value: "Por Humedad" },
-    { name: "Razon 1", value: "Razon 1" },
-    { name: "Razon 2", value: "Razon 2" },
-    { name: "Razon 3", value: "Razon 3" },
-  ];
-
   const naves = [
     { name: "Nave 1", value: "Nave 1" },
     { name: "Nave 2", value: "Nave 2" },
     { name: "Nave 3", value: "Nave 3" },
     { name: "Nave 4", value: "Nave 4" },
+    { name: "Red Sea", value: "Red Sea" },
+    { name: "Perimetrales", value: "Perimetrales" },
   ];
 
-  //Inicio de FETCH REGISTROS
+  // FETCH REGISTROS
   const fetchIngresoPPInvernadero = async () => {
     try {
       const { data, error } = await supabase
         .from("Ingreso_PP_Invernadero")
         .select();
 
-      if (error) throw error; // Si hay error, lanza una excepción
+      if (error) throw error;
 
-      setIngresoPPs(data || []); // Guarda los datos en el estado
+      setIngresoPPs(data || []);
     } catch (err) {
-      // Captura el error real
       console.error("Error en la conexión a la base de datos:", err);
+      toast.current.show({
+        severity: "error",
+        summary: "Error",
+        detail: "Error al cargar los datos",
+        life: 3000,
+      });
     }
   };
 
   useEffect(() => {
-    //Este useEffect es un hook para que solo se ejecute una sola vez al cargar la pagina
-    fetchIngresoPPInvernadero(); //Ejecuta la funcion fetchUsuarios que obtiene los datos de la tabla Usuarios
+    fetchIngresoPPInvernadero();
   }, []);
-  //Fin de FETCH REGISTROS
 
-  //Inicio Formatear la FECHA DE REGISTRO
+  // Formatear fecha
   const formatDateTime = (date, format = "DD-MM-YYYY hh:mm A") => {
     const options = {
       day: "2-digit",
@@ -117,11 +107,8 @@ function IngresoPPInvernadero() {
     };
 
     const formatter = new Intl.DateTimeFormat("en-US", options);
-
-    // Convertir fecha al formato inicial
     const parts = formatter.formatToParts(date);
 
-    // Crear un mapa con los valores para personalizar el formato
     const dateMap = parts.reduce((acc, part) => {
       if (part.type !== "literal") {
         acc[part.type] = part.value;
@@ -129,7 +116,6 @@ function IngresoPPInvernadero() {
       return acc;
     }, {});
 
-    // Reemplazar los patrones en el formato
     return format
       .replace("DD", dateMap.day)
       .replace("MM", dateMap.month)
@@ -138,8 +124,8 @@ function IngresoPPInvernadero() {
       .replace("mm", dateMap.minute)
       .replace("A", dateMap.dayPeriod || "AM");
   };
-  //Fin Formatear la FECHA DE REGISTRO
 
+  // Exportar PDF
   const exportPdf = () => {
     if (selectedIngresoPPs.length === 0) {
       toast.current.show({
@@ -148,39 +134,47 @@ function IngresoPPInvernadero() {
         detail: "No hay filas seleccionadas para exportar.",
         life: 3000,
       });
-      return; // Detener la ejecución si no hay filas seleccionadas
+      return;
     }
 
     const doc = new jsPDF();
-
-    // Configuración del título
     doc.setFontSize(18);
-    doc.text("Registros de Cosecha Eggies Invernadero - Embudos", 14, 22);
+    doc.text("Registros de Ingreso PP Invernadero", 14, 22);
 
-    // Combinar datos seleccionados con el campo "registrado"
     const exportData = selectedIngresoPPs.map((row) => ({
       ...row,
-      registrado: `${row.fec_registro || ""} ${row.hor_registro || ""}`, // Combina las fechas
+      registrado: `${row.fec_registro || ""} ${row.hor_registro || ""}`,
     }));
 
-    // Mapear cada registro en un array de valores en el mismo orden de exportColumns
+    const cols = [
+      { field: "fec_ingreso_pp", header: "Ingreso PP" },
+      { field: "lote_cosecha_pp", header: "# Lote" },
+      { field: "nave", header: "Nave" },
+      { field: "cantidad_ur", header: "# UR's" },
+      { field: "kg_pp_modulo", header: "KG PP/Modulo" },
+      { field: "cantidad_pp_modulo", header: "# PP/Modulo" },
+      { field: "kg_pp_redsea", header: "KG PP/RedSea" },
+      { field: "fec_cam_camas", header: "Cambio Cama Pupado" },
+      { field: "observaciones", header: "Observaciones" },
+      { field: "registrado", header: "Registrado" },
+    ];
+
     const body = exportData.map((row) =>
-      exportColumns.map((col) => row[col.dataKey])
+      cols.map((col) => row[col.field])
     );
 
-    // Configuración de la tabla
     doc.autoTable({
-      head: [exportColumns.map((col) => col.title)], // Encabezados de la tabla
-      body: body, // Datos de la tabla
-      startY: 30, // Posición inicial de la tabla
-      styles: { fontSize: 10 }, // Estilo de la tabla
-      headStyles: { fillColor: [41, 128, 185], textColor: 255 }, // Estilo del encabezado
+      head: [cols.map((col) => col.header)],
+      body: body,
+      startY: 30,
+      styles: { fontSize: 10 },
+      headStyles: { fillColor: [41, 128, 185], textColor: 255 },
     });
 
-    // Guardar el PDF
     doc.save("Ingreso_PrePupas_Invernadero.pdf");
   };
 
+  // Exportar Excel
   const exportXlsx = () => {
     if (selectedIngresoPPs.length === 0) {
       toast.current.show({
@@ -189,87 +183,74 @@ function IngresoPPInvernadero() {
         detail: "No hay filas seleccionadas para exportar.",
         life: 3000,
       });
-      return; // Detener la ejecución si no hay filas seleccionadas
+      return;
     }
 
-    // Resto del código para generar el XLSX...
-    // Obtener los encabezados de las columnas
-    const headers = cols.map((col) => col.header); // Mapear solo los encabezados de las columnas
+    const cols = [
+      { field: "fec_ingreso_pp", header: "Ingreso PP" },
+      { field: "lote_cosecha_pp", header: "# Lote" },
+      { field: "nave", header: "Nave" },
+      { field: "cantidad_ur", header: "# UR's" },
+      { field: "kg_pp_modulo", header: "KG PP/Modulo" },
+      { field: "cantidad_pp_modulo", header: "# PP/Modulo" },
+      { field: "kg_pp_redsea", header: "KG PP/RedSea" },
+      { field: "fec_cam_camas", header: "Cambio Cama Pupado" },
+      { field: "observaciones", header: "Observaciones" },
+      { field: "registrado", header: "Registrado" },
+    ];
 
-    // Combinar los datos seleccionados y agregar el campo "registrado"
+    const headers = cols.map((col) => col.header);
     const exportData = selectedIngresoPPs.map((registro) => ({
       ...registro,
-      registrado: `${registro.fec_registro || ""} ${
-        registro.hor_registro || ""
-      }`,
+      registrado: `${registro.fec_registro || ""} ${registro.hor_registro || ""}`,
     }));
 
-    // Obtener los datos seleccionados y mapearlos para las columnas
-    const rows = exportData.map(
-      (registro) => cols.map((col) => registro[col.field]) // Mapear los valores de cada fila por las columnas
+    const rows = exportData.map((registro) =>
+      cols.map((col) => registro[col.field])
     );
 
-    // Agregar la fila de encabezados al principio de los datos
     const dataToExport = [headers, ...rows];
-
-    // Crear una hoja de trabajo a partir de los encabezados y los datos
     const ws = XLSX.utils.aoa_to_sheet(dataToExport);
-
-    // Configurar el estilo de la hoja para asegurar la correcta separación de celdas
-    const wscols = cols.map((col) => ({
-      width: Math.max(col.header.length, 10),
-    })); // Ajustar el ancho de las columnas según los encabezados
+    const wscols = cols.map((col) => ({ width: Math.max(col.header.length, 10) }));
     ws["!cols"] = wscols;
 
-    // Crear un libro de trabajo
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, "Registros");
-
-    // Exportar el archivo .xlsx
     XLSX.writeFile(wb, "Ingreso_PP_Invernadero.xlsx");
   };
 
-  // Columnas de la tabla para exportar
-  const cols = [
-    { field: "fec_ingreso_pp", header: "Ingreso PP" },
-    { field: "lote_cosecha_pp", header: "# Lote" },
-    { field: "nave", header: "Nave" },
-    { field: "cantidad_ur", header: "# UR's" },
-    { field: "kg_pp_modulo", header: "KG PP/Modulo" },
-    { field: "kg_pp_ur", header: "KG PP/UR" },
-    { field: "cantidad_pp_modulo", header: "# PP/Modulo" },
-    { field: "kg_pp_redsea", header: "KG PP/RedSea" },
-    { field: "fec_cam_camas", header: "Cambio Cama Pupado" },
-    { field: "observaciones", header: "Observaciones" },
-    { field: "registrado", header: "Registrado" }, // Campo combinado
-  ];
-
-  // Mapeo de columnas para jsPDF-Autotable
-  const exportColumns = cols.map((col) => ({
-    title: col.header, // Título del encabezado
-    dataKey: col.field, // Llave de datos
-  }));
-
-  // Fin de EXPORTAR TABLA
-
-  // //Inicio de EDITAR TABLA
+  // Editar fila
   const onRowEditComplete = async (e) => {
-    const { newData } = e; // Obtén los datos de la fila
+    const { newData } = e;
     const {
       id,
-      fec_ingreso_pp, // no se debería cambiar
-      lote_cosecha_pp, // no se debería cambiar
+      fec_ingreso_pp,
+      lote_cosecha_pp,
       nave,
       cantidad_ur,
       kg_pp_modulo,
-      kg_pp_ur,
       cantidad_pp_modulo,
       kg_pp_redsea,
       fec_cam_camas,
       observaciones,
     } = newData;
 
-    // Convertir fec_cam_camas al formato ISO (yyyy-MM-dd)
+    // Validar rangos al editar
+    const isCantidadURInvalida = cantidad_ur < 20 || cantidad_ur > 100;
+    const isKgPPModuloInvalido = kg_pp_modulo < 10 || kg_pp_modulo > 25;
+    const isCantidadPPModuloInvalido = cantidad_pp_modulo < 50 || cantidad_pp_modulo > 100;
+    const isKgPPRedseaInvalido = kg_pp_redsea < 400 || kg_pp_redsea > 550;
+
+    if ((isCantidadURInvalida || isKgPPModuloInvalido || isCantidadPPModuloInvalido || isKgPPRedseaInvalido) && !observaciones) {
+      toast.current.show({
+        severity: "error",
+        summary: "Error",
+        detail: "Debe agregar observaciones para valores fuera de rango",
+        life: 3000,
+      });
+      return;
+    }
+
     const formattedFecCamCamas = fec_cam_camas
       ? new Date(fec_cam_camas)
           .toISOString()
@@ -279,28 +260,13 @@ function IngresoPPInvernadero() {
           .join("/")
       : null;
 
-    console.log("Datos enviados para actualizar:", {
-      id,
-      fec_ingreso_pp,
-      nave,
-      cantidad_ur,
-      kg_pp_modulo,
-      kg_pp_ur,
-      cantidad_pp_modulo,
-      kg_pp_redsea,
-      fec_cam_camas: formattedFecCamCamas, // Asegúrate de inspeccionar este valor
-      observaciones,
-    });
-
     try {
       const { error } = await supabase
         .from("Ingreso_PP_Invernadero")
         .update({
-          fec_ingreso_pp, // no se debería cambiar
           nave,
           cantidad_ur,
           kg_pp_modulo,
-          kg_pp_ur,
           cantidad_pp_modulo,
           kg_pp_redsea,
           fec_cam_camas: formattedFecCamCamas,
@@ -308,90 +274,76 @@ function IngresoPPInvernadero() {
         })
         .eq("id", id);
 
-      if (error) {
-        console.error("Error al actualizar:", error.message);
-        return;
-      }
+      if (error) throw error;
 
-      console.log(`Fila con ID ${id} actualizada correctamente.`);
-
-      // Actualizar solo la fila editada en el estado
-      console.log("IngresoPPs:", IngresoPPs);
       setIngresoPPs(
         IngresoPPs.map((ingresopp) =>
-          ingresopp.id === id
-            ? { ...newData, fec_cam_camas: formattedFecCamCamas }
-            : ingresopp
+          ingresopp.id === id ? { ...newData, fec_cam_camas: formattedFecCamCamas } : ingresopp
         )
       );
+
+      toast.current.show({
+        severity: "success",
+        summary: "Éxito",
+        detail: "Registro actualizado",
+        life: 3000,
+      });
     } catch (err) {
-      console.error("Error inesperado:", err);
+      console.error("Error al actualizar:", err);
+      toast.current.show({
+        severity: "error",
+        summary: "Error",
+        detail: "Error al actualizar el registro",
+        life: 3000,
+      });
     }
   };
 
-  const dateEditor = (options) => {
-    return (
-      <InputText
-        type="date"
-        value={options.value}
-        onChange={(e) => options.editorCallback(e.target.value)}
-      />
-    );
-  };
-  const textEditor = (options) => {
-    return (
-      <InputText
-        type="text"
-        value={options.value}
-        onChange={(e) => options.editorCallback(e.target.value)}
-      />
-    );
-  };
-  const numberEditor = (options) => {
-    return (
-      <InputText
-        type="number"
-        value={options.value}
-        onChange={(e) => options.editorCallback(e.target.value)}
-      />
-    );
-  };
-  const floatEditor = (options) => {
-    return (
-      <InputText
-        type="float"
-        value={options.value}
-        onChange={(e) => options.editorCallback(e.target.value)}
-      />
-    );
-  };
-  const DropdownEditor = (options, type) => (
-    <Dropdown
-      value={options.value || ""} // Asegura que no sea undefined
-      onChange={(e) => options.editorCallback(e.value)} // Callback para notificar el cambio
-      options={type} // Opciones disponibles
-      optionLabel="name" // Campo que muestra el texto visible
-      optionValue="value" // Campo que identifica el valor único
-      placeholder="Select a type" // Placeholder cuando no hay valor
-      className="w-full md:w-14rem" // Estilo de ancho responsivo
+  // Editores para las celdas
+  const dateEditor = (options) => (
+    <InputText
+      type="date"
+      value={options.value}
+      onChange={(e) => options.editorCallback(e.target.value)}
     />
   );
-  const allowEdit = (rowData) => {
-    return rowData.name !== "Blue Band";
-  };
 
+  const textEditor = (options) => (
+    <InputText
+      type="text"
+      value={options.value}
+      onChange={(e) => options.editorCallback(e.target.value)}
+    />
+  );
+
+  const numberEditor = (options) => (
+    <InputText
+      type="number"
+      value={options.value}
+      onChange={(e) => options.editorCallback(parseInt(e.target.value) || 0)}
+    />
+  );
+
+  const floatEditor = (options) => (
+    <InputText
+      type="number"
+      step="0.01"
+      value={options.value}
+      onChange={(e) => options.editorCallback(parseFloat(e.target.value) || 0)}
+    />
+  );
+
+  const allowEdit = (rowData) => true; // Permitir editar todas las filas
+
+  // Guardar nuevo registro
   const saveIngresoPP = async () => {
     setSubmitted(true);
 
     // Validar los campos
-    const isCantidadURInvalida =
-      pupa.cantidad_ur < 20 || pupa.cantidad_ur > 100;
-    const isKgPPModuloInvalido =
-      pupa.kg_pp_modulo < 10 || pupa.kg_pp_modulo > 25;
-    const isCantidadPPModuloInvalido =
-      pupa.cantidad_pp_modulo < 50 || pupa.cantidad_pp_modulo > 100;
-    const isKgPPRedseaInvalido =
-      pupa.kg_pp_redsea < 400 || pupa.kg_pp_redsea > 550;
+    const isCantidadURInvalida = pupa.cantidad_ur < 20 || pupa.cantidad_ur > 100;
+    const isKgPPModuloInvalido = pupa.kg_pp_modulo < 10 || pupa.kg_pp_modulo > 25;
+    const isCantidadPPModuloInvalido = pupa.cantidad_pp_modulo < 50 || pupa.cantidad_pp_modulo > 100;
+    const isKgPPRedseaInvalido = pupa.kg_pp_redsea < 400 || pupa.kg_pp_redsea > 550;
 
     // Actualizar el estado de errores
     setErroresValidacion({
@@ -402,63 +354,52 @@ function IngresoPPInvernadero() {
     });
 
     // Verificar si hay algún valor fuera de rango
-    const valoresFueraDeRango =
-      isCantidadURInvalida ||
-      isKgPPModuloInvalido ||
-      isCantidadPPModuloInvalido ||
-      isKgPPRedseaInvalido;
+    const valoresFueraDeRango = isCantidadURInvalida || 
+                               isKgPPModuloInvalido || 
+                               isCantidadPPModuloInvalido || 
+                               isKgPPRedseaInvalido;
 
-    if (
-      !pupa.fec_ingreso_pp ||
-      !pupa.lote_cosecha_pp ||
-      !pupa.nave ||
-      !pupa.cantidad_ur ||
-      !pupa.kg_pp_modulo ||
-      !pupa.kg_pp_ur ||
-      !pupa.cantidad_pp_modulo ||
-      !pupa.kg_pp_redsea ||
-      !pupa.fec_cam_camas
-    ) {
+    // Validar campos obligatorios
+    if (!pupa.fec_ingreso_pp || 
+        !pupa.lote_cosecha_pp || 
+        !pupa.nave || 
+        !pupa.cantidad_ur || 
+        !pupa.kg_pp_modulo || 
+        !pupa.cantidad_pp_modulo || 
+        !pupa.kg_pp_redsea || 
+        !pupa.fec_cam_camas) {
       toast.current.show({
         severity: "error",
         summary: "Error",
-        detail: "Llena todos los campos",
+        detail: "Debe completar todos los campos obligatorios",
         life: 3000,
       });
       return;
     }
 
-    // Validación principal
+    // Validación principal: si hay valores fuera de rango, observaciones es obligatorio
     if (valoresFueraDeRango && !pupa.observaciones) {
       setObservacionesObligatorio(true);
-      const currentErrores = {
-        "Cantidad UR": isCantidadURInvalida,
-        "Kg PrePupa Modulo": isKgPPModuloInvalido,
-        "Cantidad PrePupa Modulo": isCantidadPPModuloInvalido,
-        "Kg PrePupa RedSea": isKgPPRedseaInvalido,
-      };
-
+      
+      // Crear mensaje con los campos que están fuera de rango
+      const camposInvalidos = [];
+      if (isCantidadURInvalida) camposInvalidos.push("Cantidad UR (20-100)");
+      if (isKgPPModuloInvalido) camposInvalidos.push("Kg PP/Modulo (10-25)");
+      if (isCantidadPPModuloInvalido) camposInvalidos.push("Cantidad PP/Modulo (50K-100K)");
+      if (isKgPPRedseaInvalido) camposInvalidos.push("Kg PP/RedSea (400-550)");
+      
       toast.current.show({
         severity: "error",
         summary: "Error",
-        detail: `Debe agregar observaciones. Campos inválidos: ${Object.keys(
-          currentErrores
-        )
-          .filter((k) => currentErrores[k])
-          .join(", ")}`,
-        life: 3000,
+        detail: `Valores fuera de rango (${camposInvalidos.join(", ")}). Debe agregar observaciones.`,
+        life: 5000,
       });
       return;
     }
 
+    // Si llegamos aquí, todos los requisitos se cumplen
     setObservacionesObligatorio(false);
-    setErroresValidacion({
-      cantidad_ur: false,
-      kg_pp_modulo: false,
-      cantidad_pp_modulo: false,
-      kg_pp_redsea: false,
-    });
-
+    
     try {
       const formattedFecCamCamas = pupa.fec_cam_camas
         ? new Date(pupa.fec_cam_camas)
@@ -490,7 +431,6 @@ function IngresoPPInvernadero() {
             nave: pupa.nave,
             cantidad_ur: pupa.cantidad_ur,
             kg_pp_modulo: pupa.kg_pp_modulo,
-            kg_pp_ur: pupa.kg_pp_ur,
             cantidad_pp_modulo: pupa.cantidad_pp_modulo,
             kg_pp_redsea: pupa.kg_pp_redsea,
             fec_cam_camas: formattedFecCamCamas,
@@ -500,187 +440,78 @@ function IngresoPPInvernadero() {
           },
         ]);
 
-      if (error) {
-        console.error("Error en Supabase:", error);
-        throw new Error(
-          error.message || "Error desconocido al guardar en Supabase"
-        );
-      }
+      if (error) throw error;
 
-      console.log("Datos insertados:", data);
       toast.current.show({
         severity: "success",
-        summary: "Exitoso",
-        detail: "Registro guardado exitosamente",
+        summary: "Éxito",
+        detail: "Registro guardado correctamente",
         life: 3000,
       });
 
-      // Limpia el estado
+      // Limpiar y cerrar
       setPupa(emptyRegister);
       setPupaDialog(false);
       setSubmitted(false);
       fetchIngresoPPInvernadero();
+      
     } catch (error) {
-      console.error("Error capturado en el catch:", error.message);
+      console.error("Error al guardar:", error);
       toast.current.show({
         severity: "error",
         summary: "Error",
-        detail: error.message || "Ocurrió un error al crear el usuario",
+        detail: "Ocurrió un error al guardar el registro",
         life: 3000,
       });
     }
   };
 
+  // Manejar cambios en los inputs
   const onInputChange = (e, name) => {
-    // Obtener el valor dependiendo del tipo de input
-    let val = e.target.value;
-
-    // Si el valor proviene de un input type="number", debemos asegurarnos de convertirlo a número.
-    if (e.target.type === "number") {
-      val = val ? parseInt(val, 10) : ""; // Si no es un número, se lo dejamos vacío o le asignamos un valor numérico como 0.
-    }
-
-    console.log(`${name}: ` + val); // Mostrar el nombre del campo y el valor que se actualizó.
-
-    // Crear una copia del estado del usuario
+    const val = e.target.value;
     let _pupa = { ...pupa };
 
-    // Actualizar el valor de la propiedad correspondiente
-    _pupa[`${name}`] = val;
+    if (e.target.type === "number") {
+      _pupa[`${name}`] = val ? parseFloat(val) : "";
+    } else {
+      _pupa[`${name}`] = val;
+    }
 
-    // Actualizar el estado del usuario
     setPupa(_pupa);
   };
 
-  const onDropdownChange = (e, name) => {
-    const val = e.value;
-    console.log(`${name}: ${val}`); // Depura el valor seleccionado
+  // Toolbars y diálogos
+  const leftToolbarTemplate = () => (
+    <div className="flex flex-wrap gap-2">
+      <Button
+        label="Nuevo"
+        icon="pi pi-plus"
+        severity="success"
+        onClick={openNew}
+      />
+    </div>
+  );
 
-    setorden((prevOrdenes) => ({
-      ...prevOrdenes,
-      [name]: val, // Guarda el valor seleccionado
-    }));
-  };
-  // //Fin de EDITAR TABLA
-
-  // //Inicio de ELIMINAR REGISTRO
-  // const deleteSelectedUsuarios = async () => {
-  //   let actionMessage = "";
-  //   const selectedIds = selectedUsuarios.map((usuario) => usuario.id); // Obtener los IDs de los usuarios seleccionados del array
-
-  //   try {
-  //     // Realizar la eliminación en Supabase con un array de IDs
-  //     const { data, error } = await supabase
-  //       .from("Usuarios")
-  //       .delete()
-  //       .in("id", selectedIds); // Usamos `.in` para eliminar varios IDs
-
-  //     if (error) {
-  //       console.error("Error eliminando:", error.message);
-  //       toast.current.show({
-  //         severity: "error",
-  //         summary: "Error",
-  //         detail: "No se pudieron eliminar los usuarios",
-  //         life: 3000,
-  //       });
-  //     } else {
-  //       actionMessage = "Usuarios Eliminados";
-  //       console.log("Usuarios eliminados:", data);
-  //     }
-  //     // Mostrar mensaje de éxito
-  //     toast.current.show({
-  //       severity: "success",
-  //       summary: "Exitoso",
-  //       detail: actionMessage,
-  //       life: 3000,
-  //     });
-  //     hideDeleteUsuariosDialog(); // Cerrar el diálogo de confirmación
-  //     // Refrescar la lista de usuarios
-  //     fetchUsuarios(); // Refrescar lista de usuarios
-  //   } catch (error) {
-  //     console.error("Error en la eliminación:", error);
-  //     toast.current.show({
-  //       severity: "error",
-  //       summary: "Error",
-  //       detail: "Ocurrió un error al eliminar los usuarios",
-  //       life: 3000,
-  //     });
-  //   }
-  // };
-
-  // const hideDeleteUsuariosDialog = () => {
-  //   setDeleteUsuariosDialog(false);
-  // };
-
-  // const confirmDeleteSelected = () => {
-  //   setDeleteUsuariosDialog(true);
-  // };
-
-  // const deleteUsuariosDialogFooter = (
-  //   <React.Fragment>
-  //     <Button
-  //       label="No"
-  //       icon="pi pi-times"
-  //       outlined
-  //       onClick={hideDeleteUsuariosDialog}
-  //     />
-  //     <Button
-  //       label="Yes"
-  //       icon="pi pi-check"
-  //       severity="danger"
-  //       onClick={deleteSelectedUsuarios}
-  //     />
-  //   </React.Fragment>
-  // );
-  // //Fin de ELIMINAR REGISTRO
-
-  // //Inicio de DIALOGO DE REGISTRO
-  const leftToolbarTemplate = () => {
-    return (
-      <div className="flex flex-wrap gap-2">
-        <Button
-          label="New"
-          icon="pi pi-plus"
-          severity="success"
-          onClick={openNew}
-        />
-        {/* <Button
-          label="Delete"
-          icon="pi pi-trash"
-          severity="danger"
-          onClick={confirmDeleteSelected}
-          disabled={!selectedUsuarios || !selectedUsuarios.length}
-        /> */}
-      </div>
-    );
-  };
-
-  const rightToolbarTemplate = () => {
-    return (
-      <div className="flex flex-wrap gap-2">
-        <Button
-          label="Exportar a Excel"
-          icon="pi pi-upload"
-          className="p-button-help"
-          onClick={exportXlsx}
-          //disabled={selectedIngresoPPs.length === 0}
-        />
-        <Button
-          label="Exportar a PDF"
-          icon="pi pi-file-pdf"
-          className="p-button-danger"
-          onClick={exportPdf}
-          //disabled={selectedIngresoPPs.length === 0}
-        />
-      </div>
-    );
-  };
+  const rightToolbarTemplate = () => (
+    <div className="flex flex-wrap gap-2">
+      <Button
+        label="Exportar a Excel"
+        icon="pi pi-upload"
+        className="p-button-help"
+        onClick={exportXlsx}
+      />
+      <Button
+        label="Exportar a PDF"
+        icon="pi pi-file-pdf"
+        className="p-button-danger"
+        onClick={exportPdf}
+      />
+    </div>
+  );
 
   const header = (
     <div className="flex flex-wrap gap-2 align-items-center justify-content-between">
-      {/* <h4 className="m-0">Ingreso PP Invernadero</h4> */}
       <IconField iconPosition="left">
-        {/* <InputIcon className="pi pi-search" /> */}
         <InputText
           type="search"
           onInput={(e) => setGlobalFilter(e.target.value)}
@@ -694,7 +525,15 @@ function IngresoPPInvernadero() {
     setPupa(emptyRegister);
     setSubmitted(false);
     setPupaDialog(true);
+    setObservacionesObligatorio(false);
+    setErroresValidacion({
+      cantidad_ur: false,
+      kg_pp_modulo: false,
+      cantidad_pp_modulo: false,
+      kg_pp_redsea: false,
+    });
   };
+
   const hideDialog = () => {
     setSubmitted(false);
     setPupaDialog(false);
@@ -702,12 +541,10 @@ function IngresoPPInvernadero() {
 
   const pupaDialogFooter = (
     <React.Fragment>
-      <Button label="Cancel" icon="pi pi-times" outlined onClick={hideDialog} />
-      <Button label="Save" icon="pi pi-check" onClick={saveIngresoPP} />
+      <Button label="Cancelar" icon="pi pi-times" outlined onClick={hideDialog} />
+      <Button label="Guardar" icon="pi pi-check" onClick={saveIngresoPP} />
     </React.Fragment>
   );
-
-  // //Fin de DIALOGO DE REGISTRO
 
   return (
     <>
@@ -755,7 +592,7 @@ function IngresoPPInvernadero() {
             rows={10}
             rowsPerPageOptions={[5, 10, 25]}
             paginatorTemplate="FirstPageLink PrevPageLink PageLinks NextPageLink LastPageLink CurrentPageReport RowsPerPageDropdown"
-            currentPageReportTemplate="Showing {first} to {last} of {totalRecords} Usuarios"
+            currentPageReportTemplate="Mostrando {first} a {last} de {totalRecords} registros"
             globalFilter={globalFilter}
             header={header}
           >
@@ -764,14 +601,12 @@ function IngresoPPInvernadero() {
             <Column
               field="fec_ingreso_pp"
               header="Fecha Ingreso PP"
-              // editor={(options) => textEditor(options)}
               sortable
               style={{ minWidth: "10rem" }}
             ></Column>
             <Column
               field="lote_cosecha_pp"
-              header="Lote Cosecha PP"
-              // editor={(options) => dateEditor(options)}
+              header="Número de Lote"
               sortable
               style={{ minWidth: "10rem" }}
             ></Column>
@@ -797,13 +632,6 @@ function IngresoPPInvernadero() {
               style={{ minWidth: "10rem" }}
             ></Column>
             <Column
-              field="kg_pp_ur"
-              header="KG PP / UR"
-              editor={(options) => floatEditor(options)}
-              sortable
-              style={{ minWidth: "8rem" }}
-            ></Column>
-            <Column
               field="cantidad_pp_modulo"
               header="Cantidad PP / Modulo"
               editor={(options) => numberEditor(options)}
@@ -827,14 +655,12 @@ function IngresoPPInvernadero() {
             <Column
               field="fec_registro"
               header="Dia de Registro"
-              // editor={(options) => textEditor(options)}
               sortable
               style={{ minWidth: "14rem" }}
             ></Column>
             <Column
               field="hor_registro"
               header="Hora de Registro"
-              // editor={(options) => textEditor(options)}
               sortable
               style={{ minWidth: "14rem" }}
             ></Column>
@@ -879,11 +705,12 @@ function IngresoPPInvernadero() {
             onChange={(e) => onInputChange(e, "fec_ingreso_pp")}
             required
             autoFocus
+            className={submitted && !pupa.fec_ingreso_pp ? "p-invalid" : ""}
           />
           <br />
 
           <label htmlFor="lote_cosecha_pp" className="font-bold">
-            Lote Cosecha{" "}
+            Número de Lote{" "}
             {submitted && !pupa.lote_cosecha_pp && (
               <small className="p-error">Requerido.</small>
             )}
@@ -893,7 +720,7 @@ function IngresoPPInvernadero() {
             value={pupa.lote_cosecha_pp}
             onChange={(e) => onInputChange(e, "lote_cosecha_pp")}
             required
-            autoFocus
+            className={submitted && !pupa.lote_cosecha_pp ? "p-invalid" : ""}
           />
 
           <br />
@@ -909,17 +736,8 @@ function IngresoPPInvernadero() {
             options={naves}
             optionLabel="name"
             placeholder="Selecciona una nave"
-            className="w-full md:w-14rem"
+            className={`w-full md:w-14rem ${submitted && !pupa.nave ? "p-invalid" : ""}`}
           />
-
-          {/* <InputText
-            id="nave"
-            type="Dropdown"
-            value={pupa.nave}
-            onChange={(e) => onInputChange(e, "nave")}
-            required
-            autoFocus
-          /> */}
 
           <br />
           <label htmlFor="cantidad_ur" className="font-bold">
@@ -929,7 +747,7 @@ function IngresoPPInvernadero() {
             )}
             {erroresValidacion.cantidad_ur && (
               <small className="p-error">
-                Cantidad UR debe estar entre 20 y 100.
+                Debe estar entre 20 y 100.
               </small>
             )}
           </label>
@@ -939,10 +757,13 @@ function IngresoPPInvernadero() {
             value={pupa.cantidad_ur}
             onChange={(e) => onInputChange(e, "cantidad_ur")}
             required
-            autoFocus
+            className={
+              submitted && (!pupa.cantidad_ur || erroresValidacion.cantidad_ur) 
+                ? "p-invalid" 
+                : ""
+            }
           />
           
-
           <br />
           <label htmlFor="kg_pp_modulo" className="font-bold">
             KG PrePupa / Modulo{" "}
@@ -951,36 +772,24 @@ function IngresoPPInvernadero() {
             )}
             {erroresValidacion.kg_pp_modulo && (
               <small className="p-error">
-                Kg PrePupa Modulo debe estar entre 10 y 25 Kg por caja.
+                Debe estar entre 10 y 25 Kg por caja.
               </small>
             )}
           </label>
           <InputText
-            type="float"
+            type="number"
+            step="0.01"
             id="kg_pp_modulo"
             value={pupa.kg_pp_modulo}
             onChange={(e) => onInputChange(e, "kg_pp_modulo")}
             required
-            autoFocus
+            className={
+              submitted && (!pupa.kg_pp_modulo || erroresValidacion.kg_pp_modulo) 
+                ? "p-invalid" 
+                : ""
+            }
           />
           
-
-          <br />
-          <label htmlFor="kg_pp_ur" className="font-bold">
-            Kg PrePupa UR{" "}
-            {submitted && !pupa.kg_pp_ur && (
-              <small className="p-error">Requerido.</small>
-            )}
-          </label>
-          <InputText
-            type="float"
-            id="kg_pp_ur"
-            value={pupa.kg_pp_ur}
-            onChange={(e) => onInputChange(e, "kg_pp_ur")}
-            required
-            autoFocus
-          />
-
           <br />
           <label htmlFor="cantidad_pp_modulo" className="font-bold">
             Cantidad PrePupa Modulo{" "}
@@ -989,7 +798,7 @@ function IngresoPPInvernadero() {
             )}
             {erroresValidacion.cantidad_pp_modulo && (
               <small className="p-error">
-                Cantidad PrePupa Modulo debe estar entre 50K y 100K.
+                Debe estar entre 50K y 100K.
               </small>
             )}
           </label>
@@ -999,7 +808,11 @@ function IngresoPPInvernadero() {
             value={pupa.cantidad_pp_modulo}
             onChange={(e) => onInputChange(e, "cantidad_pp_modulo")}
             required
-            autoFocus
+            className={
+              submitted && (!pupa.cantidad_pp_modulo || erroresValidacion.cantidad_pp_modulo) 
+                ? "p-invalid" 
+                : ""
+            }
           />
 
           <br />
@@ -1010,19 +823,23 @@ function IngresoPPInvernadero() {
             )}
             {erroresValidacion.kg_pp_redsea && (
               <small className="p-error">
-                Kg PrePupa RedSea debe estar entre 400 y 550.
+                Debe estar entre 400 y 550.
               </small>
             )}
           </label>
           <InputText
-            type="float"
+            type="number"
+            step="0.01"
             id="kg_pp_redsea"
             value={pupa.kg_pp_redsea}
             onChange={(e) => onInputChange(e, "kg_pp_redsea")}
             required
-            autoFocus
+            className={
+              submitted && (!pupa.kg_pp_redsea || erroresValidacion.kg_pp_redsea) 
+                ? "p-invalid" 
+                : ""
+            }
           />
-
 
           <br />
           <label htmlFor="fec_cam_camas" className="font-bold">
@@ -1037,67 +854,26 @@ function IngresoPPInvernadero() {
             value={pupa.fec_cam_camas}
             onChange={(e) => onInputChange(e, "fec_cam_camas")}
             required
-            autoFocus
+            className={submitted && !pupa.fec_cam_camas ? "p-invalid" : ""}
           />
 
           <label htmlFor="observaciones" className="font-bold">
-            Observaciones{" "}
+            Observaciones
             {observacionesObligatorio && (
-              <small className="p-error">Requerido por fuera de rango.</small>
+              <small className="p-error"> (Requerido por valores fuera de rango)</small>
             )}
           </label>
           <InputText
             id="observaciones"
             value={pupa.observaciones}
             onChange={(e) => onInputChange(e, "observaciones")}
-            required
-            autoFocus
+            required={observacionesObligatorio}
+            className={observacionesObligatorio ? "p-invalid" : ""}
           />
         </div>
       </Dialog>
-
-      {/* <Dialog
-        visible={deleteUsuarioDialog}
-        style={{ width: "32rem" }}
-        breakpoints={{ "960px": "75vw", "641px": "90vw" }}
-        header="Confirm"
-        modal
-      >
-        <div className="confirmation-content">
-          <i
-            className="pi pi-exclamation-triangle mr-3"
-            style={{ fontSize: "2rem" }}
-          />
-          {user && (
-            <span>
-              Estas seguro que deseas eliminar el Usuario: <b>{user.name}</b>?
-            </span>
-          )}
-        </div>
-      </Dialog> */}
-
-      {/* <Dialog
-        visible={deleteUsuariosDialog}
-        style={{ width: "32rem" }}
-        breakpoints={{ "960px": "75vw", "641px": "90vw" }}
-        header="Confirm"
-        modal
-        footer={deleteUsuariosDialogFooter}
-        onHide={hideDeleteUsuariosDialog}
-      >
-        <div className="confirmation-content">
-          <i
-            className="pi pi-exclamation-triangle mr-3"
-            style={{ fontSize: "2rem" }}
-          />
-          {user && (
-            <span>
-              ¿Estas seguro que quieres eliminar los Usuarios seleccionados?
-            </span>
-          )}
-        </div>
-      </Dialog> */}
     </>
   );
 }
+
 export default IngresoPPInvernadero;

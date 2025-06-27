@@ -26,15 +26,18 @@ import logo2 from "../../../assets/mosca.png";
 function ControLRendimientoDietaySiembra() {
   // Lista estática de operarios
   const operariosFijos = [
-    { nombre: "Stiven" },
-    { nombre: "Patrick" },
-    { nombre: "Pablo" },
-    { nombre: "Kendal" },
-    { nombre: "José Luis" },
-    { nombre: "Jose Geovani" },
+    { nombre: "Stiven Martinez" },
+    { nombre: "Patrick Rees" },
+    { nombre: "Pablo León" },
+    { nombre: "Kendal Godinez" },
+    { nombre: "José Luis Hernández" },
+    { nombre: "Jose Geovanni Quesada" },
+    { nombre: "Wilberth Herrera" },
+    { nombre: "Brulio Solano" },
   ];
 
   let emptyRegister = {
+    turno: "",
     cantidad_tandas: "",
     kg_dieta_caja: "",
     kg_residuo_organico: "",
@@ -56,12 +59,14 @@ function ControLRendimientoDietaySiembra() {
     cajas_dieta_no_sembradas_rep: "",
     cajas_sembradas_pro: "",
     cajas_dieta_no_sembradas_pro: "",
+    neonatos_no_sem: "",
+    destino_neonatos: "",
     tipo_control: "",
     operario: "",
     fec_registro: "",
     hor_registro: "",
     fecha_siembra: "",
-    fecha_prod: "", // Nuevo campo añadido
+    fecha_prod: "",
     observaciones: "",
   };
 
@@ -75,8 +80,10 @@ function ControLRendimientoDietaySiembra() {
   const [registroDialog, setRegistroDialog] = useState(false);
   const navigate = useNavigate();
 
-  const tipoDieta = ["Producción", "Reproducción", "Neonatos"];
+  const tipoDieta = ["Producción", "Reproducción", "Neonatos", "Sin dieta"];
   const tipoControl = ["Control", "Prueba"];
+  const turnos = ["1", "2", "3"];
+  const destinosNeonatos = ["Devolución a hatchery", "Siembra día siguiente", "Siembra turno siguiente", "No aplica"];
 
   const [observacionesObligatorio, setObservacionesObligatorio] = useState(false);
   const [erroresValidacion, setErroresValidacion] = useState({
@@ -85,6 +92,7 @@ function ControLRendimientoDietaySiembra() {
     cajas_dieta_no_sembradas_rep: false,
     cajas_sembradas_pro: false,
     cajas_dieta_no_sembradas_pro: false,
+    neonatos_no_sem: false,
   });
 
   const [lotes, setLotes] = useState([]);
@@ -152,12 +160,13 @@ function ControLRendimientoDietaySiembra() {
     registro.dieta_hatchery,
     registroDialog,
     calcularTotal
+    
   ]);
 
   const convertirFecha = (fecha) =>
     fecha ? fecha.split("-").reverse().join("/") : "";
 
-  const formatDate = (dateString) => {  //FORMATEA LA FECHA DE DD/MM/YYYY A DD-MM-YYYY 
+  const formatDate = (dateString) => {
     if (!dateString) return "";
     const [day, month, year] = dateString.split("/");
     return `${day}-${month}-${year}`;
@@ -203,7 +212,6 @@ function ControLRendimientoDietaySiembra() {
       const { data, error } = await supabase
         .from("Lotes")
         .select()
-        .in("etapa_actual", ["DespachoHatchery", "Dieta"])
         .order("fecha_registro", { ascending: false });
       if (error) throw error;
       setLotes(data || []);
@@ -302,28 +310,36 @@ function ControLRendimientoDietaySiembra() {
       0,
       100
     );
+    const isNeonatosNoSemInvalido = isInvalid(
+      registro.neonatos_no_sem,
+      0,
+      1000
+    );
 
     setErroresValidacion({
       cajas_sembradas_rep: isCajasSembradasRepInvalido,
       cajas_dieta_no_sembradas_rep: isCajasDietaNoSembradasRepInvalido,
       cajas_sembradas_pro: isCajasSembradasProInvalido,
       cajas_dieta_no_sembradas_pro: isCajasDietaNoSembradasProInvalido,
+      neonatos_no_sem: isNeonatosNoSemInvalido,
     });
 
     const valoresFueraDeRango =
       isCajasSembradasRepInvalido ||
       isCajasDietaNoSembradasRepInvalido ||
       isCajasSembradasProInvalido ||
-      isCajasDietaNoSembradasProInvalido;
+      isCajasDietaNoSembradasProInvalido ||
+      isNeonatosNoSemInvalido;
 
     const camposRequeridos = [
       "cantidad_tandas", "kg_dieta_caja", "kg_residuo_organico", 
       "kg_puntilla_arroz", "kg_destilado_maiz", "kg_melaza", 
       "g_espesante", "lts_agua", "g_pure_banano", "kg_otro", 
       "kg_harina_soya", "dieta_hatchery", "kg_total", "tipo_dieta",
-      "cajas_procesadas_neonatos", "cajas_sembradas_rep", 
-      "cajas_dieta_no_sembradas_rep", "cajas_sembradas_pro", 
-      "cajas_dieta_no_sembradas_pro", "tipo_control", "operario"
+      "cajas_procesadas_neonatos", "neonatos_no_sem", "destino_neonatos",
+      "cajas_sembradas_rep", "cajas_dieta_no_sembradas_rep", 
+      "cajas_sembradas_pro", "cajas_dieta_no_sembradas_pro", 
+      "tipo_control", "operario", "turno"
     ];
 
     const camposFaltantes = camposRequeridos.filter(field => !registro[field]);
@@ -345,6 +361,7 @@ function ControLRendimientoDietaySiembra() {
         "Cajas no Sembradas Reproduccion": isCajasDietaNoSembradasRepInvalido,
         "Cajas Sembradas Produccion": isCajasSembradasProInvalido,
         "Cajas No Sembradas Produccion": isCajasDietaNoSembradasProInvalido,
+        "Neonatos no sembrados": isNeonatosNoSemInvalido,
       };
 
       toast.current.show({
@@ -366,6 +383,7 @@ function ControLRendimientoDietaySiembra() {
       cajas_dieta_no_sembradas_rep: false,
       cajas_sembradas_pro: false,
       cajas_dieta_no_sembradas_pro: false,
+      neonatos_no_sem: false,
     });
 
     try {
@@ -412,6 +430,8 @@ function ControLRendimientoDietaySiembra() {
             kg_total: registro.kg_total,
             tipo_dieta: registro.tipo_dieta,
             cajas_procesadas_neonatos: registro.cajas_procesadas_neonatos,
+            neonatos_no_sem: registro.neonatos_no_sem,
+            destino_neonatos: registro.destino_neonatos,
             cajas_sembradas_rep: registro.cajas_sembradas_rep,
             cajas_dieta_no_sembradas_rep: registro.cajas_dieta_no_sembradas_rep,
             cajas_sembradas_pro: registro.cajas_sembradas_pro,
@@ -421,6 +441,7 @@ function ControLRendimientoDietaySiembra() {
             fec_registro: currentDate,
             hor_registro: currentTime,
             fecha_siembra: fechaSiembra,
+            turno: registro.turno,
             fecha_prod: convertirFecha(registro.fecha_prod),
             observaciones: registro.observaciones,
           },
@@ -543,7 +564,6 @@ function ControLRendimientoDietaySiembra() {
       e.preventDefault();
     }
     
-    // Si es un campo decimal, permite un solo punto
     if (e.key === '.' && e.target.value.includes('.')) {
       e.preventDefault();
     }
@@ -594,7 +614,7 @@ function ControLRendimientoDietaySiembra() {
         .from("Control_Rendimiento_DietaySiembra")
         .update({
           ...newData,
-          fecha_prod: newData.fecha_prod // Incluir el nuevo campo
+          fecha_prod: newData.fecha_prod
         })
         .eq("id", newData.id);
 
@@ -713,6 +733,8 @@ function ControLRendimientoDietaySiembra() {
     { field: "kg_total", header: "Kg Total" },
     { field: "tipo_dieta", header: "Tipo Dieta" },
     { field: "cajas_procesadas_neonatos", header: "Cajas Procesadas Neonatos" },
+    { field: "neonatos_no_sem", header: "Neonatos no sembrados" },
+    { field: "destino_neonatos", header: "Destino neonatos" },
     { field: "cajas_sembradas_rep", header: "Cajas Sembradas Rep" },
     { field: "cajas_dieta_no_sembradas_rep", header: "Cajas Dieta No Sembradas Rep" },
     { field: "cajas_sembradas_pro", header: "Cajas Sembradas Pro" },
@@ -720,6 +742,7 @@ function ControLRendimientoDietaySiembra() {
     { field: "tipo_control", header: "Tipo Control" },
     { field: "fecha_siembra", header: "Fecha Siembra" },
     { field: "operario", header: "Operario" },
+      { field: "turno", header: "Turno" },
     { field: "observaciones", header: "Observaciones" },
     { field: "registrado", header: "Registrado" },
   ];
@@ -810,7 +833,7 @@ function ControLRendimientoDietaySiembra() {
       ({ fec_registro, hor_registro, ...registro }) => ({
         ...registro,
         registrado: `${fec_registro || ""} ${hor_registro || ""}`,
-        fecha_prod: row.fecha_prod // Nuevo campo añadido
+        fecha_prod: registro.fecha_prod
       })
     );
 
@@ -895,7 +918,6 @@ function ControLRendimientoDietaySiembra() {
               field="fecha_prod"
               header="Fecha Producción"
               sortable
-              // body={(rowData) => formatDate(rowData.fecha_prod)}
             />
             <Column
               field="cantidad_tandas"
@@ -991,6 +1013,7 @@ function ControLRendimientoDietaySiembra() {
               editor={(options) => numberEditor(options)}
               sortable
             />
+            
             <Column
               field="cajas_sembradas_rep"
               header="Cajas Sembradas Rep"
@@ -1025,7 +1048,6 @@ function ControLRendimientoDietaySiembra() {
               field="fecha_siembra"
               header="Fecha Siembra"
               sortable
-              // body={(rowData) => formatDate(rowData.fecha_siembra)}
             />
             <Column
               field="operario"
@@ -1033,11 +1055,30 @@ function ControLRendimientoDietaySiembra() {
               editor={(options) => textEditor(options)}
               sortable
             />
+            <Column
+              field="turno"
+              header="Turno"
+              editor={(options) => textEditor(options)}
+              sortable
+            />
+
+            <Column
+              field="neonatos_no_sem"
+              header="Cajas de neonatos no sembradas"
+              editor={(options) => numberEditor(options)}
+              sortable
+            />
+            <Column
+              field="destino_neonatos"
+              header="Destino neonatos"
+              editor={(options) => textEditor(options)}
+              sortable
+            />
+
             <Column 
               field="fec_registro" 
               header="Fecha Registro" 
               sortable 
-              // body={(rowData) => formatDate(rowData.fec_registro)} 
             />
             <Column field="hor_registro" header="Hora Registro" sortable />
             <Column
@@ -1390,6 +1431,21 @@ function ControLRendimientoDietaySiembra() {
             required
           />
           <br />
+          <label htmlFor="turno" className="font-bold">
+              Turno{" "}
+              {submitted && !registro.turno && (
+                <small className="p-error">Requerido.</small>
+              )}
+            </label>
+            <Dropdown
+              id="turno"
+              value={registro.turno}
+              options={turnos}
+              onChange={(e) => onInputChange(e, "turno")}
+              placeholder="Seleccione un turno"
+              required
+            />
+            <br />
           <Divider />
           <h3>
             <strong>Neonatos:</strong>
@@ -1399,7 +1455,6 @@ function ControLRendimientoDietaySiembra() {
             {submitted && !registro.cajas_procesadas_neonatos && (
               <small className="p-error">Requerido.</small>
             )}
-           
           </label>
           <InputText
             type="number"
@@ -1410,6 +1465,8 @@ function ControLRendimientoDietaySiembra() {
             required
           />
           <br />
+
+
           <Divider />
           <h3>
             <strong>Reproducción:</strong>
@@ -1500,6 +1557,45 @@ function ControLRendimientoDietaySiembra() {
             id="cajas_dieta_no_sembradas_pro"
             value={registro.cajas_dieta_no_sembradas_pro}
             onChange={(e) => onInputChange(e, "cajas_dieta_no_sembradas_pro")}
+            required
+          />
+          <br />
+          <h3>
+            <strong>Sobrante:</strong>
+          </h3>
+          <label htmlFor="neonatos_no_sem" className="font-bold">
+            Neonatos no sembrados{" "}
+            {submitted && !registro.neonatos_no_sem && (
+              <small className="p-error">Requerido.</small>
+            )}
+            {erroresValidacion.neonatos_no_sem && (
+              <small className="p-error">
+                Neonatos no sembrados debe estar entre 0 y 1000.
+              </small>
+            )}
+          </label>
+          <InputText
+            type="number"
+            onKeyDown={handleKeyPress}
+            id="neonatos_no_sem"
+            value={registro.neonatos_no_sem}
+            onChange={(e) => onInputChange(e, "neonatos_no_sem")}
+            required
+          />
+          <br />
+
+          <label htmlFor="destino_neonatos" className="font-bold">
+            Destino de neonatos no sembrados{" "}
+            {submitted && !registro.destino_neonatos && (
+              <small className="p-error">Requerido.</small>
+            )}
+          </label>
+          <Dropdown
+            id="destino_neonatos"
+            value={registro.destino_neonatos}
+            options={destinosNeonatos}
+            onChange={(e) => onInputChange(e, "destino_neonatos")}
+            placeholder="Seleccione un destino"
             required
           />
           <br />

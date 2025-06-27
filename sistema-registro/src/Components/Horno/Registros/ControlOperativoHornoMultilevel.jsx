@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useRef } from "react";
 import { useNavigate } from "react-router-dom";
-import "./ControlOperativoHornoMultilevel.css"; // Importa el CSS
+import "./ControlOperativoHornoMultilevel.css";
 import supabase from "../../../supabaseClient";
 import "primereact/resources/themes/lara-light-indigo/theme.css";
 import "primeicons/primeicons.css";
@@ -21,9 +21,8 @@ import logo2 from "../../../assets/mosca.png";
 const ControlOperativoHornoMultilevel = () => {
   let emptyRegister = {
     operario_horno: "",
-
-
     d_voltaje: "",
+    fecha: "",
     d_amperaje: "",
     temp_seteada: "",
     temp_real: "",
@@ -35,29 +34,26 @@ const ControlOperativoHornoMultilevel = () => {
     entrada4: "",
     entrada5: "",
     entrada6: "",
-
     kpa_manometro1: "",
     kpa_manometro2: "",
     kpa_manometro3: "",
     kpa_manometro4: "",
-
     banda_alimentacion: "",
     banda_alimentacion1: "",
     banda_alimentacion2: "",
     banda_alimentacion3: "",
     banda_alimentacion4: "",
     banda_alimentacion5: "",
-
     psi_tanque1: "",
     psi_tanque2: "",
     psi_tanque3: "",
     psi_tanque4: "",
-
     fec_registro: "",
     hor_registro: "",
     observaciones: "",
     hor_inicio: "",
     hor_fin: "",
+    hora_toma_dato: "",
     tipo_control: "",
   };
 
@@ -88,6 +84,7 @@ const ControlOperativoHornoMultilevel = () => {
       console.log("Error en la conexión a la base de datos");
     }
   };
+
   useEffect(() => {
     fetchRegistros();
   }, []);
@@ -117,7 +114,6 @@ const ControlOperativoHornoMultilevel = () => {
     setSubmitted(true);
     if (
       !registro.operario_horno ||
-
       !registro.d_voltaje ||
       !registro.d_amperaje ||
       !registro.temp_seteada ||
@@ -146,7 +142,9 @@ const ControlOperativoHornoMultilevel = () => {
       !registro.psi_tanque4 ||
       !registro.hor_inicio ||
       !registro.hor_fin ||
-      !registro.tipo_control
+      !registro.hora_toma_dato ||
+      !registro.tipo_control ||
+      !registro.fecha
     ) {
       toast.current.show({
         severity: "error",
@@ -166,8 +164,8 @@ const ControlOperativoHornoMultilevel = () => {
         .insert([
           {
             operario_horno: registro.operario_horno,
-
             d_voltaje: registro.d_voltaje,
+            fecha: registro.fecha,
             d_amperaje: registro.d_amperaje,
             temp_seteada: registro.temp_seteada,
             temp_real: registro.temp_real,
@@ -198,6 +196,7 @@ const ControlOperativoHornoMultilevel = () => {
             observaciones: registro.observaciones,
             hor_inicio: registro.hor_inicio,
             hor_fin: registro.hor_fin,
+            hora_toma_dato: registro.hora_toma_dato,
             tipo_control: registro.tipo_control,
           },
         ]);
@@ -411,7 +410,7 @@ const ControlOperativoHornoMultilevel = () => {
   );
 
   const cols = [
-
+    { field: "fecha", header: "Fecha Control" },
     { field: "hor_inicio", header: "Hora de Inicio" },
     { field: "hor_fin", header: "Hora de Fin" },
     { field: "hora_toma_dato", header: "Hora de toma de dato" },
@@ -600,7 +599,11 @@ const ControlOperativoHornoMultilevel = () => {
             currentPageReportTemplate="Mostrando del {first} al {last} de {totalRecords} Registros"
           >
             <Column selectionMode="multiple" exportable={false}></Column>
-            
+            <Column
+              field="fecha"
+              header="Fecha Control"
+              editor={(options) => floatEditor(options)}
+            ></Column>
             <Column
               field="hor_inicio"
               header="Hora de Inicio"
@@ -708,28 +711,33 @@ const ControlOperativoHornoMultilevel = () => {
               editor={(options) => floatEditor(options)}
             ></Column>
             <Column
+              field="banda_alimentacion"
+              header="Banda Alimentación (Hertz)"
+              editor={(options) => floatEditor(options)}
+            ></Column>
+            <Column
               field="banda_alimentacion1"
-              header="Banda Alimentacion 1"
+              header="Banda Alimentación 1 (Hertz)"
               editor={(options) => floatEditor(options)}
             ></Column>
             <Column
               field="banda_alimentacion2"
-              header="Banda Alimentacion 2"
+              header="Banda Alimentación 2 (Hertz)"
               editor={(options) => floatEditor(options)}
             ></Column>
             <Column
               field="banda_alimentacion3"
-              header="Banda Alimentacion 3"
+              header="Banda Alimentación 3 (Hertz)"
               editor={(options) => floatEditor(options)}
             ></Column>
             <Column
               field="banda_alimentacion4"
-              header="Banda Alimentacion 4"
+              header="Banda Alimentación 4 (Hertz)"
               editor={(options) => floatEditor(options)}
             ></Column>
             <Column
               field="banda_alimentacion5"
-              header="Banda Alimentacion 5"
+              header="Banda Alimentación 5 (Hertz)"
               editor={(options) => floatEditor(options)}
             ></Column>
             <Column
@@ -785,15 +793,26 @@ const ControlOperativoHornoMultilevel = () => {
         onHide={hideDialog}
       >
         <div className="p-field">
-
-        <Divider />
+          <Divider />
           <h3>Rango de Temperatura de operación:</h3>
           <h3>90°C a 140°C</h3>
           <Divider />
 
+          <br />
+          <label htmlFor="fecha" className="font-bold">
+            Fecha Control{" "}
+    
+          </label>
+          <InputText
+            type="date"
+            id="fecha"
+            value={registro.fecha}
+            onChange={(e) => onInputChange(e, "fecha")}
+            required
+          />
+          <br />
           <label htmlFor="hor_inicio" className="font-bold">
             Hora Inicio{" "}
-            
           </label>
           <InputText
             type="time"
@@ -801,11 +820,9 @@ const ControlOperativoHornoMultilevel = () => {
             value={registro.hor_inicio}
             onChange={(e) => onInputChange(e, "hor_inicio")}
           />
-
           <br />
           <label htmlFor="hor_fin" className="font-bold">
             Hora Fin{" "}
-            
           </label>
           <InputText
             type="time"
@@ -817,11 +834,14 @@ const ControlOperativoHornoMultilevel = () => {
           <br />
           <label htmlFor="hora_toma_dato" className="font-bold">
             Hora de Toma de Datos{" "}
+            {submitted && !registro.hora_toma_dato && (
+              <small className="p-error">Requerido.</small>
+            )}
           </label>
           <InputText
             type="time"
             id="hora_toma_dato"
-            value={registro.hor_fin}
+            value={registro.hora_toma_dato}
             onChange={(e) => onInputChange(e, "hora_toma_dato")}
           />
 

@@ -35,11 +35,10 @@ import "jspdf-autotable";
 
 function ControlRendimientoCosechayFrass() {
   let emptyRegister = {
-    
     fec_cosecha: "",
     cant_cajas_cosechadas: "",
     cant_cajas_lote: 0,
-    _originalCajas: 0, // Nuevo campo para almacenar el valor original
+    _originalCajas: 0,
     kg_larva_fresca: "",
     cant_cajas_desechadas: "",
     kg_total_frass: "",
@@ -47,9 +46,28 @@ function ControlRendimientoCosechayFrass() {
     fec_registro: "",
     hor_registro: "",
     observaciones: "",
-    
+    operario: "",
+    turno: "",
     tipo_produccion: "",
     tipo_control: "",
+  };
+
+  const onSort = useCallback((event) => {
+    setLazyParams(prev => ({
+      ...prev,
+      sortField: event.sortField,
+      sortOrder: event.sortOrder,
+      first: 0
+    }));
+  }, []);
+
+  const onFilter = (e) => {
+    setGlobalFilter(e.target.value);
+    setLazyParams(prev => ({
+      ...prev,
+      globalFilter: e.target.value,
+      first: 0
+    }));
   };
 
   const [registros, setRegistros] = useState([]);
@@ -60,7 +78,7 @@ function ControlRendimientoCosechayFrass() {
   const [globalFilter, setGlobalFilter] = useState("");
   const [submitted, setSubmitted] = useState(false);
   const [registroDialog, setRegistroDialog] = useState(false);
-  const [outOfRange, setOutOfRange] = useState(false); // Estado para controlar si algún valor está fuera de rango
+  const [outOfRange, setOutOfRange] = useState(false);
   const navigate = useNavigate();
 
   //Errores de validación
@@ -69,7 +87,7 @@ function ControlRendimientoCosechayFrass() {
   const [erroresValidacion, setErroresValidacion] = useState({
     cant_cajas_cosechadas: false,
     kg_larva_fresca: false,
-    cant_cajas_desechadas: false, //Si es mayor a 0
+    cant_cajas_desechadas: false,
     kg_total_frass: false,
     kg_material_grueso: false,
   });
@@ -88,30 +106,17 @@ function ControlRendimientoCosechayFrass() {
     globalFilter: null,
   });
 
-  //Inicio de Sorting y Filtro global por lazy load
-  // Manejar sorting
-  const onSort = useCallback((event) => {
-    setLazyParams((prev) => ({
-      ...prev,
-      sortField: event.sortField,
-      sortOrder: event.sortOrder,
-    }));
-  }, []);
-
-  // Manejar filtro global
-  const onFilter = useCallback((e) => {
-    const value = e.target.value;
-    setGlobalFilter(value);
-    setLazyParams((prev) => ({
-      ...prev,
-      globalFilter: value,
-      first: 0,
-    }));
-  }, []);
-  //FIN de Sorting y Filtro global por lazy load
+  // Turnos disponibles
+  const turnosDisponibles = [
+    { label: "Turno 1", value: "1" },
+    { label: "Turno 2", value: "2" },
+    { label: "Turno 3", value: "3" },
+  ];
 
   const tiposControl = ["Prueba", "Control"];
   const tiposProduccion = ["Produccion", "Hatchery"];
+
+  
 
   const fetchRegistros = useCallback(
     async (start = 0, limit = 10) => {
@@ -121,17 +126,13 @@ function ControlRendimientoCosechayFrass() {
           .from("Control_Rendimiento_CosechayFrass")
           .select("*", { count: "exact" })
           .range(start, start + limit - 1);
-        // Ordenar por defecto por fecha descendente (más nuevos primero)
-        // .order("fec_registro", { ascending: false });
 
-        // Aplicar sorting
         if (lazyParams.sortField) {
           query = query.order(lazyParams.sortField, {
             ascending: lazyParams.sortOrder === 1,
           });
         }
 
-        // Aplicar filtro global
         if (lazyParams.globalFilter) {
           query = query.or(
             `numero_lote.ilike.%${lazyParams.globalFilter}%,fec_registro.ilike.%${lazyParams.globalFilter}%`
@@ -154,12 +155,12 @@ function ControlRendimientoCosechayFrass() {
     },
     [lazyParams.sortField, lazyParams.sortOrder, lazyParams.globalFilter]
   );
+
   const fetchLotes = useCallback(async () => {
     try {
       const { data, error } = await supabase
         .from("Lotes")
-        .select()
-        .ilike("etapa_actual", "%Cosecha%"); // Busca "Cosecha" en cualquier posición del string
+        .select();
 
       if (error) throw error;
       setLotes(data || []);
@@ -179,7 +180,7 @@ function ControlRendimientoCosechayFrass() {
     lazyParams.sortOrder,
     lazyParams.globalFilter,
   ]);
-  // Manejar cambio de página y lazy loading
+
   const onPage = useCallback(
     (event) => {
       setLazyParams({
@@ -191,6 +192,7 @@ function ControlRendimientoCosechayFrass() {
     },
     [lazyParams]
   );
+
   const convertirFecha = (fecha) =>
     fecha ? fecha.split("-").reverse().join("/") : "";
 
@@ -218,19 +220,17 @@ function ControlRendimientoCosechayFrass() {
   const saveRegistro = useCallback(async () => {
     setSubmitted(true);
 
-    // Validar los campos con el nuevo rango dinámico
     const isCantCajasCosechadasInvalido =
       registro.cant_cajas_cosechadas < 0 ||
       registro.cant_cajas_cosechadas > 5000;
     const isKgLarvaFrescaInvalido =
       registro.kg_larva_fresca < 0 || registro.kg_larva_fresca > 12000;
-    const isCantCajasDesechadasInvalido = registro.cant_cajas_desechadas < 0; // Corregido: debe ser < 0
+    const isCantCajasDesechadasInvalido = registro.cant_cajas_desechadas < 0;
     const isKgTotalFrassInvalido =
       registro.kg_total_frass < 0 || registro.kg_total_frass > 6000;
     const isKgMaterialGruesoInvalido =
       registro.kg_material_grueso < 0 || registro.kg_material_grueso > 6000;
 
-    // Actualizar el estado de errores
     const erroresValidacion = {
       cant_cajas_cosechadas: isCantCajasCosechadasInvalido,
       kg_larva_fresca: isKgLarvaFrescaInvalido,
@@ -239,33 +239,10 @@ function ControlRendimientoCosechayFrass() {
       kg_material_grueso: isKgMaterialGruesoInvalido,
     };
 
-    // Verificar si algún valor está fuera de rango
     const valoresFueraDeRango = Object.values(erroresValidacion).some(
       (error) => error
     );
 
-    // Validación principal
-    /*
-    if (
-
-      !registro.fec_cosecha ||
-      !registro.cant_cajas_cosechadas ||
-      !registro.kg_larva_fresca ||
-      !registro.cant_cajas_desechadas ||
-      !registro.kg_total_frass ||
-      !registro.kg_material_grueso ||
-      !registro.tipo_control ||
-      !registro.tipo_produccion 
-    ) {
-      toast.current.show({
-        severity: "error",
-        summary: "Error",
-        detail: "Llena todos los campos obligatorios.",
-        life: 3000,
-      });
-      return;
-    }*/
-    // Mostrar mensajes de error específicos para cada campo fuera de rango
     if (erroresValidacion.cant_cajas_cosechadas) {
       toast.current.show({
         severity: "error",
@@ -273,7 +250,7 @@ function ControlRendimientoCosechayFrass() {
         detail: `Cajas Cosechadas debe estar entre 0 y 5000`,
         life: 3000,
       });
-      return; // Detener el proceso si hay un error
+      return;
     }
 
     if (erroresValidacion.kg_larva_fresca) {
@@ -283,7 +260,7 @@ function ControlRendimientoCosechayFrass() {
         detail: "Larva Fresca debe estar entre 0 y 12000 KG",
         life: 3000,
       });
-      return; // Detener el proceso si hay un error
+      return;
     }
 
     if (erroresValidacion.cant_cajas_desechadas) {
@@ -293,7 +270,7 @@ function ControlRendimientoCosechayFrass() {
         detail: "Cajas Desechadas no puede ser menor que 0",
         life: 3000,
       });
-      return; // Detener el proceso si hay un error
+      return;
     }
 
     if (erroresValidacion.kg_total_frass) {
@@ -303,20 +280,19 @@ function ControlRendimientoCosechayFrass() {
         detail: "Frass Fino Total debe estar entre 0 y 6000 KG",
         life: 3000,
       });
-      return; // Detener el proceso si hay un error
+      return;
     }
 
     if (erroresValidacion.kg_material_grueso) {
       toast.current.show({
         severity: "error",
         summary: "Error",
-        detail: "Material Grueso debe estar entre 0 y 6000 KG",
+        detail: "Material Grueso debe estar entre 0 and 6000 KG",
         life: 3000,
       });
-      return; // Detener el proceso si hay un error
+      return;
     }
 
-    // Si algún valor está fuera de rango y no hay observaciones, mostrar error
     if (valoresFueraDeRango && !registro.observaciones) {
       const camposInvalidos = Object.keys(erroresValidacion)
         .filter((key) => erroresValidacion[key])
@@ -344,14 +320,13 @@ function ControlRendimientoCosechayFrass() {
         detail: `Debe agregar observaciones. Campos inválidos: ${camposInvalidos}`,
         life: 3000,
       });
-      return; // Detener el proceso si hay un error
+      return;
     }
 
     try {
       const currentDate = formatDateTime(new Date(), "DD/MM/YYYY");
       const currentTime = formatDateTime(new Date(), "hh:mm A");
 
-      // Verificar si el lote seleccionado existe
       const { data: loteExistente, error: loteError } = await supabase
         .from("Lotes")
         .select("cant_cajas_cosecha")
@@ -368,23 +343,10 @@ function ControlRendimientoCosechayFrass() {
         return;
       }
 
-      // Sumar cajas cosechadas y desechadas
       const totalCajasProcesadas =
         parseInt(registro.cant_cajas_cosechadas, 10) +
         parseInt(registro.cant_cajas_desechadas, 10);
 
-      // Verificar si hay suficientes cajas para cosechar
-      if (totalCajasProcesadas > loteExistente.cant_cajas_cosecha) {
-        toast.current.show({
-          severity: "error",
-          summary: "Error",
-          detail: `No hay suficientes cajas para cosechar. Disponibles: ${loteExistente.cant_cajas_cosecha}`,
-          life: 3000,
-        });
-        return;
-      }
-
-      // Actualizar Control_Rendimiento_CosechayFrass
       const { data, error } = await supabase
         .from("Control_Rendimiento_CosechayFrass")
         .insert([
@@ -399,6 +361,8 @@ function ControlRendimientoCosechayFrass() {
             fec_registro: currentDate,
             hor_registro: currentTime,
             observaciones: registro.observaciones,
+            operario: registro.operario,
+            turno: registro.turno,
             tipo_produccion: registro.tipo_produccion,
             tipo_control: registro.tipo_control,
           },
@@ -410,10 +374,7 @@ function ControlRendimientoCosechayFrass() {
           "Error en Supabase: Mirar consola para ver error", error || "Error desconocido al guardar en Supabase"
         );
       }
-      // 
 
-
-      // Actualizar Lotes
       const nuevasCajasCosecha =
         loteExistente.cant_cajas_cosecha - totalCajasProcesadas;
 
@@ -422,7 +383,6 @@ function ControlRendimientoCosechayFrass() {
         .update({
           cant_cajas_cosecha: nuevasCajasCosecha,
           fecha_cosecha: currentDate,
-
         })
         .eq("base_numero_lote", registro.base_numero_lote);
 
@@ -440,7 +400,6 @@ function ControlRendimientoCosechayFrass() {
         life: 3000,
       });
 
-      // Limpia el estado
       setRegistro(emptyRegister);
       setRegistroDialog(false);
       setSubmitted(false);
@@ -455,13 +414,12 @@ function ControlRendimientoCosechayFrass() {
     }
   }, [registro, lotes, convertirFecha]);
 
-const handleKeyPress = (e) => {
+  const handleKeyPress = (e) => {
     const invalidChars = ['e', 'E', '+', '-'];
     if (invalidChars.includes(e.key)) {
       e.preventDefault();
     }
     
-    // Si es un campo decimal, permite un solo punto
     if (e.key === '.' && e.target.value.includes('.')) {
       e.preventDefault();
     }
@@ -505,7 +463,7 @@ const handleKeyPress = (e) => {
     return (
       <InputText
         type="number"
-onKeyDown={handleKeyPress}
+        onKeyDown={handleKeyPress}
         value={options.value}
         onChange={(e) => options.editorCallback(e.target.value)}
       />
@@ -528,14 +486,12 @@ onKeyDown={handleKeyPress}
 
   const onRowEditComplete = async ({ newData, data: oldData }) => {
     try {
-      // Calcular diferencia en cajas cosechadas y desechadas
       const diferenciaCosechadas =
         newData.cant_cajas_cosechadas - oldData.cant_cajas_cosechadas;
       const diferenciaDesechadas =
         newData.cant_cajas_desechadas - oldData.cant_cajas_desechadas;
       const diferenciaTotal = diferenciaCosechadas + diferenciaDesechadas;
 
-      // Obtener cantidad actual del lote
       const { data: lote, error: loteError } = await supabase
         .from("Lotes")
         .select("cant_cajas_cosecha")
@@ -544,21 +500,18 @@ onKeyDown={handleKeyPress}
 
       if (loteError) throw loteError;
 
-      // Calcular nuevo valor
       const nuevasCajasCosecha = lote.cant_cajas_cosecha - diferenciaTotal;
 
       if (nuevasCajasCosecha < 0) {
         throw new Error("La cantidad de cajas no puede ser negativa");
       }
 
-      // Verificar si hay suficientes cajas para cosechar
       if (diferenciaTotal > lote.cant_cajas_cosecha) {
         throw new Error(
           `No hay suficientes cajas para cosechar. Disponibles: ${lote.cant_cajas_cosecha}`
         );
       }
 
-      // Actualizar Control_Rendimiento_CosechayFrass
       const { error: updateError } = await supabase
         .from("Control_Rendimiento_CosechayFrass")
         .update(newData)
@@ -566,7 +519,6 @@ onKeyDown={handleKeyPress}
 
       if (updateError) throw updateError;
 
-      // Actualizar Lotes
       const { error: loteUpdateError } = await supabase
         .from("Lotes")
         .update({
@@ -577,7 +529,6 @@ onKeyDown={handleKeyPress}
 
       if (loteUpdateError) throw loteUpdateError;
 
-      // Actualizar estado local
       setRegistros((prev) =>
         prev.map((item) => (item.id === newData.id ? newData : item))
       );
@@ -637,16 +588,18 @@ onKeyDown={handleKeyPress}
     );
   };
 
+ 
+
   const header = (
-       <div className="flex flex-wrap gap-2 align-items-center justify-content-between">
-         <InputText
-           type="search"
-           value={globalFilter}
-           onInput={onFilter}
-           placeholder="Buscar por Lote u Fecha de Registro"
-         />
-       </div>
-     );
+    <div className="flex flex-wrap gap-2 align-items-center justify-content-between">
+      <InputText
+        type="search"
+        value={globalFilter}
+        onChange={onFilter}  // Cambiado de onInput a onChange
+        placeholder="Buscar por Lote u Fecha de Registro"
+      />
+    </div>
+  );
 
   const openNew = () => {
     setRegistro(emptyRegister);
@@ -681,6 +634,8 @@ onKeyDown={handleKeyPress}
     { field: "cant_cajas_desechadas", header: "Cajas Desechadas" },
     { field: "kg_total_frass", header: "Total Frass (KG)" },
     { field: "kg_material_grueso", header: "Material Grueso (KG)" },
+    { field: "operario", header: "Operario" },
+    { field: "turno", header: "Turno" },
     { field: "observaciones", header: "Observaciones" },
     { field: "registrado", header: "Registrado" },
   ];
@@ -848,7 +803,6 @@ onKeyDown={handleKeyPress}
             <Column
               field="numero_lote"
               header="Número Lote"
-              // editor={(options) => textEditor(options)}
               sortable
               style={{ minWidth: "10rem" }}
             ></Column>
@@ -870,7 +824,6 @@ onKeyDown={handleKeyPress}
               editor={(options) => textEditor(options)}
               sortable
             />
-            
             <Column
               field="cant_cajas_cosechadas"
               header="Cajas Cosechadas"
@@ -901,7 +854,18 @@ onKeyDown={handleKeyPress}
               sortable
               editor={(options) => floatEditor(options)}
             />
-            
+            <Column
+              field="operario"
+              header="Operario"
+              sortable
+              editor={(options) => textEditor(options)}
+            />
+            <Column
+              field="turno"
+              header="Turno"
+              sortable
+              editor={(options) => textEditor(options)}
+            />
             <Column
               field="observaciones"
               header="Observaciones"
@@ -946,7 +910,6 @@ onKeyDown={handleKeyPress}
               );
 
               if (loteSeleccionado) {
-                // Obtener datos actualizados del lote desde Supabase
                 const { data: loteActual, error } = await supabase
                   .from("Lotes")
                   .select("cant_cajas_cosecha")
@@ -999,7 +962,6 @@ onKeyDown={handleKeyPress}
           <br />
           <label htmlFor="kg_larva_fresca" className="font-bold">
             Larva Fresca Estandar (KG) (0 - 12000){" "}
-            
             {erroresValidacion.kg_larva_fresca && (
               <small className="p-error">
                 Kg Larva Fresca fuera de rango 0 a 12000.
@@ -1008,7 +970,7 @@ onKeyDown={handleKeyPress}
           </label>
           <InputText
             type="number"
-onKeyDown={handleKeyPress}
+            onKeyDown={handleKeyPress}
             id="kg_larva_fresca"
             value={registro.kg_larva_fresca}
             onChange={(e) => onInputChange(e, "kg_larva_fresca")}
@@ -1017,7 +979,6 @@ onKeyDown={handleKeyPress}
           <br />
           <label htmlFor="cant_cajas_desechadas" className="font-bold">
             Cajas Desechadas (=0){" "}
-            
             {erroresValidacion.cant_cajas_desechadas && (
               <small className="p-error">
                 Kg Larva Fresca fuera de rango 0 a 12000.
@@ -1026,7 +987,7 @@ onKeyDown={handleKeyPress}
           </label>
           <InputText
             type="number"
-onKeyDown={handleKeyPress}
+            onKeyDown={handleKeyPress}
             id="cant_cajas_desechadas"
             value={registro.cant_cajas_desechadas}
             onChange={(e) => onInputChange(e, "cant_cajas_desechadas")}
@@ -1035,7 +996,6 @@ onKeyDown={handleKeyPress}
           <br />
           <label htmlFor="kg_total_frass" className="font-bold">
             Frass Fino Total (KG) (0 - 6000){" "}
-            
             {erroresValidacion.kg_total_frass && (
               <small className="p-error">
                 Kg Total Frass Fuera de rango 0 a 6000.
@@ -1044,7 +1004,7 @@ onKeyDown={handleKeyPress}
           </label>
           <InputText
             type="number"
-onKeyDown={handleKeyPress}
+            onKeyDown={handleKeyPress}
             id="kg_total_frass"
             value={registro.kg_total_frass}
             onChange={(e) => onInputChange(e, "kg_total_frass")}
@@ -1053,7 +1013,6 @@ onKeyDown={handleKeyPress}
           <br />
           <label htmlFor="kg_material_grueso" className="font-bold">
             Total Material Grueso (KG) (0 - 6000){" "}
-            
             {erroresValidacion.kg_material_grueso && (
               <small className="p-error">
                 Kg Material Grueso Fuera de rango 0 a 6000.
@@ -1062,7 +1021,7 @@ onKeyDown={handleKeyPress}
           </label>
           <InputText
             type="number"
-onKeyDown={handleKeyPress}
+            onKeyDown={handleKeyPress}
             id="kg_material_grueso"
             value={registro.kg_material_grueso}
             onChange={(e) => onInputChange(e, "kg_material_grueso")}
@@ -1099,8 +1058,38 @@ onKeyDown={handleKeyPress}
             placeholder="Selecciona un tipo"
             required
           />
+          <label htmlFor="operario" className="font-bold">
+            Operario{" "}
+            {submitted && !registro.operario && (
+              <small className="p-error">Requerido.</small>
+            )}
+          </label>
+          <InputText
+            id="operario"
+            value={registro.operario}
+            onChange={(e) => onInputChange(e, "operario")}
+            required
+          />
           
           <br />
+          
+          <label htmlFor="turno" className="font-bold">
+            Turno{" "}
+            {submitted && !registro.turno && (
+              <small className="p-error">Requerido.</small>
+            )}
+          </label>
+          <Dropdown
+            id="turno"
+            value={registro.turno}
+            options={turnosDisponibles}
+            onChange={(e) => onInputChange(e, "turno")}
+            placeholder="Seleccione el turno"
+            required
+          />
+          
+          <br />
+          
           <label htmlFor="observaciones" className="font-bold">
             Observaciones{" "}
             {observacionesObligatorio && (
