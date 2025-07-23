@@ -35,8 +35,9 @@ import Horno from './pages/Horno/PagesHorno.jsx';
 import ControlRendimientoSecadoHornoMultilevel from './pages/Horno/Registros/PagesControlRendimientoSecadoHornoMultilevel.jsx';
 import ControlRendimientoSecadoHornoMicroondas from './pages/Horno/Registros/PagesControlRendimientoSecadoHornoMicroondas.jsx';
 import ControlOperativoHornoMultilevel from './pages/Horno/Registros/PagesControlOperativoHornoMultilevel.jsx';
-import ControlRendimientoProductoTerminado from './pages/Horno/Registros/PagesControlRendimientoProductoTerminado.jsx'
-import ControlReempaque from './pages/Horno/Registros/PagesControlReempaque.jsx'
+import ControlRendimientoProductoTerminado from './pages/Horno/Registros/PagesControlRendimientoProductoTerminado.jsx';
+import ControlReempaque from './pages/Horno/Registros/PagesControlReempaque.jsx';
+import ControlLarvaMolida from './pages/Horno/Registros/PagesControlLarvaMolida.jsx';
 
 //imports de paginas de Calidad
 import Calidad from './pages/Calidad/PagesCalidad.jsx';
@@ -67,6 +68,7 @@ import VisualizarKPIs from './pages/Visualizar/Registros/PagesVisualizarKPIs';
 import VisualizarLotes from './pages/Visualizar/Registros/PagesVisualizarLotes';
 import VisualizarSKUs from './pages/Visualizar/Registros/PagesVisuazlizarSKUs';
 import FlashReport from './pages/Visualizar/Registros/PagesFlashReport';
+import PagesControlLarvaMolida from './pages/Horno/Registros/PagesControlLarvaMolida.jsx';
 
 
 const Layout = () => {
@@ -202,6 +204,10 @@ const router = createBrowserRouter([{
       {
         path: `ControlReempaque`,
         element: <ControlReempaque />,
+      },
+      {
+        path: `ControlLarvaMolida`,
+        element: <PagesControlLarvaMolida />,
       },
     ],
   },

@@ -51,6 +51,13 @@ function Horno() {
       ruta: '/Horno/ControlReempaque',
       cols: 1,
       className: 'boton-grid oven-button'
+    },
+    {
+      titulo: 'Control Larva Molida',
+      // subtitulo: 'Control Larva Molida',
+      ruta: '/Horno/ControlLarvaMolida',
+      cols: 2,
+      className: 'boton-grid oven-button'
     }
   ];
 

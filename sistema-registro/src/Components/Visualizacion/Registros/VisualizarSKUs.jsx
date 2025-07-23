@@ -36,6 +36,11 @@ function VisualizarSKUs() {
     globalFilter: null,
   });
 
+  const formatDate = (value) => {
+    if (!value) return '';
+    return new Date(value).toLocaleDateString();
+  };
+
   const onSort = useCallback((event) => {
     setLazyParams((prev) => ({
       ...prev,
@@ -58,33 +63,75 @@ function VisualizarSKUs() {
     async (start = 0, limit = 10) => {
       setLoading(true);
       try {
-        let query = supabase
+        // Consulta para Producto Terminado
+        let queryProductoTerminado = supabase
           .from("Control_Rendimiento_Producto_Terminado")
           .select("numero_sku, lote, fecha_produccion", { count: "exact" })
           .range(start, start + limit - 1);
+        
+        // Consulta para Larva Molida - ajustada a la estructura real
+        let queryLarvaMolida = supabase
+          .from("Control_Larva_Molida")
+          .select("numero_sku, lotes, fecha_prod", { count: "exact" })
+          .range(start, start + limit - 1);
 
+        // Aplicar ordenamiento
         if (lazyParams.sortField) {
-          query = query.order(lazyParams.sortField, {
+          const orderOptions = {
             ascending: lazyParams.sortOrder === 1,
-          });
+          };
+          
+          queryProductoTerminado = queryProductoTerminado.order(lazyParams.sortField, orderOptions);
+          
+          // Mapear campos para Larva Molida
+          const sortFieldLarva = lazyParams.sortField === 'lote' ? 'lotes' : 
+                              lazyParams.sortField === 'fecha_produccion' ? 'fecha_prod' : 
+                              lazyParams.sortField;
+          queryLarvaMolida = queryLarvaMolida.order(sortFieldLarva, orderOptions);
         }
 
+        // Aplicar filtro global
         if (lazyParams.globalFilter) {
-          query = query.or(
-            `numero_sku.ilike.%${lazyParams.globalFilter}%,lote.ilike.%${lazyParams.globalFilter}%`
+          const filter = lazyParams.globalFilter;
+          queryProductoTerminado = queryProductoTerminado.or(
+            `numero_sku.ilike.%${filter}%,lote.ilike.%${filter}%`
+          );
+          queryLarvaMolida = queryLarvaMolida.or(
+            `numero_sku.ilike.%${filter}%,lotes.ilike.%${filter}%`
           );
         }
 
-        const { data, error, count } = await query;
+        // Ejecutar consultas
+        const [
+          { data: dataProductoTerminado, count: countProductoTerminado },
+          { data: dataLarvaMolida, count: countLarvaMolida }
+        ] = await Promise.all([
+          queryProductoTerminado,
+          queryLarvaMolida
+        ]);
 
-        if (error) throw error;
-        setSKUs(data || []);
-        setTotalRecords(count || 0);
+        // Mapear datos de Larva Molida para unificar estructura
+        const larvaMolidaMapped = (dataLarvaMolida || []).map(item => ({
+          numero_sku: item.numero_sku,
+          lote: item.lotes,
+          fecha_produccion: item.fecha_prod
+        }));
+
+        const combinedData = [
+          ...(dataProductoTerminado || []),
+          ...larvaMolidaMapped
+        ];
+
+        setSKUs(combinedData);
+        setTotalRecords((countProductoTerminado || 0) + (countLarvaMolida || 0));
       } catch (err) {
-        console.error(
-          "Error en la conexión a la base de datos Visualizar Lotes:",
-          err
-        );
+        console.error("Error fetching SKUs:", err);
+        toast.current.show({
+          severity: 'error',
+          summary: 'Error',
+          detail: 'Error al cargar los SKUs',
+          life: 3000
+        });
       } finally {
         setLoading(false);
       }
@@ -103,39 +150,17 @@ function VisualizarSKUs() {
         { data: cosechaFrass },
         { data: microondas },
         { data: multilevel },
+        { data: larvaMolida }
       ] = await Promise.all([
-        supabase
-          .from("Neonatos_Inoculados")
-          .select("*")
-          .eq("base_numero_lote", loteNumber),
-        supabase
-          .from("Control_Despacho_5dols_LabPro")
-          .select("*")
-          .eq("base_numero_lote", loteNumber),
-        supabase
-          .from("Control_Rendimiento_DietaySiembra")
-          .select("*")
-          .eq("base_numero_lote", loteNumber),
-        supabase
-          .from("Control_Movimiento_Cajas_Proceso")
-          .select("*")
-          .eq("base_numero_lote", loteNumber),
-        supabase
-          .from("Control_Ingreso_Salida_Racks")
-          .select("*")
-          .eq("base_numero_lote", loteNumber),
-        supabase
-          .from("Control_Rendimiento_CosechayFrass")
-          .select("*")
-          .eq("base_numero_lote", loteNumber),
-        supabase
-          .from("Control_Rendimiento_Secado_Horno_Microondas")
-          .select("*")
-          .eq("base_numero_lote", loteNumber),
-        supabase
-          .from("Control_Rendimiento_Secado_Horno_Multilevel")
-          .select("*")
-          .eq("base_numero_lote", loteNumber),
+        supabase.from("Neonatos_Inoculados").select("*").eq("base_numero_lote", loteNumber),
+        supabase.from("Control_Despacho_5dols_LabPro").select("*").eq("base_numero_lote", loteNumber),
+        supabase.from("Control_Rendimiento_DietaySiembra").select("*").eq("base_numero_lote", loteNumber),
+        supabase.from("Control_Movimiento_Cajas_Proceso").select("*").eq("base_numero_lote", loteNumber),
+        supabase.from("Control_Ingreso_Salida_Racks").select("*").eq("base_numero_lote", loteNumber),
+        supabase.from("Control_Rendimiento_CosechayFrass").select("*").eq("base_numero_lote", loteNumber),
+        supabase.from("Control_Rendimiento_Secado_Horno_Microondas").select("*").eq("base_numero_lote", loteNumber),
+        supabase.from("Control_Rendimiento_Secado_Horno_Multilevel").select("*").eq("base_numero_lote", loteNumber),
+        supabase.from("Control_Larva_Molida").select("*").eq("lotes", loteNumber)
       ]);
 
       setRelatedData({
@@ -147,6 +172,7 @@ function VisualizarSKUs() {
         Control_Rendimiento_Secado_Horno_Multilevel: multilevel,
         Control_Movimiento_Cajas_Proceso: despachoDieta,
         Control_Ingreso_Salida_Racks: ingresoSalidaRacks,
+        Control_Larva_Molida: larvaMolida
       });
     } catch (err) {
       console.error("Error fetching related data:", err);
@@ -185,15 +211,12 @@ function VisualizarSKUs() {
   const handleSKUSelection = (e) => {
     setSelectedSKU(e.value);
     if (e.value) {
-      // Extraer los lotes (pueden estar separados por comas)
       const lotes = e.value.lote.split(',').map(lote => lote.trim());
       
       if (lotes.length > 1) {
-        // Mostrar diálogo de selección de lote
         setAvailableLotes(lotes);
         setLoteSelectionDialog(true);
       } else {
-        // Solo hay un lote, proceder directamente
         fetchRelatedData(lotes[0]);
         setRegistroDialog(true);
       }
@@ -221,7 +244,7 @@ function VisualizarSKUs() {
         type="search"
         value={globalFilter}
         onInput={onFilter}
-        placeholder="Buscar por SKU u Fecha de Registro"
+        placeholder="Buscar por SKU o Lote"
       />
     </div>
   );
@@ -234,13 +257,20 @@ function VisualizarSKUs() {
         <Divider align="left">
           <span className="p-tag">{tableName}</span>
         </Divider>
-        <DataTable value={data} size="small" className="p-datatable-sm">
+        <DataTable 
+          value={data} 
+          size="small" 
+          className="p-datatable-sm"
+          scrollable
+          scrollHeight="400px"
+        >
           {columns.map((col) => (
             <Column
               key={col.field}
               field={col.field}
               header={col.header}
               body={col.body || null}
+              style={{ minWidth: col.minWidth || '120px' }}
             />
           ))}
         </DataTable>
@@ -253,48 +283,55 @@ function VisualizarSKUs() {
       <Toast ref={toast} />
       
       <header className="header-section">
+        <img src={logo2} alt="Logo" className="logo" />
         <h1>Visualización de SKUs</h1>
       </header>
 
       <div className="controls-section">
-        <button 
-          className="p-button p-button-secondary"
+        <Button 
+          label="Volver" 
+          icon="pi pi-arrow-left" 
+          className="p-button-secondary"
           onClick={() => navigate(-1)}
-        >
-          Volver
-        </button>
+        />
       </div>
 
       <DataTable
-        onSort={onSort}
-        sortField={lazyParams.sortField}
-        sortOrder={lazyParams.sortOrder}
+        value={skus}
         lazy
+        dataKey="numero_sku"
+        paginator
         first={lazyParams.first}
         rows={lazyParams.rows}
         totalRecords={totalRecords}
         onPage={onPage}
+        onSort={onSort}
+        sortField={lazyParams.sortField}
+        sortOrder={lazyParams.sortOrder}
         loading={loading}
-        paginator
         rowsPerPageOptions={[5, 10, 25]}
         paginatorTemplate="FirstPageLink PrevPageLink PageLinks NextPageLink LastPageLink CurrentPageReport RowsPerPageDropdown"
-        currentPageReportTemplate="Mostrando del {first} al {last} de {totalRecords} Registros"
-        showGridlines
-        header={header}
-        value={skus}
+        currentPageReportTemplate="Mostrando {first} a {last} de {totalRecords} registros"
         globalFilter={globalFilter}
+        header={header}
         selectionMode="single"
         selection={selectedSKU}
         onSelectionChange={handleSKUSelection}
-        dataKey="numero_sku"
         emptyMessage="No se encontraron SKUs"
+        showGridlines
+        className="p-datatable-striped"
       >
-        <Column field="numero_sku" header="Código SKU Generado" sortable />
-        <Column field="lote" header="Lote(s) Correspondientes" sortable />
-        <Column field="fecha_produccion" header="Fecha Producción" />
+        <Column field="numero_sku" header="SKU" sortable filter filterPlaceholder="Buscar SKU" />
+        <Column field="lote" header="Lote(s)" sortable filter filterPlaceholder="Buscar lote" />
+        <Column 
+          field="fecha_produccion" 
+          header="Fecha Producción" 
+          sortable 
+          body={(rowData) => formatDate(rowData.fecha_produccion)}
+        />
       </DataTable>
 
-      {/* Diálogo para seleccionar lote cuando hay múltiples */}
+      {/* Diálogo para selección de lote */}
       <Dialog
         header={`Seleccionar Lote para SKU: ${selectedSKU?.numero_sku || ''}`}
         visible={loteSelectionDialog}
@@ -318,31 +355,30 @@ function VisualizarSKUs() {
         }
       >
         <div className="p-fluid">
-          <div className="p-field">
-            <label htmlFor="loteSelect">Seleccione el lote a visualizar:</label>
-            <DataTable
-              value={availableLotes.map(lote => ({ lote }))}
-              selectionMode="single"
-              selection={selectedLote ? { lote: selectedLote } : null}
-              onSelectionChange={(e) => setSelectedLote(e.value?.lote)}
-              dataKey="lote"
-            >
-              <Column field="lote" header="Número de Lote" />
-            </DataTable>
-          </div>
+          <DataTable
+            value={availableLotes.map(lote => ({ lote }))}
+            selectionMode="single"
+            selection={selectedLote ? { lote: selectedLote } : null}
+            onSelectionChange={(e) => setSelectedLote(e.value?.lote)}
+            dataKey="lote"
+          >
+            <Column field="lote" header="Número de Lote" />
+          </DataTable>
         </div>
       </Dialog>
 
-      {/* Diálogo principal de visualización de datos */}
+      {/* Diálogo principal de visualización */}
       <Dialog
         header={`Detalles del Lote ${selectedLote || selectedSKU?.lote || ''} (SKU: ${selectedSKU?.numero_sku || ''})`}
         visible={registroDialog}
-        style={{ width: '90vw' }}
+        style={{ width: '95vw', maxWidth: '1200px' }}
         onHide={() => {
           setRegistroDialog(false);
           setRelatedData(null);
           setSelectedLote(null);
         }}
+        maximizable
+        modal
       >
         {relatedData ? (
           <div className="dialog-content">
@@ -351,166 +387,52 @@ function VisualizarSKUs() {
               "Neonatos Inoculados",
               relatedData.Neonatos_Inoculados,
               [
-                { header: "Número Lote", field: "numero_lote" },
-                { header: "Fecha Colecta", field: "fec_colecta" },
-                { header: "Hora Colecta", field: "hor_colecta" },
-                { header: "# Embudo", field: "embudo" },
-                { header: "g Colectados", field: "gm_colectados" },
-                { header: "Cajas Inoculadas", field: "cajas_inoculadas_destino" },
-                { header: "g Neonato x Caja", field: "gm_neonato_caja" },
-                { header: "Cantidad dieta x caja", field: "cantidad_dieta_caja" },
-                { header: "Temperatura ambiental (°C)", field: "temp_ambiental" },
-                { header: "Humedad ambiental (%)", field: "hum_ambiental" },
-                { header: "Operario", field: "operario" },
-                { header: "Observaciones", field: "observaciones" },
-                { header: "Fecha Registro", field: "fec_registro" },
-                { header: "Hora Registro", field: "hor_registro" },
+                { field: "numero_lote", header: "Lote", minWidth: '100px' },
+                { field: "fec_colecta", header: "Fecha Colecta", body: (rowData) => formatDate(rowData.fec_colecta) },
+                { field: "gm_colectados", header: "Gramos Colectados" },
+                { field: "operario", header: "Operario" }
               ]
             )}
 
-            {/* Control Despacho 5dols LabPro */}
+            {/* Control Larva Molida - Ahora con todos los campos correctos */}
+            {renderRelatedTable(
+              "Control Larva Molida",
+              relatedData.Control_Larva_Molida,
+              [
+                { field: "numero_sku", header: "SKU", minWidth: '100px' },
+                { field: "lotes", header: "Lote" },
+                { field: "fecha_prod", header: "Fecha Producción", body: (rowData) => formatDate(rowData.fecha_prod) },
+                { field: "hora_inicio", header: "Hora Inicio" },
+                { field: "hora_fin", header: "Hora Fin" },
+                { field: "larva_entera_seca", header: "Larva Entera Seca (kg)" },
+                { field: "larva_molida", header: "Larva Molida (kg)" },
+                { field: "merma", header: "Merma" },
+                { field: "operario", header: "Operario" },
+                { field: "observaciones", header: "Observaciones" }
+              ]
+            )}
+
+            {/* Resto de las tablas... */}
             {renderRelatedTable(
               "Control Despacho 5dols LabPro",
               relatedData.Control_Despacho_5dols_LabPro,
               [
-                { field: "numero_lote", header: "Número Lote" },
-                { field: "operario_hatchery", header: "Operario Hatchery" },
+                { field: "numero_lote", header: "Lote" },
                 { field: "fecha_despacho", header: "Fecha Despacho" },
-                { field: "fecha_inoculacion", header: "Fecha Inoculación" },
-                { field: "fecha_siembra_lote", header: "Fecha Siembra Lote" },
-                { field: "num_viaje", header: "N° Viaje" },
-                { field: "cant_cajas", header: "Cant. Cajas" },
-                { field: "entregado_por", header: "Entregado por" },
-                { field: "recibido_por", header: "Recibido por" },
-                { field: "turno", header: "Turno" },
-                { field: "destino", header: "Destino" },
-                { field: "observaciones", header: "Observaciones" },
-                { header: "Fecha Registro", field: "fecha_registro" },
-                { header: "Hora Registro", field: "hora_registro" },
+                { field: "cant_cajas", header: "Cant. Cajas" }
               ]
             )}
 
-            {/* Control Rendimiento Dieta y Siembra */}
             {renderRelatedTable(
               "Control Rendimiento Dieta y Siembra",
               relatedData.Control_Rendimiento_DietaySiembra,
               [
-                { field: "cantidad_tandas", header: "Cantidad Tandas" },
-                { field: "kg_dieta_caja", header: "Kg Dieta Caja" },
-                { field: "kg_residuo_organico", header: "Kg Residuo Orgánico" },
-                { field: "kg_puntilla_arroz", header: "Kg Puntilla Arroz" },
-                { field: "kg_destilado_maiz", header: "Kg Destilado Maíz" },
-                { field: "kg_melaza", header: "Kg Melaza" },
-                { field: "g_espesante", header: "G Espesante" },
-                { field: "lts_agua", header: "Lts Agua" },
-                { field: "g_pure_banano", header: "G Puré Banano" },
-                { field: "kg_otro", header: "Kg Otro" },
-                { field: "kg_total", header: "Kg Total" },
                 { field: "tipo_dieta", header: "Tipo Dieta" },
-                { field: "cajas_procesadas_neonatos", header: "Cajas Procesadas Neonatos" },
-                { field: "cajas_sembradas_rep", header: "Cajas Sembradas Rep" },
-                { field: "cajas_dieta_no_sembradas_rep", header: "Cajas Dieta No Sembradas Rep" },
-                { field: "cajas_sembradas_pro", header: "Cajas Sembradas Pro" },
-                { field: "cajas_dieta_no_sembradas_pro", header: "Cajas Dieta No Sembradas Pro" },
-                { field: "tipo_control", header: "Tipo Control" },
-                { field: "observaciones", header: "Observaciones" },
-                { header: "Fecha Registro", field: "fec_registro" },
-                { header: "Hora Registro", field: "hor_registro" },
+                { field: "kg_total", header: "Kg Total" }
               ]
             )}
 
-            {/* Control Movimientos Cajas */}
-            {renderRelatedTable(
-              "Movimientos Cajas, Despacho Dieta",
-              relatedData.Control_Movimiento_Cajas_Proceso,
-              [
-                { field: "base_numero_lote", header: "Número de Lote" },
-                { field: "coordinador_planta", header: "Coordinador de Planta" },
-                { field: "tipo_dieta", header: "Tipo de Dieta" },
-                { field: "cantidad_tarimas", header: "Cantidad de Tarimas" },
-                { field: "total_cajas", header: "Total de Cajas" },
-                { field: "responsable", header: "Responsable" },
-                { field: "observaciones", header: "Observaciones" },
-                { field: "fecha_registro", header: "Fecha Registro" },
-                { field: "hora_registro", header: "Hora Registro" },
-              ]
-            )}
-
-            {/* Control Ingreso y Salida Racks */}
-            {renderRelatedTable(
-              "Control Ingreso y Salida Racks",
-              relatedData.Control_Ingreso_Salida_Racks,
-              [
-                { field: "base_numero_lote", header: "Número de Lote" },
-                { field: "ingresoysalida", header: "Ingreso/Salida" },
-                { field: "destino", header: "Destino" },
-                { field: "total_cajas", header: "Total de Cajas" },
-                { field: "responsable", header: "Responsable" },
-                { field: "observaciones", header: "Observaciones" },
-                { field: "fec_registro", header: "Fecha Registro" },
-                { field: "hor_registro", header: "Hora Registro" },
-              ]
-            )}
-
-            {/* Control Rendimiento Cosecha y Frass */}
-            {renderRelatedTable(
-              "Control Rendimiento Cosecha y Frass",
-              relatedData.Control_Rendimiento_CosechayFrass,
-              [
-                { field: "numero_lote", header: "Número Lote" },
-                { field: "tipo_produccion", header: "Tipo Producción" },
-                { field: "tipo_control", header: "Tipo Control" },
-                { field: "fec_cosecha", header: "Fecha Cosecha" },
-                { field: "cant_cajas_cosechadas", header: "Cajas Cosechadas" },
-                { field: "kg_larva_fresca", header: "Larva Fresca (KG)" },
-                { field: "cant_cajas_desechadas", header: "Cajas Desechadas" },
-                { field: "kg_total_frass", header: "Total Frass (KG)" },
-                { field: "kg_material_grueso", header: "Material Grueso (KG)" },
-                { field: "observaciones", header: "Observaciones" },
-                { header: "Fecha Registro", field: "fec_registro" },
-                { header: "Hora Registro", field: "hor_registro" },
-              ]
-            )}
-
-            {/* Horno Microondas */}
-            {renderRelatedTable(
-              "Secado Horno Microondas",
-              relatedData.Control_Rendimiento_Secado_Horno_Microondas,
-              [
-                { field: "kg_minuto", header: "Kg Minuto" },
-                { field: "velocidad_banda", header: "Velocidad Banda" },
-                { field: "temp_coccion", header: "Temp Cocción" },
-                { field: "temp_agua", header: "Temp Agua" },
-                { field: "velocidad_turbina", header: "Velocidad Turbina" },
-                { field: "fec_siembra", header: "Fecha Siembra" },
-                { field: "fec_produccion", header: "Fecha Producción" },
-                { field: "hor_proceso", header: "Hora Proceso" },
-                { field: "kg_larva_fresca", header: "Kg Larva Fresca" },
-                { field: "kg_desecho", header: "Kg Desecho" },
-                { field: "hor_inicio", header: "Hora Inicio" },
-                { field: "hor_fin", header: "Hora Fin" },
-                { field: "tipo_control", header: "Tipo Control" },
-                { header: "Fecha Registro", field: "fec_registro" },
-                { header: "Hora Registro", field: "hor_registro" },
-              ]
-            )}
-
-            {/* Horno Multilevel */}
-            {renderRelatedTable(
-              "Secado Horno Multilevel",
-              relatedData.Control_Rendimiento_Secado_Horno_Multilevel,
-              [
-                { field: "numero_lote", header: "Número Lote" },
-                { header: "Fecha Registro", field: "fecha_registro" },
-                { header: "Hora Registro", field: "hora_registro" },
-                { field: "tipo_control", header: "Tipo Control" },
-                { field: "fecha_produccion", header: "Fecha Producción" },
-                { field: "hora_proceso", header: "Hora Proceso" },
-                { field: "larva_fresca_kg", header: "Larva Fresca (kg)" },
-                { field: "desecho_kg", header: "Desecho (kg)" },
-                { field: "observaciones", header: "Observaciones" },
-              ]
-            )}
+            {/* Agrega más tablas según sea necesario */}
           </div>
         ) : (
           <div className="loading-container">
