@@ -588,7 +588,8 @@ function RecepcionMateriasPrimas() {
       <div className="controltiempos-container">
         <Toast ref={toast} />
         <h1>
-        
+          <img src={logo2} alt="mosca" className="logo2" />
+          Recepción de Materias Primas
         
         </h1>
         <div className="welcome-message">
@@ -828,6 +829,8 @@ function RecepcionMateriasPrimas() {
               header="Resultado"
               editor={(options) => textEditor(options)}
             ></Column>
+            <Column field="fec_registro" header="Fecha Registro"></Column>
+            <Column field="hor_registro" header="Hora Registro"></Column>
             <Column
               field="observaciones"
               header="Observaciones"
@@ -853,9 +856,9 @@ function RecepcionMateriasPrimas() {
         onHide={hideDialog}
       >
         <h3>
-            <strong>INFORMACION PRODUCTO:</strong>
-          </h3>
-          <Divider />
+          <strong>INFORMACION PRODUCTO:</strong>
+        </h3>
+        <Divider />
         <div className="field">
           <label htmlFor="producto" className="font-bold">
             Producto{" "}
@@ -1185,7 +1188,7 @@ function RecepcionMateriasPrimas() {
           />
           <br />
           <label htmlFor="replica" className="font-bold">
-          Replica{" "}
+            Replica{" "}
             {submitted && !registro.replica && (
               <small className="p-error">Requerido.</small>
             )}

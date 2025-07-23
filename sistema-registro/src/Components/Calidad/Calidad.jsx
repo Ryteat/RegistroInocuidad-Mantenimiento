@@ -6,49 +6,88 @@ import logo2 from "../../assets/mosca.png";
 function Calidad() {
   const navigate = useNavigate();
   const location = useLocation();
-
-  // Verifica si estás en la ruta principal de Calidad
   const isRootPath = location.pathname === "/Calidad";
+
+  // Matriz de botones organizados por categorías
+  const botones = [
+    {
+      titulo: 'Control Neonatos',
+      ruta: '/Calidad/ControlNeonatos',
+      cols: 2,
+      className: 'boton-grid calidad-button'
+    },
+    {
+      titulo: 'Control Calidad Cosecha',
+      ruta: '/Calidad/ControlCalidadCosecha',
+      cols: 1,
+      className: 'boton-grid calidad-button'
+    },
+    {
+      titulo: 'Control Calidad Horno Multilevel',
+      ruta: '/Calidad/ControlCalidadHornoMultilevel',
+      cols: 1,
+      className: 'boton-grid calidad-button'
+    },
+    {
+      titulo: 'Control Calidad Dieta-Siembra',
+      ruta: '/Calidad/ControlCalidadDietaSiembra',
+      cols: 1,
+      className: 'boton-grid calidad-button'
+    },
+    {
+      titulo: 'Recepción Materias Primas',
+      ruta: '/Calidad/RecepcionMateriasPrimas',
+      cols: 1,
+      className: 'boton-grid calidad-button'
+    },
+    {
+      titulo: 'Control Calidad Engorde Hatchery',
+      ruta: '/Calidad/ControlCalidadEngordeHatchery',
+      cols: 1,
+      className: 'boton-grid calidad-button'
+    },
+    {
+      titulo: 'Control Calidad Horno Microondas',
+      ruta: '/Calidad/ControlCalidadHornoMicroondas',
+      cols: 1,
+      className: 'boton-grid calidad-button'
+    }
+  ];
 
   return (
     <div className="calidad-container">
       {isRootPath && (
         <>
-          <h1>
-            <img src={logo2} alt="mosca" className="logo2" />
-            Registros de Calidad
-          </h1>
+          <header className="calidad-header">
+            <img src={logo2} alt="Logo" className="logo2" />
+            <h1>Registros de Calidad</h1>
+          </header>
+          
           <div className="welcome-message">
-            <p>Esta es la página de registros de calidad.</p>
+            <p>Sistema de registro para controles de calidad</p>
           </div>
-          <div className="botones">
-            <button
-              onClick={() => navigate("/Calidad/ControlNeonatos")}
-              className="back-button"
-            >
-              1- Control Neonatos
-            </button>
-            <button
-              onClick={() => navigate("/Calidad/ControlCalidadCosecha")}
-              className="back-button"
-            >
-              2- Control de Calidad de Cosecha
-            </button>
-            <button
-              onClick={() => navigate("/Calidad/RecepcionMateriasPrimas")}
-              className="back-button"
-            >
-              3- Recepcion de Materias Priams
-            </button>
+          
+          <div className="grid-botones">
+            {botones.map((boton, index) => (
+              <button
+                key={index}
+                className={`${boton.className} cols-${boton.cols}`}
+                onClick={() => navigate(boton.ruta)}
+              >
+                {boton.titulo}
+              </button>
+            ))}
             
-            <button onClick={() => navigate(-1)} className="back-button">
+            <button
+              className="boton-grid logout-button cols-2"
+              onClick={() => navigate(-1)}
+            >
               Volver al Menú Principal
             </button>
           </div>
         </>
       )}
 
-      {/* Aquí se renderizarán las subrutas */}
       <Outlet />
     </div>
   );

@@ -619,6 +619,8 @@ function Control_Neonatos() {
               header="Encargado Investigación y Desarrollo"
               editor={(options) => textEditor(options)}
             ></Column>
+            <Column field="fecha_registro" header="Fecha Registro"></Column>
+                        <Column field="hora_registro" header="Hora Registro"></Column>
             <Column
               field="observaciones"
               header="Observaciones"

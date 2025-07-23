@@ -1,6 +1,12 @@
-import React, { useEffect, useState, useRef } from "react";
+import React, {
+  useEffect,
+  useState,
+  useRef,
+  useCallback,
+  useMemo,
+} from "react";
 import { useNavigate } from "react-router-dom";
-import "./ControlRendimientoSecadoHornoMultilevel.css"; // Importa el CSS
+import "./ControlRendimientoSecadoHornoMultilevel.css";
 import supabase from "../../../supabaseClient";
 import "primereact/resources/themes/lara-light-indigo/theme.css";
 import "primeicons/primeicons.css";
@@ -17,19 +23,19 @@ import jsPDF from "jspdf";
 import "jspdf-autotable";
 import logo2 from "../../../assets/mosca.png";
 
-
 function ControlRendimientoSecadoHornoMultilevel() {
   let emptyRegister = {
     fecha_registro: "",
     hora_registro: "",
     tipo_control: "",
-    fecha_siembra: "",
     fecha_produccion: "",
     hora_proceso: "",
     larva_fresca_kg: "",
-    cajas_totales: "",
+    larva_seca: "",
     desecho_kg: "",
+    operario: "",
     observaciones: "",
+    base_numero_lote: null,
   };
 
   const [registros, setRegistros] = useState([]);
@@ -37,131 +43,425 @@ function ControlRendimientoSecadoHornoMultilevel() {
   const toast = useRef(null);
   const dt = useRef(null);
   const [selectedRegistros, setSelectedRegistros] = useState([]);
-  const [globalFilter, setGlobalFilter] = useState(null);
+  const [globalFilter, setGlobalFilter] = useState("");
   const [submitted, setSubmitted] = useState(false);
   const [registroDialog, setRegistroDialog] = useState(false);
   const navigate = useNavigate();
+  const [lotes, setLotes] = useState([]);
+  const [observacionesObligatorio, setObservacionesObligatorio] = useState(false);
+  const [isEditing, setIsEditing] = useState(false);
 
+  // Estados para lazy loading
+  const [loading, setLoading] = useState(false);
+  const [totalRecords, setTotalRecords] = useState(0);
+  const [lazyParams, setLazyParams] = useState({
+    first: 0,
+    rows: 10,
+    page: 1,
+    sortField: null,
+    sortOrder: null,
+    filters: {},
+    globalFilter: null,
+  });
 
-  // Función para formatear la fecha en formato día/mes/año
-const formatearFecha = (fecha) => {
-  if (!fecha) return "";
-  const date = new Date(fecha);
-  const dia = String(date.getDate()).padStart(2, "0");
-  const mes = String(date.getMonth() + 1).padStart(2, "0"); // Los meses comienzan en 0
-  const año = date.getFullYear();
-  return `${dia}/${mes}/${año}`;
+  // Funciones para manejo de fechas
+  const formatDateForInput = (dateStr) => {
+    if (!dateStr) return "";
+    const [day, month, year] = dateStr.split("/");
+    return `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`;
   };
 
-  // Función para convertir la fecha de día/mes/año a formato ISO (año-mes-día)
-  const convertirFechaISO = (fecha) => {
-  if (!fecha) return "";
-  const [dia, mes, año] = fecha.split("/");
-  return `${año}-${mes}-${dia}`;
-};
+  const formatDateForDisplay = (dateStr) => {
+    if (!dateStr) return "";
+    const [year, month, day] = dateStr.split("-");
+    return `${day}/${month}/${year}`;
+  };
 
-  // Opciones para el campo "tipo_control"
-  const tiposControl = ["Prueba", "Control"];
+  const formatDateTime = (date, format = "DD-MM-YYYY hh:mm A") => {
+    const fmt = new Intl.DateTimeFormat("en-US", {
+      day: "2-digit",
+      month: "2-digit",
+      year: "numeric",
+      hour: "2-digit",
+      minute: "2-digit",
+      hour12: true,
+    })
+      .formatToParts(date)
+      .reduce((acc, { type, value }) => ({ ...acc, [type]: value }), {});
 
-  const fetchRegistros = async () => {
-    try {
-      const { data, error } = await supabase
-        .from("Control_Rendimiento_Secado_Horno_Multilevel")
-        .select();
-      if (data) {
-        // Formatear las fechas al formato día/mes/año
-        const registrosFormateados = data.map((registro) => ({
-          ...registro,
-          fecha_registro: formatearFecha(registro.fecha_registro),
-          fecha_siembra: formatearFecha(registro.fecha_siembra),
-          fecha_produccion: formatearFecha(registro.fecha_produccion),
-        }));
-        setRegistros(registrosFormateados);
-      }
-    } catch {
-      console.log("Error en la conexión a la base de datos");
+    return format
+      .replace("DD", fmt.day)
+      .replace("MM", fmt.month)
+      .replace("YYYY", fmt.year)
+      .replace("hh", fmt.hour.padStart(2, "0"))
+      .replace("mm", fmt.minute)
+      .replace("A", fmt.dayPeriod || "AM");
+  };
+
+  // Handlers para eventos
+  const onSort = useCallback((event) => {
+    setLazyParams((prev) => ({
+      ...prev,
+      sortField: event.sortField,
+      sortOrder: event.sortOrder,
+    }));
+  }, []);
+
+  const onFilter = useCallback((e) => {
+    const value = e.target.value;
+    setGlobalFilter(value);
+    setLazyParams((prev) => ({
+      ...prev,
+      globalFilter: value,
+      first: 0,
+    }));
+  }, []);
+
+  const onPage = useCallback(
+    (event) => {
+      setLazyParams({
+        ...lazyParams,
+        first: event.first,
+        rows: event.rows,
+        page: event.page + 1,
+      });
+    },
+    [lazyParams]
+  );
+
+  const handleKeyPress = (e) => {
+    const invalidChars = ['e', 'E', '+', '-'];
+    if (invalidChars.includes(e.key)) {
+      e.preventDefault();
+    }
+    
+    if (e.key === '.' && e.target.value.includes('.')) {
+      e.preventDefault();
     }
   };
 
-  useEffect(() => {
-    fetchRegistros();
-  }, []);
-
-  const obtenerHoraActual = () => {
-    const ahora = new Date();
-    const horas = String(ahora.getHours()).padStart(2, "0");
-    const minutos = String(ahora.getMinutes()).padStart(2, "0");
-    return `${horas}:${minutos}`;
+  const handleNumericChange = (e, name) => {
+    const value = e.target.value;
+    if (value === "" || (!isNaN(value) && parseFloat(value) >= 0)) {
+      setRegistro(prev => ({...prev, [name]: value}));
+    }
   };
 
-  const saveRegistro = async () => {
+  // Función para manejar cambios en los inputs
+  const onInputChange = (e, name) => {
+    const val = (e.target && e.target.value) || '';
+    setRegistro({ ...registro, [name]: val });
+  };
+
+  // Fetch data
+  const fetchRegistros = useCallback(
+    async (start = 0, limit = 10) => {
+      setLoading(true);
+      try {
+        let query = supabase
+          .from("Control_Rendimiento_Secado_Horno_Multilevel")
+          .select("*", { count: "exact" })
+          .range(start, start + limit - 1);
+
+        if (lazyParams.sortField) {
+          query = query.order(lazyParams.sortField, {
+            ascending: lazyParams.sortOrder === 1,
+          });
+        }
+
+        if (lazyParams.globalFilter) {
+          query = query.or(
+            `numero_lote.ilike.%${lazyParams.globalFilter}%,fecha_registro.ilike.%${lazyParams.globalFilter}%`
+          );
+        }
+
+        const { data, error, count } = await query;
+
+        if (error) throw error;
+        setRegistros(data || []);
+        setTotalRecords(count || 0);
+      } catch (err) {
+        console.error("Error fetching registros:", err);
+        toast.current.show({
+          severity: "error",
+          summary: "Error",
+          detail: "Error al cargar los registros",
+          life: 3000,
+        });
+      } finally {
+        setLoading(false);
+      }
+    },
+    [lazyParams.sortField, lazyParams.sortOrder, lazyParams.globalFilter]
+  );
+
+  const fetchLotes = useCallback(async () => {
+    try {
+      const { data, error } = await supabase
+        .from("Lotes")
+        .select()
+        .order("fecha_registro", { ascending: false });
+
+      if (error) throw error;
+      setLotes(data || []);
+    } catch (err) {
+      console.error("Error fetching lotes:", err);
+      toast.current.show({
+        severity: "error",
+        summary: "Error",
+        detail: "Error al cargar los lotes",
+        life: 3000,
+      });
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchRegistros(lazyParams.first, lazyParams.rows);
+    fetchLotes();
+  }, [
+    fetchRegistros,
+    lazyParams.first,
+    lazyParams.rows,
+    lazyParams.sortField,
+    lazyParams.sortOrder,
+    lazyParams.globalFilter,
+    fetchLotes
+  ]);
+
+  // Editores para DataTable
+  const dateEditor = (options) => {
+    return (
+      <InputText
+        type="date"
+        value={options.value ? formatDateForInput(options.value) : ""}
+        onChange={(e) => {
+          const selectedDate = e.target.value;
+          options.editorCallback(formatDateForDisplay(selectedDate));
+        }}
+      />
+    );
+  };
+
+  const timeEditor = (options) => {
+    return (
+      <InputText
+        type="time"
+        value={options.value}
+        onChange={(e) => options.editorCallback(e.target.value)}
+      />
+    );
+  };
+
+  const textEditor = (options) => {
+    return (
+      <InputText
+        type="text"
+        value={options.value}
+        onChange={(e) => options.editorCallback(e.target.value)}
+      />
+    );
+  };
+
+  const numberEditor = (options) => {
+    return (
+      <InputText
+        type="number"
+        onKeyDown={handleKeyPress}
+        value={options.value}
+        onChange={(e) => options.editorCallback(e.target.value)}
+      />
+    );
+  };
+
+  const dropdownEditor = (options) => {
+    const tiposControl = ["Prueba", "Control"];
+    return (
+      <Dropdown
+        value={options.value}
+        options={tiposControl}
+        onChange={(e) => options.editorCallback(e.value)}
+        placeholder="Selecciona tipo"
+      />
+    );
+  };
+
+  // Funciones para CRUD
+  const openNew = () => {
+    setRegistro(emptyRegister);
+    setSubmitted(false);
+    setIsEditing(false);
+    setRegistroDialog(true);
+  };
+
+  const onRowEditInit = (event) => {
+    const registroEditado = { ...event.data };
+    
+    // Convertir fechas al formato correcto para el input date
+    if (registroEditado.fecha_produccion) {
+      registroEditado.fecha_produccion = formatDateForInput(registroEditado.fecha_produccion);
+    }
+    
+    setRegistro(registroEditado);
+    setSubmitted(false);
+    setIsEditing(true);
+    setRegistroDialog(true);
+  };
+
+  const onRowEditComplete = async ({ newData, data: oldData }) => {
+    try {
+      const { error } = await supabase
+        .from("Control_Rendimiento_Secado_Horno_Multilevel")
+        .update(newData)
+        .eq("id", newData.id);
+
+      if (error) throw error;
+
+      setRegistros(prev =>
+        prev.map(item => (item.id === newData.id ? newData : item))
+      );
+
+      toast.current.show({
+        severity: "success",
+        summary: "Éxito",
+        detail: "Registro actualizado correctamente",
+        life: 3000,
+      });
+    } catch (error) {
+      toast.current.show({
+        severity: "error",
+        summary: "Error",
+        detail: error.message || "Error al actualizar el registro",
+        life: 3000,
+      });
+    }
+  };
+
+  const hideDialog = () => {
+    setSubmitted(false);
+    setRegistroDialog(false);
+    setIsEditing(false);
+  };
+
+  const saveRegistro = useCallback(async () => {
     setSubmitted(true);
+
+    // Validaciones
     if (
-      !registro.fecha_registro ||
       !registro.tipo_control ||
-      !registro.fecha_siembra ||
       !registro.fecha_produccion ||
       !registro.hora_proceso ||
       !registro.larva_fresca_kg ||
-      !registro.cajas_totales ||
+      !registro.larva_seca ||
+      !registro.operario ||
       !registro.desecho_kg
     ) {
       toast.current.show({
         severity: "error",
         summary: "Error",
-        detail: "Llena todos los campos",
+        detail: "Por favor complete todos los campos requeridos",
         life: 3000,
       });
       return;
     }
-  
-    const horaActual = obtenerHoraActual();
-    const registroConHora = {
-      ...registro,
-      fecha_registro: convertirFechaISO(registro.fecha_registro),
-      fecha_siembra: convertirFechaISO(registro.fecha_siembra),
-      fecha_produccion: convertirFechaISO(registro.fecha_produccion),
-      hora_registro: horaActual,
-    };
-  
+
     try {
-      const { id, ...registroSinId } = registroConHora;
-      const { data, error } = await supabase
-        .from("Control_Rendimiento_Secado_Horno_Multilevel")
-        .insert([registroSinId]);
-      if (error) {
-        console.error("Error en Supabase:", error);
-        throw new Error(
-          error.message || "Error desconocido al guardar en Supabase"
-        );
+      const currentDate = formatDateTime(new Date(), "DD/MM/YYYY");
+      const currentTime = formatDateTime(new Date(), "hh:mm A");
+
+      if (isEditing) {
+        // Lógica para edición
+        const registroActualizado = {
+          ...registro,
+          fecha_produccion: formatDateForDisplay(registro.fecha_produccion)
+        };
+
+        const { error } = await supabase
+          .from("Control_Rendimiento_Secado_Horno_Multilevel")
+          .update(registroActualizado)
+          .eq("id", registro.id);
+
+        if (error) throw error;
+
+        toast.current.show({
+          severity: "success",
+          summary: "Éxito",
+          detail: "Registro actualizado correctamente",
+          life: 3000,
+        });
+      } else {
+        // Lógica para creación
+        if (registro.base_numero_lote === "Sin Lote Asignado") {
+          registro.base_numero_lote = null;
+        } else if (registro.base_numero_lote) {
+          const { data: loteExistente, error: loteError } = await supabase
+            .from("Lotes")
+            .select("base_numero_lote")
+            .eq("base_numero_lote", registro.base_numero_lote)
+            .single();
+         
+          if (loteError || !loteExistente) {
+            throw new Error(`El lote ${registro.base_numero_lote} no existe.`);
+          }
+        }
+
+        const { data, error } = await supabase
+          .from("Control_Rendimiento_Secado_Horno_Multilevel")
+          .insert([{
+            ...registro,
+            fecha_registro: currentDate,
+            hora_registro: currentTime,
+            fecha_produccion: formatDateForDisplay(registro.fecha_produccion),
+          }])
+          .select();
+
+        if (error) throw error;
+
+        // Actualizar lote si corresponde
+        if (registro.base_numero_lote) {
+          let etapas = [];
+          if (registro.etapa_actual && typeof registro.etapa_actual === "string" && registro.etapa_actual.trim() !== "") {
+            etapas = registro.etapa_actual.split(",").map(e => e.trim());
+          }
+
+          if (!etapas.includes("ProductoTerminado")) {
+            etapas.push("Horno", "Cosecha", "ProductoTerminado");
+          }
+
+          const { error: updateError } = await supabase
+            .from("Lotes")
+            .update({
+              etapa_actual: etapas.join(", "),
+              fecha_horneado: currentDate,
+            })
+            .eq("base_numero_lote", registro.base_numero_lote);
+
+          if (updateError) throw updateError;
+        }
+
+        toast.current.show({
+          severity: "success",
+          summary: "Éxito",
+          detail: "Registro creado correctamente",
+          life: 3000,
+        });
       }
-      toast.current.show({
-        severity: "success",
-        summary: "Exitoso",
-        detail: "Registro creado correctamente",
-        life: 3000,
-      });
+
       setRegistro(emptyRegister);
       setRegistroDialog(false);
       setSubmitted(false);
-      fetchRegistros();
+      setIsEditing(false);
+      fetchRegistros(lazyParams.first, lazyParams.rows);
     } catch (error) {
       toast.current.show({
         severity: "error",
         summary: "Error",
-        detail: error.message || "Ocurrió un error al crear el registro",
+        detail: error.message || "Ocurrió un error al guardar el registro",
         life: 3000,
       });
     }
-  };
+  }, [registro, isEditing, fetchRegistros, lazyParams.first, lazyParams.rows]);
 
-  const onInputChange = (e, name) => {
-    let val = e.target.value;
-    let _registro = { ...registro };
-    _registro[name] = val;
-    setRegistro(_registro);
-  };
-
+  // Templates para UI
   const leftToolbarTemplate = () => {
     return (
       <div className="flex flex-wrap gap-2">
@@ -198,22 +498,12 @@ const formatearFecha = (fecha) => {
     <div className="flex flex-wrap gap-2 align-items-center justify-content-between">
       <InputText
         type="search"
-        onInput={(e) => setGlobalFilter(e.target.value)}
-        placeholder="Buscador Global..."
+        value={globalFilter}
+        onInput={onFilter}
+        placeholder="Buscar por Lote u Fecha de Registro"
       />
     </div>
   );
-
-  const openNew = () => {
-    setRegistro(emptyRegister);
-    setSubmitted(false);
-    setRegistroDialog(true);
-  };
-
-  const hideDialog = () => {
-    setSubmitted(false);
-    setRegistroDialog(false);
-  };
 
   const registroDialogFooter = (
     <React.Fragment>
@@ -223,10 +513,15 @@ const formatearFecha = (fecha) => {
         outlined
         onClick={hideDialog}
       />
-      <Button label="Guardar" icon="pi pi-check" onClick={saveRegistro} />
+      <Button 
+        label={isEditing ? "Actualizar" : "Guardar"} 
+        icon="pi pi-check" 
+        onClick={saveRegistro} 
+      />
     </React.Fragment>
   );
 
+  // Funciones para exportar
   const exportPdf = () => {
     if (selectedRegistros.length === 0) {
       toast.current.show({
@@ -237,46 +532,44 @@ const formatearFecha = (fecha) => {
       });
       return;
     }
-  
+
     const doc = new jsPDF();
     doc.setFontSize(18);
-    doc.text("Registros de Control de Rendimiento y Secado", 14, 22);
-  
+    doc.text("Registros de Control Rendimiento Secado Horno Multilevel", 14, 22);
+
+    const exportData = selectedRegistros.map(
+      ({ fecha_registro, hora_registro, ...row }) => ({
+        ...row,
+        registrado: `${fecha_registro || ""} ${hora_registro || ""}`,
+      })
+    );
+
     doc.autoTable({
-      head: [
-        [
-          "Fecha Registro",
-          "Hora Registro",
-          "Tipo Control",
-          "Fecha Siembra",
-          "Fecha Producción",
-          "Hora Proceso",
-          "Larva Fresca (kg)",
-          "Cajas Totales",
-          "Desecho (kg)",
-          "Observaciones",
-        ],
-      ],
-      body: selectedRegistros.map((registro) => [
-        formatearFecha(registro.fecha_registro),
-        registro.hora_registro,
-        registro.tipo_control,
-        formatearFecha(registro.fecha_siembra),
-        formatearFecha(registro.fecha_produccion),
-        registro.hora_proceso,
-        registro.larva_fresca_kg,
-        registro.cajas_totales,
-        registro.desecho_kg,
-        registro.observaciones,
+      head: [["Número Lote", "Fecha Producción", "Larva Fresca (kg)", "Larva Seca (kg)", "Desecho (kg)", "Observaciones"]],
+      body: exportData.map(item => [
+        item.numero_lote,
+        item.fecha_produccion,
+        item.larva_fresca_kg,
+        item.larva_seca,
+        item.desecho_kg,
+        item.operario,
+        item.observaciones
       ]),
       startY: 30,
-      styles: { fontSize: 10 },
-      headStyles: { fillColor: [41, 128, 185], textColor: 255 },
+      styles: {
+        fontSize: 8,
+        cellPadding: 2,
+      },
+      headStyles: {
+        fillColor: [41, 128, 185],
+        textColor: 255,
+        fontStyle: 'bold'
+      }
     });
-  
+
     doc.save("Control_Rendimiento_Secado_Horno_Multilevel.pdf");
   };
-  
+
   const exportXlsx = () => {
     if (selectedRegistros.length === 0) {
       toast.current.show({
@@ -287,37 +580,39 @@ const formatearFecha = (fecha) => {
       });
       return;
     }
-  
+
     const headers = [
-      "Fecha Registro",
-      "Hora Registro",
-      "Tipo Control",
-      "Fecha Siembra",
-      "Fecha Producción",
+      "Número Lote", 
+      "Tipo Control", 
+      "Fecha Producción", 
       "Hora Proceso",
       "Larva Fresca (kg)",
-      "Cajas Totales",
+      "Larva Seca (kg)",
       "Desecho (kg)",
+      "Opeario",
       "Observaciones",
+      "Fecha Registro",
+      "Hora Registro"
     ];
-    const rows = selectedRegistros.map((registro) => [
-      formatearFecha(registro.fecha_registro),
-      registro.hora_registro,
-      registro.tipo_control,
-      formatearFecha(registro.fecha_siembra),
-      formatearFecha(registro.fecha_produccion),
-      registro.hora_proceso,
-      registro.larva_fresca_kg,
-      registro.cajas_totales,
-      registro.desecho_kg,
-      registro.observaciones,
-    ]);
-  
-    const dataToExport = [headers, ...rows];
-    const ws = XLSX.utils.aoa_to_sheet(dataToExport);
-    const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, "Registros");
-    XLSX.writeFile(wb, "Control_Rendimiento_Secado_Horno_Multilevel.xlsx");
+
+    const exportData = selectedRegistros.map(item => ({
+      "Número Lote": item.numero_lote,
+      "Tipo Control": item.tipo_control,
+      "Fecha Producción": item.fecha_produccion,
+      "Hora Proceso": item.hora_proceso,
+      "Larva Fresca (kg)": item.larva_fresca_kg,
+      "Larva Seca (kg)": item.larva_seca,
+      "Desecho (kg)": item.desecho_kg,
+      "Operario": item.operario,
+      "Observaciones": item.observaciones,
+      "Fecha Registro": item.fecha_registro,
+      "Hora Registro": item.hora_registro
+    }));
+
+    const worksheet = XLSX.utils.json_to_sheet(exportData);
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, "Registros");
+    XLSX.writeFile(workbook, "Control_Rendimiento_Secado_Horno_Multilevel.xlsx");
   };
 
   return (
@@ -330,8 +625,8 @@ const formatearFecha = (fecha) => {
         </h1>
         <div className="welcome-message">
           <p>
-            Bienvenido al sistema de control de rendimiento y secado. Aquí puedes
-            gestionar los registros de producción.
+            Bienvenido al sistema de control de rendimiento y secado. Aquí
+            puedes gestionar los registros de producción.
           </p>
         </div>
         <div className="buttons-container">
@@ -339,7 +634,7 @@ const formatearFecha = (fecha) => {
             Volver
           </button>
           <br />
-        <br />
+          <br />
           <button onClick={() => navigate(-2)} className="menu-button">
             Menú principal
           </button>
@@ -353,84 +648,129 @@ const formatearFecha = (fecha) => {
           ></Toolbar>
           <DataTable
             ref={dt}
+            onSort={onSort}
+            sortField={lazyParams.sortField}
+            sortOrder={lazyParams.sortOrder}
+            lazy
+            first={lazyParams.first}
+            rows={lazyParams.rows}
+            totalRecords={totalRecords}
+            onPage={onPage}
+            loading={loading}
+            editMode="row"
+            onRowEditInit={onRowEditInit}
+            onRowEditComplete={onRowEditComplete}
             value={registros}
             selection={selectedRegistros}
             onSelectionChange={(e) => setSelectedRegistros(e.value)}
             globalFilter={globalFilter}
             header={header}
             paginator
-            rows={10}
             rowsPerPageOptions={[5, 10, 25]}
             paginatorTemplate="FirstPageLink PrevPageLink PageLinks NextPageLink LastPageLink CurrentPageReport RowsPerPageDropdown"
             currentPageReportTemplate="Mostrando del {first} al {last} de {totalRecords} Registros"
+            dataKey="id"
           >
             <Column selectionMode="multiple" exportable={false}></Column>
+            <Column
+              field="numero_lote"
+              header="Número Lote"
+              editor={(options) => textEditor(options)}
+              sortable
+              style={{ minWidth: "10rem" }}
+            ></Column>
+            <Column
+              field="fecha_produccion"
+              header="Fecha Producción"
+              editor={(options) => dateEditor(options)}
+              sortable
+            />
+            <Column 
+              field="hora_proceso" 
+              header="Hora Proceso" 
+              editor={(options) => timeEditor(options)}
+              sortable 
+            />
+            <Column
+              field="larva_fresca_kg"
+              header="Larva Fresca (kg)"
+              editor={(options) => numberEditor(options)}
+              sortable
+            />
+            <Column
+              field="larva_seca"
+              header="Larva Seca (kg)"
+              editor={(options) => numberEditor(options)}
+              sortable
+            />
+            <Column 
+              field="tipo_control" 
+              header="Tipo Control" 
+              editor={(options) => dropdownEditor(options)}
+              sortable 
+            />
+            <Column 
+              field="desecho_kg" 
+              header="Desecho (kg)" 
+              editor={(options) => numberEditor(options)}
+              sortable 
+            />
+            <Column
+              field="operario"
+              header="Operario"   
+              editor={(options) => textEditor(options)}
+              sortable
+            />  
             <Column field="fecha_registro" header="Fecha Registro" sortable />
             <Column field="hora_registro" header="Hora Registro" sortable />
-            <Column field="tipo_control" header="Tipo Control" sortable />
-            <Column field="fecha_siembra" header="Fecha Siembra" sortable />
-            <Column field="fecha_produccion" header="Fecha Producción" sortable />
-            <Column field="hora_proceso" header="Hora Proceso" sortable />
-            <Column field="larva_fresca_kg" header="Larva Fresca (kg)" sortable />
-            <Column field="cajas_totales" header="Cajas Totales" sortable />
-            <Column field="desecho_kg" header="Desecho (kg)" sortable />
-            <Column field="observaciones" header="Observaciones" sortable />
+            <Column 
+              field="observaciones" 
+              header="Observaciones" 
+              editor={(options) => textEditor(options)}
+              sortable 
+            />
+            <Column
+              rowEditor
+              headerStyle={{ width: '10%', minWidth: '8rem' }}
+              bodyStyle={{ textAlign: 'center' }}
+            ></Column>
           </DataTable>
         </div>
       </div>
-      <Dialog
-        visible={registroDialog}
-        style={{ width: "32rem" }}
-        breakpoints={{ "960px": "75vw", "641px": "90vw" }}
-        header="Nuevo registro"
-        modal
-        className="p-fluid"
-        footer={registroDialogFooter}
+      
+      {/* Diálogo para agregar/editar registros */}
+      <Dialog 
+        visible={registroDialog} 
+        style={{ width: '50vw' }} 
+        breakpoints={{ '960px': '75vw', '641px': '90vw' }}
+        header={isEditing ? "Editar Registro" : "Nuevo Registro"} 
+        modal 
+        className="p-fluid" 
+        footer={registroDialogFooter} 
         onHide={hideDialog}
       >
         <div className="field">
-          <label htmlFor="fecha_registro" className="font-bold">
-            Fecha Registro{" "}
-            {submitted && !registro.fecha_registro && (
-              <small className="p-error">Requerido.</small>
-            )}
-          </label>
-          <InputText
-            type="date"
-            id="fecha_registro"
-            value={registro.fecha_registro}
-            onChange={(e) => onInputChange(e, "fecha_registro")}
-            required
-            autoFocus
-          />
-          <br />
-          <label htmlFor="tipo_control" className="font-bold">
-            Tipo Control{" "}
-            {submitted && !registro.tipo_control && (
-              <small className="p-error">Requerido.</small>
-            )}
+          <label htmlFor="base_numero_lote" className="font-bold">
+            Número de lote
           </label>
           <Dropdown
-            id="tipo_control"
-            value={registro.tipo_control}
-            options={tiposControl}
-            onChange={(e) => onInputChange(e, "tipo_control")}
-            placeholder="Selecciona un tipo"
-            required
-          />
-          <br />
-          <label htmlFor="fecha_siembra" className="font-bold">
-            Fecha Siembra{" "}
-            {submitted && !registro.fecha_siembra && (
-              <small className="p-error">Requerido.</small>
-            )}
-          </label>
-          <InputText
-            type="date"
-            id="fecha_siembra"
-            value={registro.fecha_siembra}
-            onChange={(e) => onInputChange(e, "fecha_siembra")}
-            required
+            value={registro.base_numero_lote}
+            filter
+            onChange={(e) => {
+              setRegistro({
+                ...registro,
+                base_numero_lote: e.value,
+              });
+            }}
+            options={[
+              { base_numero_lote: "Sin Lote Asignado" },
+              ...(lotes || []),
+            ]}
+            optionLabel="base_numero_lote"
+            optionValue="base_numero_lote"
+            placeholder="Selecciona un Número de lote"
+            className="w-full md:w-14rem"
+            disabled={isEditing}
           />
           <br />
           <label htmlFor="fecha_produccion" className="font-bold">
@@ -461,6 +801,21 @@ const formatearFecha = (fecha) => {
             required
           />
           <br />
+          <label htmlFor="tipo_control" className="font-bold">
+            Tipo Control{" "}
+            {submitted && !registro.tipo_control && (
+              <small className="p-error">Requerido.</small>
+            )}
+          </label>
+          <Dropdown
+            id="tipo_control"
+            value={registro.tipo_control}
+            options={["Prueba", "Control"]}
+            onChange={(e) => onInputChange(e, "tipo_control")}
+            placeholder="Selecciona un tipo"
+            required
+          />
+          <br />
           <label htmlFor="larva_fresca_kg" className="font-bold">
             Larva Fresca (kg){" "}
             {submitted && !registro.larva_fresca_kg && (
@@ -469,24 +824,30 @@ const formatearFecha = (fecha) => {
           </label>
           <InputText
             type="number"
+            onKeyDown={handleKeyPress}
             id="larva_fresca_kg"
             value={registro.larva_fresca_kg}
-            onChange={(e) => onInputChange(e, "larva_fresca_kg")}
+            onChange={(e) => handleNumericChange(e, "larva_fresca_kg")}
             required
+            min="0"
+            step="0.01"
           />
           <br />
-          <label htmlFor="cajas_totales" className="font-bold">
-            Cajas Totales{" "}
-            {submitted && !registro.cajas_totales && (
+          <label htmlFor="larva_seca" className="font-bold">
+            Larva Seca (kg){" "}
+            {submitted && !registro.larva_seca && (
               <small className="p-error">Requerido.</small>
             )}
           </label>
           <InputText
             type="number"
-            id="cajas_totales"
-            value={registro.cajas_totales}
-            onChange={(e) => onInputChange(e, "cajas_totales")}
+            onKeyDown={handleKeyPress}
+            id="larva_seca"
+            value={registro.larva_seca}
+            onChange={(e) => handleNumericChange(e, "larva_seca")}
             required
+            min="0"
+            step="0.01"
           />
           <br />
           <label htmlFor="desecho_kg" className="font-bold">
@@ -497,14 +858,32 @@ const formatearFecha = (fecha) => {
           </label>
           <InputText
             type="number"
+            onKeyDown={handleKeyPress}
             id="desecho_kg"
             value={registro.desecho_kg}
-            onChange={(e) => onInputChange(e, "desecho_kg")}
+            onChange={(e) => handleNumericChange(e, "desecho_kg")}
             required
+            min="0"
+            step="0.01"
           />
           <br />
-          <label htmlFor="observaciones" className="font-bold">
+          <label htmlFor="Operario" className="font-bold">
+            Operario{" "}
+              {submitted && !registro.operario && (
+               <small className="p-error">Requerido.</small>
+              )}
+          </label>
+          <InputText
+            id="operario"
+            value={registro.operario}
+            onChange={(e) => onInputChange(e, "operario")}
+          />
+          <br />
+          <label htmlFor="Observaciones" className="font-bold">
             Observaciones{" "}
+            {observacionesObligatorio && (
+              <small className="p-error">Requerido por fuera de rango.</small>
+            )}
           </label>
           <InputText
             id="observaciones"

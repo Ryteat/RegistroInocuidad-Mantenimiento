@@ -1,4 +1,10 @@
-import React, { useEffect, useState, useRef } from "react";
+import React, {
+  useEffect,
+  useState,
+  useRef,
+  useCallback,
+  useMemo,
+} from "react";
 import { useNavigate } from "react-router-dom";
 import "./ControlRendimientoSecadoHornoMicroondas.css"; // Importa el CSS
 import supabase from "../../../supabaseClient";
@@ -28,7 +34,6 @@ function ControlRendimientoSecadoHornoMultilevel() {
     fec_produccion: "",
     hor_proceso: "",
     kg_larva_fresca: "",
-    cajas_totales: "",
     kg_desecho: "",
     hor_inicio: "",
     hor_fin: "",
@@ -43,11 +48,11 @@ function ControlRendimientoSecadoHornoMultilevel() {
   const toast = useRef(null);
   const dt = useRef(null);
   const [selectedRegistros, setSelectedRegistros] = useState([]);
-  const [globalFilter, setGlobalFilter] = useState(null);
+  const [globalFilter, setGlobalFilter] = useState("");
   const [submitted, setSubmitted] = useState(false);
   const [registroDialog, setRegistroDialog] = useState(false);
   const navigate = useNavigate();
-
+  const [lotes, setLotes] = useState([]);
   // Opciones para el campo "linea_produc"
   const lineasProduccion = ["Producción", "Reproducción"];
   const tipoControl = ["Control", "Prueba"];
@@ -58,25 +63,124 @@ function ControlRendimientoSecadoHornoMultilevel() {
     //no tiene rangos
   });
 
-  const convertirFecha = (fecha) =>
-    fecha ? fecha.split("-").reverse().join("/") : "";
+  // Nuevos estados para lazy loading
+  const [loading, setLoading] = useState(false);
+  const [totalRecords, setTotalRecords] = useState(0);
+  const [lazyParams, setLazyParams] = useState({
+    first: 0,
+    rows: 10,
+    page: 1,
+    sortField: null,
+    sortOrder: null,
+    filters: {},
+    globalFilter: null,
+  });
 
-  const fetchRegistros = async () => {
+  //Inicio de Sorting y Filtro global por lazy load
+  // Manejar sorting
+  const onSort = useCallback((event) => {
+    setLazyParams((prev) => ({
+      ...prev,
+      sortField: event.sortField,
+      sortOrder: event.sortOrder,
+    }));
+  }, []);
+
+  // Manejar filtro global
+  const onFilter = useCallback((e) => {
+    const value = e.target.value;
+    setGlobalFilter(value);
+    setLazyParams((prev) => ({
+      ...prev,
+      globalFilter: value,
+      first: 0,
+    }));
+  }, []);
+  //FIN de Sorting y Filtro global por lazy load
+
+  const fetchRegistros = useCallback(
+    async (start = 0, limit = 10) => {
+      setLoading(true);
+      try {
+        let query = supabase
+          .from("Control_Rendimiento_Secado_Horno_Microondas")
+          .select("*", { count: "exact" })
+          .range(start, start + limit - 1);
+        // Ordenar por defecto por fecha descendente (más nuevos primero)
+        // .order("fec_registro", { ascending: false });
+
+        // Aplicar sorting
+        if (lazyParams.sortField) {
+          query = query.order(lazyParams.sortField, {
+            ascending: lazyParams.sortOrder === 1,
+          });
+        }
+
+        // Aplicar filtro global
+        if (lazyParams.globalFilter) {
+          query = query.or(
+            `numero_lote.ilike.%${lazyParams.globalFilter}%,fec_registro.ilike.%${lazyParams.globalFilter}%`
+          );
+        }
+
+        const { data, error, count } = await query;
+
+        if (error) throw error;
+        setRegistros(data || []);
+        setTotalRecords(count || 0);
+      } catch (err) {
+        console.error(
+          "Error en la conexión a la base de datos Secado Horno Multilevel",
+          err
+        );
+      } finally {
+        setLoading(false);
+      }
+    },
+    [lazyParams.sortField, lazyParams.sortOrder, lazyParams.globalFilter]
+  );
+  const fetchLotes = useCallback(async () => {
     try {
       const { data, error } = await supabase
-        .from("Control_Rendimiento_Secado_Horno_Microondas")
-        .select();
-      if (data) {
-        setRegistros(data);
-      }
-    } catch {
-      console.log("Error en la conexión a la base de datos");
+        .from("Lotes")
+        .select()
+        .ilike("etapa_actual", "%Horno%", "%ProductoTerminado%")
+        .order("fecha_registro", { ascending: false }); // Busca "Horno" en cualquier posición del string
+
+      if (error) throw error;
+      setLotes(data || []);
+    } catch (err) {
+      console.log("Error en la conexión a la base de datos Lotes", err);
     }
-  };
+  }, []);
 
   useEffect(() => {
-    fetchRegistros();
-  }, []);
+    fetchRegistros(lazyParams.first, lazyParams.rows);
+    fetchLotes();
+  }, [
+    fetchRegistros,
+    lazyParams.first,
+    lazyParams.rows,
+    lazyParams.sortField,
+    lazyParams.sortOrder,
+    lazyParams.globalFilter,
+  ]);
+
+  // Manejar cambio de página y lazy loading
+  const onPage = useCallback(
+    (event) => {
+      setLazyParams({
+        ...lazyParams,
+        first: event.first,
+        rows: event.rows,
+        page: event.page + 1,
+      });
+    },
+    [lazyParams]
+  );
+
+  const convertirFecha = (fecha) =>
+    fecha ? fecha.split("-").reverse().join("/") : "";
 
   const formatDateTime = (date, format = "DD-MM-YYYY hh:mm A") => {
     const fmt = new Intl.DateTimeFormat("en-US", {
@@ -99,7 +203,7 @@ function ControlRendimientoSecadoHornoMultilevel() {
       .replace("A", fmt.dayPeriod || "AM");
   };
 
-  const saveRegistro = async () => {
+  const saveRegistro = useCallback(async () => {
     setSubmitted(true);
     if (
       !registro.kg_minuto ||
@@ -111,7 +215,6 @@ function ControlRendimientoSecadoHornoMultilevel() {
       !registro.fec_produccion ||
       !registro.hor_proceso ||
       !registro.kg_larva_fresca ||
-      !registro.cajas_totales ||
       !registro.kg_desecho ||
       !registro.hor_inicio ||
       !registro.hor_fin ||
@@ -125,15 +228,34 @@ function ControlRendimientoSecadoHornoMultilevel() {
       });
       return;
     }
-
     try {
-      const currentDate = formatDateTime(new Date(), "DD/MM/YYYY"); // Fecha actual
-      const currentTime = formatDateTime(new Date(), "hh:mm A"); // Hora actual
+      const currentDate = formatDateTime(new Date(), "DD/MM/YYYY");
+      const currentTime = formatDateTime(new Date(), "hh:mm A");
+      if(registro.base_numero_lote === "Sin Lote Asignado"){
+        registro.base_numero_lote = null;
+      }else{
+      // Verificar si el lote seleccionado existe
+      const { data: loteExistente, error: loteError } = await supabase
+        .from("Lotes")
+        .select("base_numero_lote")
+        .eq("base_numero_lote", registro.base_numero_lote)
+        .single();
 
+      if (loteError || !loteExistente) {
+        toast.current.show({
+          severity: "error",
+          summary: "Error",
+          detail: `El lote ${registro.base_numero_lote} no existe.`,
+          life: 3000,
+        });
+        return;
+      }
+    }
       const { data, error } = await supabase
         .from("Control_Rendimiento_Secado_Horno_Microondas")
         .insert([
           {
+            base_numero_lote: registro.base_numero_lote, // Lote seleccionado
             kg_minuto: registro.kg_minuto,
             velocidad_banda: registro.velocidad_banda,
             temp_coccion: registro.temp_coccion,
@@ -156,15 +278,29 @@ function ControlRendimientoSecadoHornoMultilevel() {
       if (error) {
         console.error("Error en Supabase:", error);
         throw new Error(
-          error.message || "Error desconocido al guardar en Supabase"
+          "Error en Supabase: Mirar consola para ver error" || "Error desconocido al guardar en Supabase"
         );
       }
+
+      const { error: updateError } = await supabase
+        .from("Lotes")
+        .update({
+          fecha_horneado: currentDate,
+        })
+        .eq("base_numero_lote", registro.base_numero_lote);
+
+      if (updateError) {
+        console.error("Error actualizando lote:", updateError);
+        throw new Error("Error al actualizar información del lote");
+      }
+
       toast.current.show({
         severity: "success",
         summary: "Exitoso",
         detail: "Registro creado correctamente",
         life: 3000,
       });
+
       setRegistro(emptyRegister);
       setRegistroDialog(false);
       setSubmitted(false);
@@ -177,7 +313,7 @@ function ControlRendimientoSecadoHornoMultilevel() {
         life: 3000,
       });
     }
-  };
+  }, [registro, lotes, convertirFecha]);
 
   const dateEditor = (options) => {
     const convertToInputFormat = (date) => {
@@ -227,6 +363,7 @@ function ControlRendimientoSecadoHornoMultilevel() {
     return (
       <InputText
         type="number"
+onKeyDown={handleKeyPress}
         value={options.value}
         onChange={(e) => options.editorCallback(e.target.value)}
       />
@@ -243,25 +380,56 @@ function ControlRendimientoSecadoHornoMultilevel() {
     );
   };
 
+  const handleKeyPress = (e) => {
+    const invalidChars = ['e', 'E', '+', '-'];
+    if (invalidChars.includes(e.key)) {
+      e.preventDefault();
+    }
+    
+    // Si es un campo decimal, permite un solo punto
+    if (e.key === '.' && e.target.value.includes('.')) {
+      e.preventDefault();
+    }
+  };
+
   const allowEdit = (rowData) => {
     return rowData.name !== "Blue Band";
   };
 
-  const onRowEditComplete = async ({ newData }) => {
-    const { id, ...updatedData } = newData;
+  const onRowEditComplete = async ({ newData, data: oldData }) => {
     try {
-      const { error } = await supabase
-        .from("Control_Rendimiento_Secado_Horno_Microondas")
-        .update(updatedData)
-        .eq("id", id);
+      // 1. Calcular diferencia de cajas
+      const diferencia = newData.cajas_totales - oldData.cajas_totales;
 
-      if (error) return console.error("Error al actualizar:", error.message);
+      // 2. Actualizar Control_Rendimiento_DietaySiembra
+      const { error: updateError } = await supabase
+        .from("Control_Rendimiento_Secado_Horno_Multilevel")
+        .update(newData)
+        .eq("id", newData.id);
 
+      if (updateError) throw updateError;
+
+      // 3. Actualizar Lotes
+      const { error: loteUpdateError } = await supabase
+        .from("Lotes")
+        .update({
+          etapa_actual: "HornoMic",
+        })
+        .eq("base_numero_lote", oldData.base_numero_lote);
+
+      if (loteUpdateError) throw loteUpdateError;
+
+      // 6. Actualizar estado local
       setRegistros((prev) =>
-        prev.map((n) => (n.id === id ? { ...n, ...newData } : n))
+        prev.map((item) => (item.id === newData.id ? newData : item))
       );
-    } catch (err) {
-      console.error("Error inesperado:", err);
+    } catch (error) {
+      toast.current.show({
+        severity: "error",
+        summary: "Error en edición",
+        detail: error.message || "Error al actualizar el registro",
+        life: 3000,
+      });
     }
   };
 
@@ -308,8 +476,9 @@ function ControlRendimientoSecadoHornoMultilevel() {
     <div className="flex flex-wrap gap-2 align-items-center justify-content-between">
       <InputText
         type="search"
-        onInput={(e) => setGlobalFilter(e.target.value)}
-        placeholder="Buscador Global..."
+        value={globalFilter}
+        onInput={onFilter}
+        placeholder="Buscar por Lote u Fecha de Registro"
       />
     </div>
   );
@@ -347,7 +516,6 @@ function ControlRendimientoSecadoHornoMultilevel() {
     { field: "fec_produccion", header: "Fecha Producción" },
     { field: "hor_proceso", header: "Hora Proceso" },
     { field: "kg_larva_fresca", header: "Kg Larva Fresca" },
-    { field: "cajas_totales", header: "Cajas Totales" },
     { field: "kg_desecho", header: "Kg Desecho" },
     { field: "hor_inicio", header: "Hora Inicio" },
     { field: "hor_fin", header: "Hora Fin" },
@@ -497,21 +665,36 @@ function ControlRendimientoSecadoHornoMultilevel() {
             right={rightToolbarTemplate}
           ></Toolbar>
           <DataTable
+            ref={dt}
+            onSort={onSort}
+            sortField={lazyParams.sortField}
+            sortOrder={lazyParams.sortOrder}
+            lazy
+            first={lazyParams.first}
+            rows={lazyParams.rows}
+            totalRecords={totalRecords}
+            onPage={onPage}
+            loading={loading}
             editMode="row"
             onRowEditComplete={onRowEditComplete}
-            ref={dt}
             value={registros}
             selection={selectedRegistros}
             onSelectionChange={(e) => setSelectedRegistros(e.value)}
             globalFilter={globalFilter}
             header={header}
             paginator
-            rows={10}
             rowsPerPageOptions={[5, 10, 25]}
             paginatorTemplate="FirstPageLink PrevPageLink PageLinks NextPageLink LastPageLink CurrentPageReport RowsPerPageDropdown"
             currentPageReportTemplate="Mostrando del {first} al {last} de {totalRecords} Registros"
           >
             <Column selectionMode="multiple" exportable={false}></Column>
+            <Column
+              field="numero_lote"
+              header="Número Lote"
+              // editor={(options) => textEditor(options)}
+              sortable
+              style={{ minWidth: "10rem" }}
+            ></Column>
             <Column
               field="kg_minuto"
               header="Kg Minuto"
@@ -567,12 +750,6 @@ function ControlRendimientoSecadoHornoMultilevel() {
               sortable
             />
             <Column
-              field="cajas_totales"
-              header="Cajas Totales"
-              editor={(options) => numberEditor(options)}
-              sortable
-            />
-            <Column
               field="kg_desecho"
               header="Kg Desecho"
               editor={(options) => floatEditor(options)}
@@ -624,6 +801,33 @@ function ControlRendimientoSecadoHornoMultilevel() {
         onHide={hideDialog}
       >
         <div className="field">
+          <label htmlFor="base_numero_lote" className="font-bold">
+            Número de lote{" "}
+            {submitted && !registro.base_numero_lote && (
+              <small className="p-error">Requerido.</small>
+            )}
+          </label>
+          <Dropdown
+                      value={registro.base_numero_lote}
+                      filter
+                      onChange={async (e) => {
+                        setRegistro({
+                          ...registro,
+                          base_numero_lote: e.value,
+                        });
+                      }}
+                      options={[
+                        {
+                          base_numero_lote: "Sin Lote Asignado"
+                        },
+                        ...(lotes || []),
+                      ]}
+                      optionLabel="base_numero_lote" // Mostrar el campo "label" en el dropdown
+                      optionValue="base_numero_lote" // Guardar el valor de "base_numero_lote"
+                      placeholder="Selecciona un Número de lote"
+                      className="w-full md:w-14rem"
+                    />
+          <br />
           <label htmlFor="kg_minuto" className="font-bold">
             Kg Minuto{" "}
             {submitted && !registro.kg_minuto && (
@@ -632,6 +836,7 @@ function ControlRendimientoSecadoHornoMultilevel() {
           </label>
           <InputText
             type="number"
+onKeyDown={handleKeyPress}
             id="kg_minuto"
             value={registro.kg_minuto}
             onChange={(e) => onInputChange(e, "kg_minuto")}
@@ -647,6 +852,7 @@ function ControlRendimientoSecadoHornoMultilevel() {
           </label>
           <InputText
             type="number"
+onKeyDown={handleKeyPress}
             id="velocidad_banda"
             value={registro.velocidad_banda}
             onChange={(e) => onInputChange(e, "velocidad_banda")}
@@ -661,6 +867,7 @@ function ControlRendimientoSecadoHornoMultilevel() {
           </label>
           <InputText
             type="number"
+onKeyDown={handleKeyPress}
             id="temp_coccion"
             value={registro.temp_coccion}
             onChange={(e) => onInputChange(e, "temp_coccion")}
@@ -675,6 +882,7 @@ function ControlRendimientoSecadoHornoMultilevel() {
           </label>
           <InputText
             type="number"
+onKeyDown={handleKeyPress}
             id="temp_agua"
             value={registro.temp_agua}
             onChange={(e) => onInputChange(e, "temp_agua")}
@@ -689,6 +897,7 @@ function ControlRendimientoSecadoHornoMultilevel() {
           </label>
           <InputText
             type="number"
+onKeyDown={handleKeyPress}
             id="velocidad_turbina"
             value={registro.velocidad_turbina}
             onChange={(e) => onInputChange(e, "velocidad_turbina")}
@@ -745,23 +954,10 @@ function ControlRendimientoSecadoHornoMultilevel() {
           </label>
           <InputText
             type="number"
+onKeyDown={handleKeyPress}
             id="kg_larva_fresca"
             value={registro.kg_larva_fresca}
             onChange={(e) => onInputChange(e, "kg_larva_fresca")}
-            required
-          />
-          <br />
-          <label htmlFor="cajas_totales" className="font-bold">
-            Cajas Totales{" "}
-            {submitted && !registro.cajas_totales && (
-              <small className="p-error">Requerido.</small>
-            )}
-          </label>
-          <InputText
-            type="number"
-            id="cajas_totales"
-            value={registro.cajas_totales}
-            onChange={(e) => onInputChange(e, "cajas_totales")}
             required
           />
           <br />
@@ -773,6 +969,7 @@ function ControlRendimientoSecadoHornoMultilevel() {
           </label>
           <InputText
             type="number"
+onKeyDown={handleKeyPress}
             id="kg_desecho"
             value={registro.kg_desecho}
             onChange={(e) => onInputChange(e, "kg_desecho")}

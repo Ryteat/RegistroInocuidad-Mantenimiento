@@ -43,9 +43,9 @@ function LimpiezaDesinfeccionEquiposMaquinariaPesada() {
   ];
   
   const supervisores = [
-    { label: "Juan", value: "Juan" },
-    { label: "Paco", value: "Paco" },
-    { label: "Ana", value: "Ana" }
+    { label: "Fabián Jimenez Barboza", value: "Fabián Jimenez Barboza" },
+    { label: "Hugo Leiva Araya", value: "Hugo Leiva Araya" },
+    { label: "Otro", value: "Otro" }
   ];
 
   const fetchRegistros = async () => {

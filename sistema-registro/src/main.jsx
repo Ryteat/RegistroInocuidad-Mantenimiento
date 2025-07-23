@@ -14,15 +14,18 @@ import ColectaInvernadero from './pages/Hatchery/Registros/PagesColectaInvernade
 import IngresoPPInvernadero from './pages/Hatchery/Registros/PagesIngresoPPInvernadero.jsx';
 import NIB from './pages/Hatchery/Registros/PagesNIB.jsx';
 import ControlRendimientoCosechaReproduccion from './pages/Hatchery/Registros/PagesControlRendimientoCosechaReproduccion.jsx';
+import ControlDespachoLabPro from './pages/Hatchery/Registros/PagesControlDespachoLabPro.jsx';
 
 //imports paginas Dieta
 import Dieta from './pages/Dieta/PagesDieta.jsx';
 import ControlInventarioCascaraPila from './pages/Dieta/Registros/PagesControlInventarioCascaraPila.jsx';
 import ControlRendimientoDietaySiembra from './pages/Dieta/Registros/PagesControlRendimientoDietaySiembra.jsx';
+import ControlMovimientosCajasProceso from './pages/Dieta/Registros/PagesControlMovimientosCajasProceso.jsx';
 
 //imports paginas Gerencia
 import Gerencia from './pages/Gerencia/PagesGerencia.jsx';
 import GestionUsuarios from './pages/Gerencia/Registros/PagesGestionUsuarios.jsx';
+
 
 //control de tiempos imports
 import ControlTiempos from './pages/ControlTiempos/PagesControlTiempos.jsx';
@@ -32,21 +35,40 @@ import Horno from './pages/Horno/PagesHorno.jsx';
 import ControlRendimientoSecadoHornoMultilevel from './pages/Horno/Registros/PagesControlRendimientoSecadoHornoMultilevel.jsx';
 import ControlRendimientoSecadoHornoMicroondas from './pages/Horno/Registros/PagesControlRendimientoSecadoHornoMicroondas.jsx';
 import ControlOperativoHornoMultilevel from './pages/Horno/Registros/PagesControlOperativoHornoMultilevel.jsx';
+import ControlRendimientoProductoTerminado from './pages/Horno/Registros/PagesControlRendimientoProductoTerminado.jsx';
+import ControlReempaque from './pages/Horno/Registros/PagesControlReempaque.jsx';
+import ControlLarvaMolida from './pages/Horno/Registros/PagesControlLarvaMolida.jsx';
 
 //imports de paginas de Calidad
 import Calidad from './pages/Calidad/PagesCalidad.jsx';
 import ControlCalidadCosecha from './pages/Calidad/Registros/PagesControlCalidadCosecha.jsx';
 import RecepcionMateriasPrimas from './pages/Calidad/Registros/PagesRecepcionMateriasPrimas.jsx';
 import ControlNeonatos from './pages/Calidad/Registros/PagesControlNeonatos.jsx';
+import ControlCalidadEngordeHatchery from './pages/Calidad/Registros/PagesControlCalidadEngordeHatchery.jsx';
+import ControlCalidadHornoMicroondas from './pages/Calidad/Registros/PagesControlCalidadHornoMicroondas.jsx';
+import ControlCalidadHornoMultilevel from './pages/Calidad/Registros/PagesControlCalidadHornoMultilevel.jsx';
+import ControlCalidadDietaSiembra from './pages/Calidad/Registros/PagesControlCalidadDietaSiembra.jsx';
 
-//imports de paginas de Mantnimiento
+//imports de paginas de Mantenimiento
 import Mantenimiento from './pages/Mantenimiento/PagesMantenimiento.jsx';
 import LimpiezaDesinfeccionEquiposMaquinariaPesada from './pages/Mantenimiento/Registros/PagesLimpiezaDesinfeccionEquiposMaquinariaPesada.jsx';
+import ReporteInspeccion from './pages/Mantenimiento/Registros/PagesReporteInspeccion.jsx'
+import ReporteInspeccionSemanal from './pages/Mantenimiento/Registros/PagesReporteInspeccionSemanal.jsx'
+import PreoperacionalTeletruk from './pages/Mantenimiento/Registros/PagesPreoperacionalTeletruk.jsx'
 
 //imports de paginas de Cosecha
 import Cosecha from './pages/Cosecha/PagesCosecha.jsx';
-import ControlRendimientoCosechayFrass from './Components/Cosecha/Registros/ControlRendimientoCosechayFrass.jsx';
+import ControlRendimientoCosechayFrass from './pages/Cosecha/Registros/PagesControlRendimientoCosechayFrass.jsx'
+import ControlIngresoySalidaRacks from './pages/Cosecha/Registros/PagesControlIngresoySalidaRacks.jsx'
 
+//imports de páginas visualizar
+// En main.js
+import Visualizar from './pages/Visualizar/PagesVisualizar';
+import VisualizarKPIs from './pages/Visualizar/Registros/PagesVisualizarKPIs';
+import VisualizarLotes from './pages/Visualizar/Registros/PagesVisualizarLotes';
+import VisualizarSKUs from './pages/Visualizar/Registros/PagesVisuazlizarSKUs';
+import FlashReport from './pages/Visualizar/Registros/PagesFlashReport';
+import PagesControlLarvaMolida from './pages/Horno/Registros/PagesControlLarvaMolida.jsx';
 
 
 const Layout = () => {
@@ -85,6 +107,10 @@ const router = createBrowserRouter([{
           path: `ControlRendimientoCosechaReproduccion`,
           element: <ControlRendimientoCosechaReproduccion />,
         },
+        {
+          path: `ControlDespachoLabPro`,
+          element: <ControlDespachoLabPro />,
+        },
       ],
     },
 
@@ -102,6 +128,10 @@ const router = createBrowserRouter([{
           path: `ControlRendimientoDietaySiembra`,
           element: <ControlRendimientoDietaySiembra />,
         },
+        {
+          path: `ControlMovimientosCajasProceso`,
+          element: <ControlMovimientosCajasProceso />,
+        },
       ],
     },
 
@@ -114,8 +144,32 @@ const router = createBrowserRouter([{
         {
           path: `GestionUsuarios`,
           element: <GestionUsuarios />,
-        },
+        }
         
+      ],
+    },
+
+    // Grupo de rutas de Visualizar
+    {
+      path: `/Visualizar`,
+      element: <Visualizar />, // Componente padre
+      children: [
+        {
+          path: `VisualizarKPIs`,
+          element: <VisualizarKPIs />, // Componente hijo
+        },
+        {
+          path: `VisualizarLotes`,
+          element: <VisualizarLotes />, // Componente hijo
+        },
+        {
+          path: `VisualizarSKUs`,
+          element: <VisualizarSKUs />, // Componente hijo
+        },
+        {
+          path: `FlashReport`,
+          element: <FlashReport />, // Componente hijo
+        },
       ],
     },
 
@@ -143,6 +197,18 @@ const router = createBrowserRouter([{
         path: `ControlOperativoHornoMultilevel`,
         element: <ControlOperativoHornoMultilevel />,
       },
+      {
+        path: `ControlRendimientoProductoTerminado`,
+        element: <ControlRendimientoProductoTerminado />,
+      },
+      {
+        path: `ControlReempaque`,
+        element: <ControlReempaque />,
+      },
+      {
+        path: `ControlLarvaMolida`,
+        element: <PagesControlLarvaMolida />,
+      },
     ],
   },
   
@@ -164,6 +230,24 @@ const router = createBrowserRouter([{
         path: `ControlNeonatos`,
         element: <ControlNeonatos />,
       },
+      {
+        path: `ControlCalidadEngordeHatchery`,
+        element: <ControlCalidadEngordeHatchery />,
+      },
+      
+      {
+        path: `ControlCalidadHornoMicroondas`,
+        element: <ControlCalidadHornoMicroondas />,
+      },
+
+      {
+        path: `ControlCalidadHornoMultilevel`,
+        element: <ControlCalidadHornoMultilevel />,
+      },
+      {
+        path: `ControlCalidadDietaSiembra`,
+        element: <ControlCalidadDietaSiembra />,
+      },
       
     ],
   },
@@ -178,7 +262,20 @@ const router = createBrowserRouter([{
         path: `LimpiezaDesinfeccionEquiposMaquinariaPesada`,
         element: <LimpiezaDesinfeccionEquiposMaquinariaPesada />,
       },
-      
+      {
+        path: `ReporteInspeccion`,
+        element: <ReporteInspeccion />,
+      },
+      {
+        path: `ReporteInspeccionSemanal`,
+        element: <ReporteInspeccionSemanal />,
+      },
+      {
+        path: `PreoperacionalTeletruk`,
+        element: <PreoperacionalTeletruk/>,
+      }
+
+
     ],
   },
 
@@ -190,13 +287,17 @@ const router = createBrowserRouter([{
         path: `ControlRendimientoCosechayFrass`,
         element: <ControlRendimientoCosechayFrass />,
       },
+      {
+        path: `ControlIngresoySalidaRacks`,
+        element: <ControlIngresoySalidaRacks />,
+      },
       
     ],
   },
 
     
 ]
-}])
+}],{ basename: "/ProNuvo" } ) // 👈 Importante: Se establece la base para todas las rutas )
 
 
 const root = ReactDOM.createRoot(document.getElementById('root'));
@@ -204,27 +305,5 @@ root.render(
   <PrimeReactProvider>
     <RouterProvider router={router}/>
     </PrimeReactProvider>
-  // <React.StrictMode>
-  //   <BrowserRouter>
-  //     <Routes>
-  //       <Route path="/" element={<Login />} />
-  //       <Route path="/MenuPrincipal" element={<MenuPrincipal />} />
-  //       <Route path="/Calidad" element={<Calidad />} />
-
-  //       <Route path="/Hatchery" element={<Hatchery />} />
-  //       <Route path="/IngresoPPInvernadero" element={<IngresoPPInvernadero />} />
-  //       <Route path="/ColectaInvernadero" element={<ColectaInvernadero />} />
-  //       <Route path="/NIB" element={<NIB />} />
-
-
-  //       <Route path="/Horno" element={<Horno />} />
-  //       <Route path="/Dieta" element={<Dieta />} />
-  //       <Route path="/Cosecha" element={<Cosecha />} />
-  //       <Route path="/Mantenimiento" element={<Mantenimiento />} /> 
-        
-
-
-  //     </Routes>
-  //   </BrowserRouter>
-  // </React.StrictMode>
+  
 );

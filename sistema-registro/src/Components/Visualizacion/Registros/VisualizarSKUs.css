@@ -1,0 +1,45 @@
+.exportar-container{
+    display: flex;
+    justify-content: space-between;
+    margin-top: 10px;
+    margin-bottom: 5px;
+}
+.visualizar-skus-container {
+    padding: 2rem;
+    max-width: 1200px;
+    margin: 0 auto;
+  }
+  
+  .header-section {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    margin-bottom: 2rem;
+  }
+  
+  .logo {
+    height: 50px;
+  }
+  
+  .controls-section {
+    display: flex;
+    gap: 1rem;
+    margin-bottom: 1.5rem;
+    align-items: center;
+  }
+  
+  .search-input {
+    flex-grow: 1;
+    max-width: 300px;
+  }
+  
+  .lotes-container {
+    margin-top: 1rem;
+  }
+  
+  .p-tag {
+    background: #3b82f6;
+    color: white;
+    padding: 0.25rem 0.5rem;
+    border-radius: 4px;
+  }

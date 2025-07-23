@@ -1,4 +1,10 @@
-import React, { useEffect, useState, useRef } from "react";
+import React, {
+  useEffect,
+  useState,
+  useRef,
+  useCallback,
+  useMemo,
+} from "react";
 import { useNavigate } from "react-router-dom";
 
 // Imports de estilos
@@ -18,8 +24,6 @@ import { Column } from "primereact/column";
 import { Toast } from "primereact/toast";
 import { Button } from "primereact/button";
 import { Toolbar } from "primereact/toolbar";
-import { IconField } from "primereact/iconfield";
-import { InputIcon } from "primereact/inputicon";
 import { Dialog } from "primereact/dialog";
 import { InputText } from "primereact/inputtext";
 import { Dropdown } from "primereact/dropdown";
@@ -31,9 +35,10 @@ import "jspdf-autotable";
 
 function ControlRendimientoCosechayFrass() {
   let emptyRegister = {
-    fec_siembra: "",
     fec_cosecha: "",
     cant_cajas_cosechadas: "",
+    cant_cajas_lote: 0,
+    _originalCajas: 0,
     kg_larva_fresca: "",
     cant_cajas_desechadas: "",
     kg_total_frass: "",
@@ -41,10 +46,28 @@ function ControlRendimientoCosechayFrass() {
     fec_registro: "",
     hor_registro: "",
     observaciones: "",
-    fec_almacenaje_frass: "",
-    cant_sacos: "",
+    operario: "",
+    turno: "",
     tipo_produccion: "",
     tipo_control: "",
+  };
+
+  const onSort = useCallback((event) => {
+    setLazyParams(prev => ({
+      ...prev,
+      sortField: event.sortField,
+      sortOrder: event.sortOrder,
+      first: 0
+    }));
+  }, []);
+
+  const onFilter = (e) => {
+    setGlobalFilter(e.target.value);
+    setLazyParams(prev => ({
+      ...prev,
+      globalFilter: e.target.value,
+      first: 0
+    }));
   };
 
   const [registros, setRegistros] = useState([]);
@@ -52,45 +75,126 @@ function ControlRendimientoCosechayFrass() {
   const toast = useRef(null);
   const dt = useRef(null);
   const [selectedRegistros, setSelectedRegistros] = useState([]);
-  const [globalFilter, setGlobalFilter] = useState(null);
+  const [globalFilter, setGlobalFilter] = useState("");
   const [submitted, setSubmitted] = useState(false);
   const [registroDialog, setRegistroDialog] = useState(false);
-  const [outOfRange, setOutOfRange] = useState(false); // Estado para controlar si algún valor está fuera de rango
+  const [outOfRange, setOutOfRange] = useState(false);
   const navigate = useNavigate();
 
   //Errores de validación
-      const [observacionesObligatorio, setObservacionesObligatorio] =
-        useState(false);
-      const [erroresValidacion, setErroresValidacion] = useState({
-        cant_cajas_cosechadas: false, 
-      kg_larva_fresca: false,
-      cant_cajas_desechadas: false, //Si es mayor a 0
-      kg_total_frass: false,
-      kg_material_grueso: false,
-      });
+  const [observacionesObligatorio, setObservacionesObligatorio] =
+    useState(false);
+  const [erroresValidacion, setErroresValidacion] = useState({
+    cant_cajas_cosechadas: false,
+    kg_larva_fresca: false,
+    cant_cajas_desechadas: false,
+    kg_total_frass: false,
+    kg_material_grueso: false,
+  });
+  const [lotes, setLotes] = useState([]);
 
-  const convertirFecha = (fecha) =>
-    fecha ? fecha.split("-").reverse().join("/") : "";
+  // Nuevos estados para lazy loading
+  const [loading, setLoading] = useState(false);
+  const [totalRecords, setTotalRecords] = useState(0);
+  const [lazyParams, setLazyParams] = useState({
+    first: 0,
+    rows: 10,
+    page: 1,
+    sortField: null,
+    sortOrder: null,
+    filters: {},
+    globalFilter: null,
+  });
+
+  // Turnos disponibles
+  const turnosDisponibles = [
+    { label: "Turno 1", value: "1" },
+    { label: "Turno 2", value: "2" },
+    { label: "Turno 3", value: "3" },
+  ];
 
   const tiposControl = ["Prueba", "Control"];
   const tiposProduccion = ["Produccion", "Hatchery"];
 
-  const fetchRegistros = async () => {
+  
+
+  const fetchRegistros = useCallback(
+    async (start = 0, limit = 10) => {
+      setLoading(true);
+      try {
+        let query = supabase
+          .from("Control_Rendimiento_CosechayFrass")
+          .select("*", { count: "exact" })
+          .range(start, start + limit - 1);
+
+        if (lazyParams.sortField) {
+          query = query.order(lazyParams.sortField, {
+            ascending: lazyParams.sortOrder === 1,
+          });
+        }
+
+        if (lazyParams.globalFilter) {
+          query = query.or(
+            `numero_lote.ilike.%${lazyParams.globalFilter}%,fec_registro.ilike.%${lazyParams.globalFilter}%`
+          );
+        }
+
+        const { data, error, count } = await query;
+
+        if (error) throw error;
+        setRegistros(data || []);
+        setTotalRecords(count || 0);
+      } catch (err) {
+        console.error(
+          "Error en la conexión a la base de datos Rendimiento Cosecha y Frass",
+          err
+        );
+      } finally {
+        setLoading(false);
+      }
+    },
+    [lazyParams.sortField, lazyParams.sortOrder, lazyParams.globalFilter]
+  );
+
+  const fetchLotes = useCallback(async () => {
     try {
       const { data, error } = await supabase
-        .from("Control_Rendimiento_CosechayFrass")
+        .from("Lotes")
         .select();
-      if (data) {
-        setRegistros(data);
-      }
-    } catch {
-      console.log("Error en la conexión a la base de datos");
+
+      if (error) throw error;
+      setLotes(data || []);
+    } catch (err) {
+      console.log("Error en la conexión a la base de datos Lotes", err);
     }
-  };
+  }, []);
 
   useEffect(() => {
-    fetchRegistros();
-  }, []);
+    fetchRegistros(lazyParams.first, lazyParams.rows);
+    fetchLotes();
+  }, [
+    fetchRegistros,
+    lazyParams.first,
+    lazyParams.rows,
+    lazyParams.sortField,
+    lazyParams.sortOrder,
+    lazyParams.globalFilter,
+  ]);
+
+  const onPage = useCallback(
+    (event) => {
+      setLazyParams({
+        ...lazyParams,
+        first: event.first,
+        rows: event.rows,
+        page: event.page + 1,
+      });
+    },
+    [lazyParams]
+  );
+
+  const convertirFecha = (fecha) =>
+    fecha ? fecha.split("-").reverse().join("/") : "";
 
   const formatDateTime = (date, format = "DD-MM-YYYY hh:mm A") => {
     const fmt = new Intl.DateTimeFormat("en-US", {
@@ -113,23 +217,20 @@ function ControlRendimientoCosechayFrass() {
       .replace("A", fmt.dayPeriod || "AM");
   };
 
- 
-
-  const saveRegistro = async () => {
+  const saveRegistro = useCallback(async () => {
     setSubmitted(true);
-  
-    // Validar los campos
+
     const isCantCajasCosechadasInvalido =
-      registro.cant_cajas_cosechadas < 500 || registro.cant_cajas_cosechadas > 2000;
+      registro.cant_cajas_cosechadas < 0 ||
+      registro.cant_cajas_cosechadas > 5000;
     const isKgLarvaFrescaInvalido =
       registro.kg_larva_fresca < 0 || registro.kg_larva_fresca > 12000;
-    const isCantCajasDesechadasInvalido = registro.cant_cajas_desechadas === 0;
+    const isCantCajasDesechadasInvalido = registro.cant_cajas_desechadas < 0;
     const isKgTotalFrassInvalido =
       registro.kg_total_frass < 0 || registro.kg_total_frass > 6000;
     const isKgMaterialGruesoInvalido =
       registro.kg_material_grueso < 0 || registro.kg_material_grueso > 6000;
-  
-    // Actualizar el estado de errores
+
     const erroresValidacion = {
       cant_cajas_cosechadas: isCantCajasCosechadasInvalido,
       kg_larva_fresca: isKgLarvaFrescaInvalido,
@@ -137,47 +238,72 @@ function ControlRendimientoCosechayFrass() {
       kg_total_frass: isKgTotalFrassInvalido,
       kg_material_grueso: isKgMaterialGruesoInvalido,
     };
-  
-    // Verificar si algún valor está fuera de rango
+
     const valoresFueraDeRango = Object.values(erroresValidacion).some(
       (error) => error
     );
-  
-    // Validación principal
-    if (
-      !registro.fec_siembra ||
-      !registro.fec_cosecha ||
-      !registro.cant_cajas_cosechadas ||
-      !registro.kg_larva_fresca ||
-      !registro.cant_cajas_desechadas ||
-      !registro.kg_total_frass ||
-      !registro.kg_material_grueso ||
-      !registro.tipo_control ||
-      !registro.tipo_produccion ||
-      !registro.fec_almacenaje_frass ||
-      !registro.cant_sacos
-    ) {
+
+    if (erroresValidacion.cant_cajas_cosechadas) {
       toast.current.show({
         severity: "error",
         summary: "Error",
-        detail: "Llena todos los campos obligatorios.",
+        detail: `Cajas Cosechadas debe estar entre 0 y 5000`,
         life: 3000,
       });
       return;
     }
-  
-    // Si algún valor está fuera de rango y no hay observaciones, mostrar error
+
+    if (erroresValidacion.kg_larva_fresca) {
+      toast.current.show({
+        severity: "error",
+        summary: "Error",
+        detail: "Larva Fresca debe estar entre 0 y 12000 KG",
+        life: 3000,
+      });
+      return;
+    }
+
+    if (erroresValidacion.cant_cajas_desechadas) {
+      toast.current.show({
+        severity: "error",
+        summary: "Error",
+        detail: "Cajas Desechadas no puede ser menor que 0",
+        life: 3000,
+      });
+      return;
+    }
+
+    if (erroresValidacion.kg_total_frass) {
+      toast.current.show({
+        severity: "error",
+        summary: "Error",
+        detail: "Frass Fino Total debe estar entre 0 y 6000 KG",
+        life: 3000,
+      });
+      return;
+    }
+
+    if (erroresValidacion.kg_material_grueso) {
+      toast.current.show({
+        severity: "error",
+        summary: "Error",
+        detail: "Material Grueso debe estar entre 0 and 6000 KG",
+        life: 3000,
+      });
+      return;
+    }
+
     if (valoresFueraDeRango && !registro.observaciones) {
       const camposInvalidos = Object.keys(erroresValidacion)
         .filter((key) => erroresValidacion[key])
         .map((key) => {
           switch (key) {
             case "cant_cajas_cosechadas":
-              return "Cajas Cosechadas (500 - 2000)";
+              return `Cajas Cosechadas `;
             case "kg_larva_fresca":
               return "Larva Fresca (0 - 12000 KG)";
             case "cant_cajas_desechadas":
-              return "Cajas Desechadas (debe ser 0)";
+              return "Cajas Desechadas (no puede ser menor que 0)";
             case "kg_total_frass":
               return "Frass Fino Total (0 - 6000 KG)";
             case "kg_material_grueso":
@@ -187,7 +313,7 @@ function ControlRendimientoCosechayFrass() {
           }
         })
         .join(", ");
-  
+
       toast.current.show({
         severity: "error",
         summary: "Error",
@@ -196,17 +322,37 @@ function ControlRendimientoCosechayFrass() {
       });
       return;
     }
-  
+
     try {
-      const currentDate = formatDateTime(new Date(), "DD/MM/YYYY"); // Solo fecha
-      const currentTime = formatDateTime(new Date(), "hh:mm A"); // Fecha en formato ISO 8601
-  
+      const currentDate = formatDateTime(new Date(), "DD/MM/YYYY");
+      const currentTime = formatDateTime(new Date(), "hh:mm A");
+
+      const { data: loteExistente, error: loteError } = await supabase
+        .from("Lotes")
+        .select("cant_cajas_cosecha")
+        .eq("base_numero_lote", registro.base_numero_lote)
+        .single();
+
+      if (loteError || !loteExistente) {
+        toast.current.show({
+          severity: "error",
+          summary: "Error",
+          detail: `El lote ${registro.base_numero_lote} no existe.`,
+          life: 3000,
+        });
+        return;
+      }
+
+      const totalCajasProcesadas =
+        parseInt(registro.cant_cajas_cosechadas, 10) +
+        parseInt(registro.cant_cajas_desechadas, 10);
+
       const { data, error } = await supabase
         .from("Control_Rendimiento_CosechayFrass")
         .insert([
           {
-            fec_siembra: registro.fec_siembra,
-            fec_cosecha: registro.fec_cosecha,
+            base_numero_lote: registro.base_numero_lote,
+            fec_cosecha: convertirFecha(registro.fec_cosecha),
             cant_cajas_cosechadas: registro.cant_cajas_cosechadas,
             kg_larva_fresca: registro.kg_larva_fresca,
             cant_cajas_desechadas: registro.cant_cajas_desechadas,
@@ -215,28 +361,45 @@ function ControlRendimientoCosechayFrass() {
             fec_registro: currentDate,
             hor_registro: currentTime,
             observaciones: registro.observaciones,
-            fec_almacenaje_frass: registro.fec_almacenaje_frass,
-            cant_sacos: registro.cant_sacos,
+            operario: registro.operario,
+            turno: registro.turno,
             tipo_produccion: registro.tipo_produccion,
             tipo_control: registro.tipo_control,
           },
         ]);
-  
+
       if (error) {
         console.error("Error en Supabase:", error);
         throw new Error(
-          error.message || "Error desconocido al guardar en Supabase"
+          "Error en Supabase: Mirar consola para ver error", error || "Error desconocido al guardar en Supabase"
         );
       }
-  
+
+      const nuevasCajasCosecha =
+        loteExistente.cant_cajas_cosecha - totalCajasProcesadas;
+
+      const { error: updateError } = await supabase
+        .from("Lotes")
+        .update({
+          cant_cajas_cosecha: nuevasCajasCosecha,
+          fecha_cosecha: currentDate,
+        })
+        .eq("base_numero_lote", registro.base_numero_lote);
+
+      if (updateError) {
+        console.error("Error al actualizar Lotes:", updateError);
+        throw new Error(
+          updateError.message || "Error desconocido al actualizar Lotes"
+        );
+      }
+
       toast.current.show({
         severity: "success",
         summary: "Exitoso",
         detail: "Registro guardado exitosamente",
         life: 3000,
       });
-  
-      // Limpia el estado
+
       setRegistro(emptyRegister);
       setRegistroDialog(false);
       setSubmitted(false);
@@ -248,6 +411,17 @@ function ControlRendimientoCosechayFrass() {
         detail: error.message || "Ocurrió un error al crear el registro",
         life: 3000,
       });
+    }
+  }, [registro, lotes, convertirFecha]);
+
+  const handleKeyPress = (e) => {
+    const invalidChars = ['e', 'E', '+', '-'];
+    if (invalidChars.includes(e.key)) {
+      e.preventDefault();
+    }
+    
+    if (e.key === '.' && e.target.value.includes('.')) {
+      e.preventDefault();
     }
   };
 
@@ -289,6 +463,7 @@ function ControlRendimientoCosechayFrass() {
     return (
       <InputText
         type="number"
+        onKeyDown={handleKeyPress}
         value={options.value}
         onChange={(e) => options.editorCallback(e.target.value)}
       />
@@ -309,21 +484,68 @@ function ControlRendimientoCosechayFrass() {
     return rowData.name !== "Blue Band";
   };
 
-  const onRowEditComplete = async ({ newData }) => {
-    const { id, ...updatedData } = newData;
+  const onRowEditComplete = async ({ newData, data: oldData }) => {
     try {
-      const { error } = await supabase
-        .from("Control_Rendimiento_CosechayFrass")
-        .update(updatedData)
-        .eq("id", id);
+      const diferenciaCosechadas =
+        newData.cant_cajas_cosechadas - oldData.cant_cajas_cosechadas;
+      const diferenciaDesechadas =
+        newData.cant_cajas_desechadas - oldData.cant_cajas_desechadas;
+      const diferenciaTotal = diferenciaCosechadas + diferenciaDesechadas;
 
-      if (error) return console.error("Error al actualizar:", error.message);
+      const { data: lote, error: loteError } = await supabase
+        .from("Lotes")
+        .select("cant_cajas_cosecha")
+        .eq("base_numero_lote", oldData.base_numero_lote)
+        .single();
+
+      if (loteError) throw loteError;
+
+      const nuevasCajasCosecha = lote.cant_cajas_cosecha - diferenciaTotal;
+
+      if (nuevasCajasCosecha < 0) {
+        throw new Error("La cantidad de cajas no puede ser negativa");
+      }
+
+      if (diferenciaTotal > lote.cant_cajas_cosecha) {
+        throw new Error(
+          `No hay suficientes cajas para cosechar. Disponibles: ${lote.cant_cajas_cosecha}`
+        );
+      }
+
+      const { error: updateError } = await supabase
+        .from("Control_Rendimiento_CosechayFrass")
+        .update(newData)
+        .eq("id", newData.id);
+
+      if (updateError) throw updateError;
+
+      const { error: loteUpdateError } = await supabase
+        .from("Lotes")
+        .update({
+          cant_cajas_cosecha: nuevasCajasCosecha,
+          etapa_actual: "Cosecha",
+        })
+        .eq("base_numero_lote", oldData.base_numero_lote);
+
+      if (loteUpdateError) throw loteUpdateError;
 
       setRegistros((prev) =>
-        prev.map((n) => (n.id === id ? { ...n, ...newData } : n))
+        prev.map((item) => (item.id === newData.id ? newData : item))
       );
-    } catch (err) {
-      console.error("Error inesperado:", err);
+
+      toast.current.show({
+        severity: "success",
+        summary: "Éxito",
+        detail: "Registro actualizado correctamente",
+        life: 3000,
+      });
+    } catch (error) {
+      toast.current.show({
+        severity: "error",
+        summary: "Error en edición",
+        detail: error.message || "Error al actualizar el registro",
+        life: 3000,
+      });
     }
   };
 
@@ -366,12 +588,15 @@ function ControlRendimientoCosechayFrass() {
     );
   };
 
+ 
+
   const header = (
     <div className="flex flex-wrap gap-2 align-items-center justify-content-between">
       <InputText
         type="search"
-        onInput={(e) => setGlobalFilter(e.target.value)}
-        placeholder="Buscador Global..."
+        value={globalFilter}
+        onChange={onFilter}  // Cambiado de onInput a onChange
+        placeholder="Buscar por Lote u Fecha de Registro"
       />
     </div>
   );
@@ -400,17 +625,17 @@ function ControlRendimientoCosechayFrass() {
   );
 
   const cols = [
+    { field: "numero_lote", header: "Número Lote" },
     { field: "tipo_produccion", header: "Tipo Producción" },
     { field: "tipo_control", header: "Tipo Control" },
-    { field: "fec_siembra", header: "Fecha Siembra" },
     { field: "fec_cosecha", header: "Fecha Cosecha" },
     { field: "cant_cajas_cosechadas", header: "Cajas Cosechadas" },
     { field: "kg_larva_fresca", header: "Larva Fresca (KG)" },
     { field: "cant_cajas_desechadas", header: "Cajas Desechadas" },
     { field: "kg_total_frass", header: "Total Frass (KG)" },
     { field: "kg_material_grueso", header: "Material Grueso (KG)" },
-    { field: "cant_sacos", header: "Sacos" },
-    { field: "fec_almacenaje_frass", header: "Fecha Almacenaje Frass" },
+    { field: "operario", header: "Operario" },
+    { field: "turno", header: "Turno" },
     { field: "observaciones", header: "Observaciones" },
     { field: "registrado", header: "Registrado" },
   ];
@@ -435,10 +660,12 @@ function ControlRendimientoCosechayFrass() {
     doc.setFontSize(18);
     doc.text("Registros de Control Rendimiento Cosecha y Frass", 14, 22);
 
-    const exportData = selectedRegistros.map(({ fec_registro, hor_registro, ...row }) => ({
-      ...row,
-      registrado: `${fec_registro || ""} ${hor_registro || ""}`,
-    }));
+    const exportData = selectedRegistros.map(
+      ({ fec_registro, hor_registro, ...row }) => ({
+        ...row,
+        registrado: `${fec_registro || ""} ${hor_registro || ""}`,
+      })
+    );
 
     const columnsPerPage = 5;
     const maxHeightPerColumn = 10;
@@ -460,11 +687,21 @@ function ControlRendimientoCosechayFrass() {
       exportColumns.forEach(({ title, dataKey }, index) => {
         const value = row[dataKey];
         doc.setFillColor(...headerColor);
-        doc.rect(startX, currentY + (index * maxHeightPerColumn), 180, maxHeightPerColumn, 'F');
+        doc.rect(
+          startX,
+          currentY + index * maxHeightPerColumn,
+          180,
+          maxHeightPerColumn,
+          "F"
+        );
         doc.setTextColor(255);
-        doc.text(title, startX + 2, currentY + (index * maxHeightPerColumn) + 7);
+        doc.text(title, startX + 2, currentY + index * maxHeightPerColumn + 7);
         doc.setTextColor(...textColor);
-        doc.text(`${value}`, startX + 90, currentY + (index * maxHeightPerColumn) + 7);
+        doc.text(
+          `${value}`,
+          startX + 90,
+          currentY + index * maxHeightPerColumn + 7
+        );
       });
 
       currentY += rowHeight;
@@ -484,18 +721,24 @@ function ControlRendimientoCosechayFrass() {
       return;
     }
 
-    const headers = cols.map(col => col.header);
-    const exportData = selectedRegistros.map(({ fec_registro, hor_registro, ...registro }) => ({
-      ...registro,
-      registrado: `${fec_registro || ""} ${hor_registro || ""}`,
-    }));
+    const headers = cols.map((col) => col.header);
+    const exportData = selectedRegistros.map(
+      ({ fec_registro, hor_registro, ...registro }) => ({
+        ...registro,
+        registrado: `${fec_registro || ""} ${hor_registro || ""}`,
+      })
+    );
 
-    const rows = exportData.map(registro => cols.map(col => registro[col.field]));
+    const rows = exportData.map((registro) =>
+      cols.map((col) => registro[col.field])
+    );
 
     const dataToExport = [headers, ...rows];
     const ws = XLSX.utils.aoa_to_sheet(dataToExport);
 
-    ws["!cols"] = cols.map(col => ({ width: Math.max(col.header.length, 10) }));
+    ws["!cols"] = cols.map((col) => ({
+      width: Math.max(col.header.length, 10),
+    }));
 
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, "Registros");
@@ -534,6 +777,15 @@ function ControlRendimientoCosechayFrass() {
             right={rightToolbarTemplate}
           ></Toolbar>
           <DataTable
+            onSort={onSort}
+            sortField={lazyParams.sortField}
+            sortOrder={lazyParams.sortOrder}
+            lazy
+            first={lazyParams.first}
+            rows={lazyParams.rows}
+            totalRecords={totalRecords}
+            onPage={onPage}
+            loading={loading}
             editMode="row"
             onRowEditComplete={onRowEditComplete}
             ref={dt}
@@ -543,18 +795,35 @@ function ControlRendimientoCosechayFrass() {
             globalFilter={globalFilter}
             header={header}
             paginator
-            rows={10}
             rowsPerPageOptions={[5, 10, 25]}
             paginatorTemplate="FirstPageLink PrevPageLink PageLinks NextPageLink LastPageLink CurrentPageReport RowsPerPageDropdown"
             currentPageReportTemplate="Mostrando del {first} al {last} de {totalRecords} Registros"
           >
             <Column selectionMode="multiple" exportable={false}></Column>
-            <Column field="fec_registro" header="Fecha Registro" sortable />
-            <Column field="hor_registro" header="Hora Registro" sortable />
-            <Column field="tipo_produccion" header="Tipo Producción" editor={(options) => textEditor(options)} sortable />
-            <Column field="tipo_control" header="Tipo Control" editor={(options) => textEditor(options)} sortable />
-            <Column field="fec_siembra" header="Fecha Siembra" editor={(options) => dateEditor(options)} sortable />
-            <Column field="fec_cosecha" header="Fecha Cosecha" editor={(options) => dateEditor(options)} sortable />
+            <Column
+              field="numero_lote"
+              header="Número Lote"
+              sortable
+              style={{ minWidth: "10rem" }}
+            ></Column>
+            <Column
+              field="fec_cosecha"
+              header="Fecha Cosecha"
+              editor={(options) => dateEditor(options)}
+              sortable
+            />
+            <Column
+              field="tipo_produccion"
+              header="Tipo Producción"
+              editor={(options) => textEditor(options)}
+              sortable
+            />
+            <Column
+              field="tipo_control"
+              header="Tipo Control"
+              editor={(options) => textEditor(options)}
+              sortable
+            />
             <Column
               field="cant_cajas_cosechadas"
               header="Cajas Cosechadas"
@@ -573,21 +842,38 @@ function ControlRendimientoCosechayFrass() {
               sortable
               editor={(options) => numberEditor(options)}
             />
-            <Column field="kg_total_frass" header="Total Frass (KG)" editor={(options) => floatEditor(options)} sortable />
+            <Column
+              field="kg_total_frass"
+              header="Total Frass (KG)"
+              editor={(options) => floatEditor(options)}
+              sortable
+            />
             <Column
               field="kg_material_grueso"
               header="Material Grueso (KG)"
               sortable
               editor={(options) => floatEditor(options)}
             />
-            <Column field="cant_sacos" header="Sacos" sortable />
             <Column
-              field="fec_almacenaje_frass"
-              header="Fecha Almacenaje Frass"
+              field="operario"
+              header="Operario"
               sortable
-              editor={(options) => dateEditor(options)}
+              editor={(options) => textEditor(options)}
             />
-            <Column field="observaciones" header="Observaciones" sortable editor={(options) => textEditor(options)} />
+            <Column
+              field="turno"
+              header="Turno"
+              sortable
+              editor={(options) => textEditor(options)}
+            />
+            <Column
+              field="observaciones"
+              header="Observaciones"
+              sortable
+              editor={(options) => textEditor(options)}
+            />
+            <Column field="fec_registro" header="Fecha Registro" sortable />
+            <Column field="hor_registro" header="Hora Registro" sortable />
             <Column
               header="Herramientas"
               rowEditor={allowEdit}
@@ -608,20 +894,45 @@ function ControlRendimientoCosechayFrass() {
         onHide={hideDialog}
       >
         <div className="field">
-          <label htmlFor="fec_siembra" className="font-bold">
-            Fecha Siembra{" "}
-            {submitted && !registro.fec_siembra && (
+          <label htmlFor="base_numero_lote" className="font-bold">
+            Número de lote{" "}
+            {submitted && !registro.base_numero_lote && (
               <small className="p-error">Requerido.</small>
             )}
           </label>
-          <InputText
-            type="date"
-            id="fec_siembra"
-            value={registro.fec_siembra}
-            onChange={(e) => onInputChange(e, "fec_siembra")}
-            required
+
+          <Dropdown
+            value={registro.base_numero_lote}
+            filter
+            onChange={async (e) => {
+              const loteSeleccionado = lotes.find(
+                (l) => l.base_numero_lote === e.value
+              );
+
+              if (loteSeleccionado) {
+                const { data: loteActual, error } = await supabase
+                  .from("Lotes")
+                  .select("cant_cajas_cosecha")
+                  .eq("base_numero_lote", e.value)
+                  .single();
+
+                if (!error && loteActual) {
+                  setRegistro({
+                    ...registro,
+                    base_numero_lote: e.value,
+                    cant_cajas_lote: loteActual.cant_cajas_cosecha || 0,
+                  });
+                }
+              }
+            }}
+            options={[...(lotes || [])]}
+            optionLabel="base_numero_lote"
+            optionValue="base_numero_lote"
+            placeholder="Selecciona un Número de lote"
+            className="w-full md:w-14rem"
             autoFocus
           />
+
           <br />
           <label htmlFor="fec_cosecha" className="font-bold">
             Fecha Cosecha{" "}
@@ -635,22 +946,14 @@ function ControlRendimientoCosechayFrass() {
             value={registro.fec_cosecha}
             onChange={(e) => onInputChange(e, "fec_cosecha")}
             required
-            autoFocus
           />
           <br />
           <label htmlFor="cant_cajas_cosechadas" className="font-bold">
-            Cajas Cosechadas (500 - 2000){" "}
-            {submitted && !registro.cant_cajas_cosechadas && (
-              <small className="p-error">Requerido.</small>
-            )}
-            {erroresValidacion.cant_cajas_cosechadas && (
-              <small className="p-error">
-                Cantidad Cajas Procesadas Fuera de rango 500 a 2000.
-              </small>
-            )}
+            Cajas Cosechadas 
           </label>
           <InputText
             type="number"
+            onKeyDown={handleKeyPress}
             id="cant_cajas_cosechadas"
             value={registro.cant_cajas_cosechadas}
             onChange={(e) => onInputChange(e, "cant_cajas_cosechadas")}
@@ -659,9 +962,6 @@ function ControlRendimientoCosechayFrass() {
           <br />
           <label htmlFor="kg_larva_fresca" className="font-bold">
             Larva Fresca Estandar (KG) (0 - 12000){" "}
-            {submitted && !registro.kg_larva_fresca && (
-              <small className="p-error">Requerido.</small>
-            )}
             {erroresValidacion.kg_larva_fresca && (
               <small className="p-error">
                 Kg Larva Fresca fuera de rango 0 a 12000.
@@ -670,6 +970,7 @@ function ControlRendimientoCosechayFrass() {
           </label>
           <InputText
             type="number"
+            onKeyDown={handleKeyPress}
             id="kg_larva_fresca"
             value={registro.kg_larva_fresca}
             onChange={(e) => onInputChange(e, "kg_larva_fresca")}
@@ -678,9 +979,6 @@ function ControlRendimientoCosechayFrass() {
           <br />
           <label htmlFor="cant_cajas_desechadas" className="font-bold">
             Cajas Desechadas (=0){" "}
-            {submitted && !registro.cant_cajas_desechadas && (
-              <small className="p-error">Requerido.</small>
-            )}
             {erroresValidacion.cant_cajas_desechadas && (
               <small className="p-error">
                 Kg Larva Fresca fuera de rango 0 a 12000.
@@ -689,6 +987,7 @@ function ControlRendimientoCosechayFrass() {
           </label>
           <InputText
             type="number"
+            onKeyDown={handleKeyPress}
             id="cant_cajas_desechadas"
             value={registro.cant_cajas_desechadas}
             onChange={(e) => onInputChange(e, "cant_cajas_desechadas")}
@@ -697,9 +996,6 @@ function ControlRendimientoCosechayFrass() {
           <br />
           <label htmlFor="kg_total_frass" className="font-bold">
             Frass Fino Total (KG) (0 - 6000){" "}
-            {submitted && !registro.kg_total_frass && (
-              <small className="p-error">Requerido.</small>
-            )}
             {erroresValidacion.kg_total_frass && (
               <small className="p-error">
                 Kg Total Frass Fuera de rango 0 a 6000.
@@ -708,6 +1004,7 @@ function ControlRendimientoCosechayFrass() {
           </label>
           <InputText
             type="number"
+            onKeyDown={handleKeyPress}
             id="kg_total_frass"
             value={registro.kg_total_frass}
             onChange={(e) => onInputChange(e, "kg_total_frass")}
@@ -716,9 +1013,6 @@ function ControlRendimientoCosechayFrass() {
           <br />
           <label htmlFor="kg_material_grueso" className="font-bold">
             Total Material Grueso (KG) (0 - 6000){" "}
-            {submitted && !registro.kg_material_grueso && (
-              <small className="p-error">Requerido.</small>
-            )}
             {erroresValidacion.kg_material_grueso && (
               <small className="p-error">
                 Kg Material Grueso Fuera de rango 0 a 6000.
@@ -727,6 +1021,7 @@ function ControlRendimientoCosechayFrass() {
           </label>
           <InputText
             type="number"
+            onKeyDown={handleKeyPress}
             id="kg_material_grueso"
             value={registro.kg_material_grueso}
             onChange={(e) => onInputChange(e, "kg_material_grueso")}
@@ -763,37 +1058,38 @@ function ControlRendimientoCosechayFrass() {
             placeholder="Selecciona un tipo"
             required
           />
-          <br />
-
-          <label htmlFor="fec_almacenaje_frass" className="font-bold">
-            Fecha Almacenaje Frass{" "}
-            {submitted && !registro.fec_almacenaje_frass && (
+          <label htmlFor="operario" className="font-bold">
+            Operario{" "}
+            {submitted && !registro.operario && (
               <small className="p-error">Requerido.</small>
             )}
           </label>
           <InputText
-            type="date"
-            id="fec_almacenaje_frass"
-            value={registro.fec_almacenaje_frass}
-            onChange={(e) => onInputChange(e, "fec_almacenaje_frass")}
+            id="operario"
+            value={registro.operario}
+            onChange={(e) => onInputChange(e, "operario")}
             required
-            autoFocus
           />
+          
           <br />
-          <label htmlFor="cant_sacos" className="font-bold">
-            Cantidad Sacos{" "}
-            {submitted && !registro.cant_sacos && (
+          
+          <label htmlFor="turno" className="font-bold">
+            Turno{" "}
+            {submitted && !registro.turno && (
               <small className="p-error">Requerido.</small>
             )}
           </label>
-          <InputText
-            type="number"
-            id="cant_sacos"
-            value={registro.cant_sacos}
-            onChange={(e) => onInputChange(e, "cant_sacos")}
+          <Dropdown
+            id="turno"
+            value={registro.turno}
+            options={turnosDisponibles}
+            onChange={(e) => onInputChange(e, "turno")}
+            placeholder="Seleccione el turno"
             required
           />
+          
           <br />
+          
           <label htmlFor="observaciones" className="font-bold">
             Observaciones{" "}
             {observacionesObligatorio && (

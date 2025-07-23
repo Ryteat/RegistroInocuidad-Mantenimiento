@@ -1,9 +1,9 @@
 import React, { useEffect, useState, useRef } from "react";
 import { useNavigate } from "react-router-dom";
-import "./GestionUsuarios.css"; // Estilos de la tabla
-import supabase from "../../../supabaseClient"; // Conexión a Supabase
-import "primereact/resources/themes/lara-light-indigo/theme.css"; // Tema
-import "primeicons/primeicons.css"; // Íconos
+import "./GestionUsuarios.css";
+import supabase from "../../../supabaseClient";
+import "primereact/resources/themes/lara-light-indigo/theme.css";
+import "primeicons/primeicons.css";
 import { DataTable } from "primereact/datatable";
 import { Column } from "primereact/column";
 import { Button } from "primereact/button";
@@ -11,47 +11,49 @@ import { Toolbar } from "primereact/toolbar";
 import { Dialog } from "primereact/dialog";
 import { InputText } from "primereact/inputtext";
 import { Toast } from "primereact/toast";
-import { Dropdown } from "primereact/dropdown";
+import { MultiSelect } from "primereact/multiselect";
 import logo2 from "../../../assets/mosca.png";
 
 function GestionUsuarios() {
-  // Estado inicial de un usuario vacío
   const emptyUser = {
-    //id: null,
     username: "",
     password: "",
-    departamento: "",
+    departamento: [],
   };
 
-  const [usuarios, setUsuarios] = useState([]); // Estado para almacenar los usuarios
-  const [usuario, setUsuario] = useState(emptyUser); // Estado para el usuario actual
-  const toast = useRef(null); // Referencia para mostrar mensajes emergentes
-  const [selectedUsuario, setSelectedUsuario] = useState(null); // Estado para el usuario seleccionado
-  const [globalFilter, setGlobalFilter] = useState(null); // Estado para el filtro global
-  const [submitted, setSubmitted] = useState(false); // Estado para controlar el envío del formulario
-  const [usuarioDialog, setUsuarioDialog] = useState(false); // Estado para mostrar/ocultar el diálogo de usuario
-  const [deleteUsuarioDialog, setDeleteUsuarioDialog] = useState(false); // Estado para mostrar/ocultar el diálogo de eliminación
-  const [showPassword, setShowPassword] = useState(false); // Estado para mostrar/ocultar la contraseña
-  const navigate = useNavigate(); // Navegación
+  const [usuarios, setUsuarios] = useState([]);
+  const [usuario, setUsuario] = useState(emptyUser);
+  const toast = useRef(null);
+  const [selectedUsuario, setSelectedUsuario] = useState(null);
+  const [globalFilter, setGlobalFilter] = useState(null);
+  const [submitted, setSubmitted] = useState(false);
+  const [usuarioDialog, setUsuarioDialog] = useState(false);
+  const [deleteUsuarioDialog, setDeleteUsuarioDialog] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
+  const navigate = useNavigate();
 
-  // Opciones de departamento
   const departamentos = [
-    { name: "Dieta", value: "Dieta" },
-    { name: "Hatchery", value: "Hatchery" },
-    { name: "Horno", value: "Horno" },
-    { name: "Cosecha", value: "Cosecha" },
-    { name: "Empaque", value: "Empaque" },
-    { name: "Mantenimiento", value: "Mantenimiento" },
-    { name: "Calidad", value: "Calidad" },
-    { name: "Gerencia", value: "Gerencia" },
+    "Dieta",
+    "Hatchery",
+    "Horno",
+    "Cosecha",
+    "Mantenimiento",
+    "Calidad",
+    "Visualizar",
+    "Gerencia"
   ];
 
-  // Fetch de usuarios desde Supabase
   const fetchUsuarios = async () => {
     try {
       const { data, error } = await supabase.from("Usuarios").select();
       if (error) throw error;
-      setUsuarios(data || []);
+
+      const formattedData = data.map(user => ({
+        ...user,
+        departamento: user.departamento ? user.departamento.split(',') : []
+      }));
+      
+      setUsuarios(formattedData);
     } catch (error) {
       console.error("Error al obtener usuarios:", error.message);
       toast.current.show({
@@ -64,15 +66,13 @@ function GestionUsuarios() {
   };
 
   useEffect(() => {
-    fetchUsuarios(); // Cargar usuarios al montar el componente
+    fetchUsuarios();
   }, []);
 
-  // Guardar o actualizar un usuario
   const saveUsuario = async () => {
     setSubmitted(true);
-  
-    // Validar campos obligatorios
-    if (!usuario.username || !usuario.password || !usuario.departamento) {
+    
+    if (!usuario.username || !usuario.password || usuario.departamento.length === 0) {
       toast.current.show({
         severity: "error",
         summary: "Error",
@@ -81,41 +81,38 @@ function GestionUsuarios() {
       });
       return;
     }
-  
+
     try {
+      const departamentoString = usuario.departamento.join(',');
+      const userData = {
+        username: usuario.username,
+        password: usuario.password,
+        departamento: departamentoString
+      };
+
       if (usuario.id) {
-        // Actualizar usuario existente
         const { error } = await supabase
           .from("Usuarios")
-          .update(usuario)
+          .update(userData)
           .eq("id", usuario.id);
         if (error) throw error;
-        toast.current.show({
-          severity: "success",
-          summary: "Éxito",
-          detail: "Usuario actualizado correctamente",
-          life: 3000,
-        });
       } else {
-        // Crear nuevo usuario sin asignar un id manualmente
-        const { error } = await supabase.from("Usuarios").insert([{
-          
-          username: usuario.username,
-          password: usuario.password,
-          departamento: usuario.departamento
-        }]);
+        const { error } = await supabase
+          .from("Usuarios")
+          .insert([userData]);
         if (error) throw error;
-        toast.current.show({
-          severity: "success",
-          summary: "Éxito",
-          detail: "Usuario creado correctamente",
-          life: 3000,
-        });
       }
-  
-      setUsuarioDialog(false); // Cerrar diálogo
-      setUsuario(emptyUser); // Reiniciar estado del usuario
-      fetchUsuarios(); // Recargar lista de usuarios
+
+      toast.current.show({
+        severity: "success",
+        summary: "Éxito",
+        detail: `Usuario ${usuario.id ? "actualizado" : "creado"} correctamente`,
+        life: 3000,
+      });
+
+      setUsuarioDialog(false);
+      setUsuario(emptyUser);
+      fetchUsuarios();
     } catch (error) {
       console.error("Error al guardar usuario:", error.message);
       toast.current.show({
@@ -127,32 +124,22 @@ function GestionUsuarios() {
     }
   };
 
-  // Eliminar un usuario
   const deleteUsuario = async () => {
-    if (!usuario.id) {
-      toast.current.show({
-        severity: "error",
-        summary: "Error",
-        detail: "No se ha seleccionado un usuario válido para eliminar",
-        life: 3000,
-      });
-      return;
-    }
-  
     try {
       const { error } = await supabase
         .from("Usuarios")
         .delete()
         .eq("id", usuario.id);
       if (error) throw error;
+
       toast.current.show({
         severity: "success",
         summary: "Éxito",
         detail: "Usuario eliminado correctamente",
         life: 3000,
       });
-      setDeleteUsuarioDialog(false); // Cerrar diálogo
-      fetchUsuarios(); // Recargar lista de usuarios
+      setDeleteUsuarioDialog(false);
+      fetchUsuarios();
     } catch (error) {
       console.error("Error al eliminar usuario:", error.message);
       toast.current.show({
@@ -164,13 +151,11 @@ function GestionUsuarios() {
     }
   };
 
-  // Confirmar eliminación de un usuario
   const confirmDeleteUsuario = (usuario) => {
     setUsuario(usuario);
     setDeleteUsuarioDialog(true);
   };
 
-  // Plantilla del toolbar
   const leftToolbarTemplate = () => {
     return (
       <div className="flex flex-wrap gap-2">
@@ -194,7 +179,6 @@ function GestionUsuarios() {
     );
   };
 
-  // Diálogo de usuario
   const usuarioDialogFooter = (
     <React.Fragment>
       <Button
@@ -207,7 +191,6 @@ function GestionUsuarios() {
     </React.Fragment>
   );
 
-  // Diálogo de confirmación de eliminación
   const deleteUsuarioDialogFooter = (
     <React.Fragment>
       <Button
@@ -225,7 +208,6 @@ function GestionUsuarios() {
     </React.Fragment>
   );
 
-  // Función para alternar la visibilidad de la contraseña
   const togglePasswordVisibility = () => {
     setShowPassword(!showPassword);
   };
@@ -238,35 +220,28 @@ function GestionUsuarios() {
         Gestión de Usuarios
       </h1>
       <div className="welcome-message">
-          <p>
-            Bienvenido al sistema de Gestión de Usuarios el cualpermite administrar 
-            de manera eficiente los usuarios registrados en el sistema. Desde esta interfaz,
-            puedes agregar nuevos usuarios, editar la información de usuarios existentes y 
-            eliminar usuarios que ya no requieran acceso.
-          </p>
-        </div>
-        <div className="buttons-container">
-          <button onClick={() => navigate(-1)} className="return-button">
-            Volver
-          </button>
-          <br />
-          <br />
-          <button onClick={() => navigate(-2)} className="menu-button">
-            Menú principal
-          </button>
-        </div>
+        <p>
+          Bienvenido al sistema de Gestión de Usuarios el cual permite administrar 
+          de manera eficiente los usuarios registrados en el sistema. Desde esta interfaz,
+          puedes agregar nuevos usuarios, editar la información de usuarios existentes y 
+          eliminar usuarios que ya no requieran acceso.
+        </p>
+      </div>
+      <div className="buttons-container">
+        <button onClick={() => navigate(-1)} className="return-button">
+          Volver
+        </button>
+        <br />
+        <br />
+        <button onClick={() => navigate(-2)} className="menu-button">
+          Menú principal
+        </button>
+      </div>
       <Toolbar className="mb-4" left={leftToolbarTemplate} />
       <DataTable
         value={usuarios}
         selection={selectedUsuario}
-        onSelectionChange={(e) => {
-          // Si la fila seleccionada ya está seleccionada, la deseleccionamos
-          if (selectedUsuario && selectedUsuario.id === e.value.id) {
-            setSelectedUsuario(null);
-          } else {
-            setSelectedUsuario(e.value);
-          }
-        }}
+        onSelectionChange={(e) => setSelectedUsuario(e.value)}
         dataKey="id"
         paginator
         rows={10}
@@ -289,7 +264,12 @@ function GestionUsuarios() {
       >
         <Column selectionMode="single" exportable={false} />
         <Column field="username" header="Nombre de Usuario" sortable />
-        <Column field="departamento" header="Departamento" sortable />
+        <Column 
+          field="departamento" 
+          header="Departamentos" 
+          body={(rowData) => rowData.departamento.join(', ')}
+          sortable 
+        />
         <Column
           body={(rowData) => (
             <div className="actions">
@@ -297,7 +277,7 @@ function GestionUsuarios() {
                 icon="pi pi-pencil"
                 className="p-button-rounded p-button-success mr-2"
                 onClick={() => {
-                  setUsuario(rowData);
+                  setUsuario({ ...rowData });
                   setUsuarioDialog(true);
                 }}
               />
@@ -308,7 +288,6 @@ function GestionUsuarios() {
         />
       </DataTable>
 
-      {/* Diálogo para agregar/editar usuario */}
       <Dialog
         visible={usuarioDialog}
         style={{ width: "450px" }}
@@ -318,7 +297,7 @@ function GestionUsuarios() {
         footer={usuarioDialogFooter}
         onHide={() => {
           setUsuarioDialog(false);
-          setShowPassword(false); // Ocultar la contraseña al cerrar el diálogo
+          setShowPassword(false);
         }}
       >
         <div className="field">
@@ -326,9 +305,7 @@ function GestionUsuarios() {
           <InputText
             id="username"
             value={usuario.username}
-            onChange={(e) =>
-              setUsuario({ ...usuario, username: e.target.value })
-            }
+            onChange={(e) => setUsuario({ ...usuario, username: e.target.value })}
             required
             autoFocus
           />
@@ -340,9 +317,7 @@ function GestionUsuarios() {
               id="password"
               type={showPassword ? "text" : "password"}
               value={usuario.password}
-              onChange={(e) =>
-                setUsuario({ ...usuario, password: e.target.value })
-              }
+              onChange={(e) => setUsuario({ ...usuario, password: e.target.value })}
               required
             />
             <Button
@@ -353,21 +328,17 @@ function GestionUsuarios() {
           </div>
         </div>
         <div className="field">
-          <label htmlFor="departamento">Departamento</label>
-          <Dropdown
-            id="departamento"
+          <label htmlFor="departamento">Departamentos</label>
+          <MultiSelect
             value={usuario.departamento}
             options={departamentos}
-            onChange={(e) =>
-              setUsuario({ ...usuario, departamento: e.value })
-            }
-            optionLabel="name"
-            placeholder="Seleccione un departamento"
+            onChange={(e) => setUsuario({ ...usuario, departamento: e.value })}
+            placeholder="Seleccione departamentos"
+            display="chip"
           />
         </div>
       </Dialog>
 
-      {/* Diálogo para confirmar eliminación */}
       <Dialog
         visible={deleteUsuarioDialog}
         style={{ width: "450px" }}
@@ -377,10 +348,7 @@ function GestionUsuarios() {
         onHide={() => setDeleteUsuarioDialog(false)}
       >
         <div className="confirmation-content">
-          <i
-            className="pi pi-exclamation-triangle mr-3"
-            style={{ fontSize: "2rem" }}
-          />
+          <i className="pi pi-exclamation-triangle mr-3" style={{ fontSize: "2rem" }} />
           {usuario && (
             <span>
               ¿Estás seguro de que deseas eliminar al usuario{" "}

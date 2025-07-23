@@ -1,5 +1,5 @@
 import React from 'react'
-import Gerencia from '../../Components/Gerencia/Gerencia'
+import Gerencia from '../../components/Gerencia/Gerencia'
 
 
 const PagesGerencia = () => {
