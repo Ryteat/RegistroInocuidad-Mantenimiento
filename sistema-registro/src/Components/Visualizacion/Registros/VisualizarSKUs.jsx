@@ -69,10 +69,16 @@ function VisualizarSKUs() {
           .select("numero_sku, lote, fecha_produccion", { count: "exact" })
           .range(start, start + limit - 1);
         
-        // Consulta para Larva Molida - ajustada a la estructura real
+        // Consulta para Larva Molida
         let queryLarvaMolida = supabase
           .from("Control_Larva_Molida")
           .select("numero_sku, lotes, fecha_prod", { count: "exact" })
+          .range(start, start + limit - 1);
+
+        // Nueva consulta para Reempaque
+        let queryReempaque = supabase
+          .from("Control_Reempaque_PT")
+          .select("numero_sku, lotes_utilizados, fecha_proceso", { count: "exact" })
           .range(start, start + limit - 1);
 
         // Aplicar ordenamiento
@@ -83,11 +89,15 @@ function VisualizarSKUs() {
           
           queryProductoTerminado = queryProductoTerminado.order(lazyParams.sortField, orderOptions);
           
-          // Mapear campos para Larva Molida
           const sortFieldLarva = lazyParams.sortField === 'lote' ? 'lotes' : 
                               lazyParams.sortField === 'fecha_produccion' ? 'fecha_prod' : 
                               lazyParams.sortField;
           queryLarvaMolida = queryLarvaMolida.order(sortFieldLarva, orderOptions);
+
+          const sortFieldReempaque = lazyParams.sortField === 'lote' ? 'lotes_utilizados' : 
+                                  lazyParams.sortField === 'fecha_produccion' ? 'fecha_proceso' : 
+                                  lazyParams.sortField;
+          queryReempaque = queryReempaque.order(sortFieldReempaque, orderOptions);
         }
 
         // Aplicar filtro global
@@ -99,31 +109,45 @@ function VisualizarSKUs() {
           queryLarvaMolida = queryLarvaMolida.or(
             `numero_sku.ilike.%${filter}%,lotes.ilike.%${filter}%`
           );
+          queryReempaque = queryReempaque.or(
+            `numero_sku.ilike.%${filter}%,lotes_utilizados.ilike.%${filter}%`
+          );
         }
 
         // Ejecutar consultas
         const [
           { data: dataProductoTerminado, count: countProductoTerminado },
-          { data: dataLarvaMolida, count: countLarvaMolida }
+          { data: dataLarvaMolida, count: countLarvaMolida },
+          { data: dataReempaque, count: countReempaque }
         ] = await Promise.all([
           queryProductoTerminado,
-          queryLarvaMolida
+          queryLarvaMolida,
+          queryReempaque
         ]);
 
-        // Mapear datos de Larva Molida para unificar estructura
+        // Mapear datos para unificar estructura
         const larvaMolidaMapped = (dataLarvaMolida || []).map(item => ({
           numero_sku: item.numero_sku,
           lote: item.lotes,
-          fecha_produccion: item.fecha_prod
+          fecha_produccion: item.fecha_prod,
+          tipo: "Larva Molida"
+        }));
+
+        const reempaqueMapped = (dataReempaque || []).map(item => ({
+          numero_sku: item.numero_sku,
+          lote: item.lotes_utilizados,
+          fecha_produccion: item.fecha_proceso,
+          tipo: "Reempaque"
         }));
 
         const combinedData = [
-          ...(dataProductoTerminado || []),
-          ...larvaMolidaMapped
+          ...(dataProductoTerminado || []).map(item => ({ ...item, tipo: "Producto Terminado" })),
+          ...larvaMolidaMapped,
+          ...reempaqueMapped
         ];
 
         setSKUs(combinedData);
-        setTotalRecords((countProductoTerminado || 0) + (countLarvaMolida || 0));
+        setTotalRecords((countProductoTerminado || 0) + (countLarvaMolida || 0) + (countReempaque || 0));
       } catch (err) {
         console.error("Error fetching SKUs:", err);
         toast.current.show({
@@ -150,7 +174,8 @@ function VisualizarSKUs() {
         { data: cosechaFrass },
         { data: microondas },
         { data: multilevel },
-        { data: larvaMolida }
+        { data: larvaMolida },
+        { data: reempaque }
       ] = await Promise.all([
         supabase.from("Neonatos_Inoculados").select("*").eq("base_numero_lote", loteNumber),
         supabase.from("Control_Despacho_5dols_LabPro").select("*").eq("base_numero_lote", loteNumber),
@@ -160,7 +185,8 @@ function VisualizarSKUs() {
         supabase.from("Control_Rendimiento_CosechayFrass").select("*").eq("base_numero_lote", loteNumber),
         supabase.from("Control_Rendimiento_Secado_Horno_Microondas").select("*").eq("base_numero_lote", loteNumber),
         supabase.from("Control_Rendimiento_Secado_Horno_Multilevel").select("*").eq("base_numero_lote", loteNumber),
-        supabase.from("Control_Larva_Molida").select("*").eq("lotes", loteNumber)
+        supabase.from("Control_Larva_Molida").select("*").ilike("lotes", `%${loteNumber}%`),
+        supabase.from("Control_Reempaque_PT").select("*").ilike("lotes_utilizados", `%${loteNumber}%`)
       ]);
 
       setRelatedData({
@@ -172,7 +198,8 @@ function VisualizarSKUs() {
         Control_Rendimiento_Secado_Horno_Multilevel: multilevel,
         Control_Movimiento_Cajas_Proceso: despachoDieta,
         Control_Ingreso_Salida_Racks: ingresoSalidaRacks,
-        Control_Larva_Molida: larvaMolida
+        Control_Larva_Molida: larvaMolida,
+        Control_Reempaque_PT: reempaque
       });
     } catch (err) {
       console.error("Error fetching related data:", err);
@@ -323,12 +350,7 @@ function VisualizarSKUs() {
       >
         <Column field="numero_sku" header="SKU" sortable filter filterPlaceholder="Buscar SKU" />
         <Column field="lote" header="Lote(s)" sortable filter filterPlaceholder="Buscar lote" />
-        <Column 
-          field="fecha_produccion" 
-          header="Fecha Producción" 
-          sortable 
-          body={(rowData) => formatDate(rowData.fecha_produccion)}
-        />
+        <Column field="tipo" header="Tipo" sortable />
       </DataTable>
 
       {/* Diálogo para selección de lote */}
@@ -394,7 +416,7 @@ function VisualizarSKUs() {
               ]
             )}
 
-            {/* Control Larva Molida - Ahora con todos los campos correctos */}
+            {/* Control Larva Molida */}
             {renderRelatedTable(
               "Control Larva Molida",
               relatedData.Control_Larva_Molida,
@@ -412,7 +434,25 @@ function VisualizarSKUs() {
               ]
             )}
 
-            {/* Resto de las tablas... */}
+            {/* Control Reempaque PT */}
+            {renderRelatedTable(
+              "Control Reempaque PT",
+              relatedData.Control_Reempaque_PT,
+              [
+                { field: "numero_sku", header: "Número SKU", minWidth: '120px' },
+                { field: "sku_generado", header: "SKU Generado" },
+                { field: "sku_utilizado", header: "SKU Utilizado" },
+                { field: "lotes_utilizados", header: "Lotes Utilizados" },
+                { field: "fecha_proceso", header: "Fecha Proceso", body: (rowData) => formatDate(rowData.fecha_proceso) },
+                { field: "tipo_proceso", header: "Tipo Proceso" },
+                { field: "motivo_proceso", header: "Motivo" },
+                { field: "presentacion_empaque", header: "Presentación" },
+                { field: "unidad_empaque", header: "Unidad" },
+                { field: "operario", header: "Operario" }
+              ]
+            )}
+
+            {/* Otras tablas... */}
             {renderRelatedTable(
               "Control Despacho 5dols LabPro",
               relatedData.Control_Despacho_5dols_LabPro,
@@ -432,7 +472,7 @@ function VisualizarSKUs() {
               ]
             )}
 
-            {/* Agrega más tablas según sea necesario */}
+            {/* Agregar más tablas según sea necesario */}
           </div>
         ) : (
           <div className="loading-container">

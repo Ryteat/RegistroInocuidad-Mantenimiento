@@ -289,7 +289,7 @@ const ControlRendimientoProductoTerminado = () => {
       const diaJulianoFormateado = diaJuliano.toString().padStart(3, "0");
       const año2Digitos = año.toString().slice(-2);
 
-      return `PR${diaJulianoFormateado}${año2Digitos}`;
+      return `LS${diaJulianoFormateado}${año2Digitos}`;
     } catch (error) {
       console.error("Error al generar formato juliano:", error);
       throw new Error("Error al procesar la fecha");
