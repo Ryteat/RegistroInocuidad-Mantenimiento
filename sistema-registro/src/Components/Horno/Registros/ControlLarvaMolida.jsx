@@ -32,6 +32,7 @@ const ControlLarvaMolida = () => {
     tipo_control: "",
     sku: "",
     numero_sku: "",
+    sku_anterior: [],
     lotes: [],
     larva_entera_seca: 0,
     larva_molida: 0,
@@ -51,6 +52,8 @@ const ControlLarvaMolida = () => {
   const navigate = useNavigate();
   const [lotes, setLotes] = useState([]);
   const [skus, setSKUs] = useState([]);
+  const [skusAnteriores, setSkusAnteriores] = useState([]);
+  const [selectedSkusAnteriores, setSelectedSkusAnteriores] = useState([]);
   const [fechaSKU, setFechaSKU] = useState("");
   const [loading, setLoading] = useState(false);
   const [totalRecords, setTotalRecords] = useState(0);
@@ -128,12 +131,22 @@ const ControlLarvaMolida = () => {
   const fetchLotes = useCallback(async () => {
     try {
       const { data, error } = await supabase
-        .from("Lotes")
-        .select()
-        .order("fecha_registro", { ascending: false });
+        .from("Neonatos_Inoculados")
+        .select("base_numero_lote")
+        .order("fec_registro", { ascending: false });
 
       if (error) throw error;
-      setLotes(data || []);
+      
+      // Filtramos valores nulos o vacíos y obtenemos valores únicos
+      const lotesUnicos = [...new Set(data
+        .map(item => item.base_numero_lote)
+        .filter(lote => lote && lote.trim() !== "")
+      )];
+
+      setLotes([
+        { base_numero_lote: "No aplica" }, // Opción "No aplica"
+        ...lotesUnicos.map(lote => ({ base_numero_lote: lote }))
+      ]);
     } catch (err) {
       console.error("Error al obtener lotes:", err);
       toast.current.show({
@@ -148,12 +161,17 @@ const ControlLarvaMolida = () => {
   const fetchSKU = async () => {
     try {
       const { data, error } = await supabase
-        .from("SKU")
-        .select("base_codigo_sku")
+        .from("Control_Larva_Molida")
+        .select("sku")
         .order("fecha_registro", { ascending: false });
 
       if (error) throw error;
-      setSKUs(data || []);
+      
+      const uniqueSKUs = [...new Set(data.map(item => item.sku))].map(sku => ({
+        base_codigo_sku: sku
+      }));
+
+      setSKUs(uniqueSKUs);
     } catch (err) {
       console.error("Error al obtener SKUs:", err);
       toast.current.show({
@@ -165,10 +183,40 @@ const ControlLarvaMolida = () => {
     }
   };
 
+ const fetchSkusAnteriores = async () => {
+    try {
+      const { data, error } = await supabase
+        .from("Control_Rendimiento_Producto_Terminado")
+        .select("numero_sku")
+        .order('fecha_registro', { ascending: false });
+
+      if (error) throw error;
+
+      // Obtenemos SKUs únicos
+      const skusUnicos = [...new Set(data.map(item => item.numero_sku))].filter(sku => sku);
+
+      setSkusAnteriores([
+        { numero_sku: "No aplica" },
+        ...skusUnicos.map(sku => ({ numero_sku: sku }))
+      ]);
+
+    } catch (error) {
+      console.error("Error al obtener SKUs anteriores:", error);
+      toast.current.show({
+        severity: "error",
+        summary: "Error",
+        detail: error.message,
+        life: 5000
+      });
+    }
+  };
+  
+
   useEffect(() => {
     fetchRegistros(lazyParams.first, lazyParams.rows);
     fetchLotes();
     fetchSKU();
+    fetchSkusAnteriores();
   }, [
     fetchRegistros,
     lazyParams.first,
@@ -257,6 +305,8 @@ const ControlLarvaMolida = () => {
     calcularMerma();
   }, [registro.larva_entera_seca, registro.larva_molida, calcularMerma]);
 
+  
+
   const saveRegistro = useCallback(async () => {
     setSubmitted(true);
     
@@ -287,6 +337,7 @@ const ControlLarvaMolida = () => {
       const currentTime = now.toTimeString().slice(0, 5);
       let skuToInsert = registro.sku;
 
+      // Generar nuevo SKU si es necesario
       if (registro.sku === "Nuevo SKU") {
         if (!fechaSKU) {
           throw new Error("Debes proporcionar una fecha para generar el SKU");
@@ -295,7 +346,14 @@ const ControlLarvaMolida = () => {
         const fechaConvertida = convertirFecha(fechaSKU);
         const posibleSKU = generarFormatoJuliano(fechaConvertida);
         
-        if (skus.some((sku) => sku.base_codigo_sku === posibleSKU)) {
+        const { data: existingSKUs, error: skuError } = await supabase
+          .from("Control_Larva_Molida")
+          .select("sku")
+          .eq("sku", posibleSKU);
+
+        if (skuError) throw skuError;
+        
+        if (existingSKUs && existingSKUs.length > 0) {
           toast.current.show({
             severity: "warn",
             detail: `El código SKU ${posibleSKU} ya existe. Selecciónalo.`,
@@ -304,20 +362,10 @@ const ControlLarvaMolida = () => {
           return;
         }
 
-        const { data, error } = await supabase.rpc("generar_sku_base", {
-          p_fecha_sku: fechaConvertida,
-          p_fecha_registro: currentDateDisplay,
-          p_hora_registro: currentTime,
-          p_tipo_sku: "LM",
-        });
-
-        if (error) throw error;
-        
-        skuToInsert = data;
-        setRegistro({ ...registro, sku: data });
+        skuToInsert = posibleSKU;
       }
 
-      // Obtener el consecutivo para el SKU
+      // Obtener consecutivo para el número de SKU
       const { count: consecutivo } = await supabase
         .from("Control_Larva_Molida")
         .select("*", { count: "exact", head: true })
@@ -325,21 +373,13 @@ const ControlLarvaMolida = () => {
 
       const numeroSKU = `${skuToInsert}-${(consecutivo + 1).toString().padStart(3, '0')}`;
 
-      const lotesIds = registro.lotes.map((l) => l.base_numero_lote);
-      const relacionesInsert = lotesIds.map((loteId) => ({
-        sku_base: skuToInsert,
-        base_numero_lote: loteId,
-      }));
+      // Preparar lotes (filtrando "No aplica")
+      const lotesIds = registro.lotes
+        .map((l) => l.base_numero_lote)
+        .filter(lote => lote !== "No aplica");
 
-      const { error: relacionesError } = await supabase
-        .from("sku_lotes")
-        .insert(relacionesInsert);
-
-      if (relacionesError) throw relacionesError;
-
-      const lotesString = registro.lotes.map((l) => l.base_numero_lote).join(", ");
-
-      const { data, error } = await supabase
+      // 1. Primero insertar el registro principal
+      const { data: newRecord, error: insertError } = await supabase
         .from("Control_Larva_Molida")
         .insert([{
           fecha_prod: convertirFecha(registro.fecha_prod),
@@ -348,7 +388,8 @@ const ControlLarvaMolida = () => {
           tipo_control: registro.tipo_control,
           sku: skuToInsert,
           numero_sku: numeroSKU,
-          lotes: lotesString,
+          sku_anterior: registro.sku_anterior?.join(", ") || "No aplica",
+          lotes: lotesIds.join(", "),
           larva_entera_seca: parseFloat(registro.larva_entera_seca) || 0,
           larva_molida: parseFloat(registro.larva_molida) || 0,
           merma: parseFloat(registro.merma) || 0,
@@ -356,16 +397,38 @@ const ControlLarvaMolida = () => {
           observaciones: registro.observaciones,
           fecha_registro: currentDateDisplay,
           hora_registro: currentTime,
-        }]);
+        }])
+        .select(); // Esto es crucial para obtener el registro insertado
 
-      if (error) throw error;
+      if (insertError) throw insertError;
 
-      const { error: updateError } = await supabase
-        .from("Lotes")
-        .update({ fecha_empaque: currentDateDisplay })
-        .in("base_numero_lote", lotesIds);
+      if (!newRecord || newRecord.length === 0) {
+        throw new Error("No se pudo crear el registro principal");
+      }
 
-      if (updateError) throw updateError;
+      // 2. Insertar relaciones SKU-Lotes solo si hay lotes válidos
+      if (lotesIds.length > 0) {
+        const relacionesInsert = lotesIds.map((loteId) => ({
+          sku_base: skuToInsert, // Usamos el SKU que acabamos de insertar
+          base_numero_lote: loteId,
+        }));
+
+        const { error: relacionesError } = await supabase
+          .from("sku_lotes")
+          .insert(relacionesInsert);
+
+        if (relacionesError) throw relacionesError;
+      }
+
+      // 3. Actualizar fechas de empaque en lotes
+      if (lotesIds.length > 0) {
+        const { error: updateError } = await supabase
+          .from("Lotes")
+          .update({ fecha_empaque: currentDateDisplay })
+          .in("base_numero_lote", lotesIds);
+
+        if (updateError) throw updateError;
+      }
 
       toast.current.show({
         severity: "success",
@@ -374,14 +437,19 @@ const ControlLarvaMolida = () => {
         life: 3000,
       });
 
+      // Limpiar el formulario
       setRegistro(emptyRegister);
+      setSelectedSkusAnteriores([]);
       setRegistroDialog(false);
       setSubmitted(false);
       setFechaSKU("");
 
+      // Refrescar datos
       fetchRegistros();
       fetchLotes();
       fetchSKU();
+      fetchSkusAnteriores();
+
     } catch (error) {
       console.error("Error en saveRegistro:", error);
       toast.current.show({
@@ -391,8 +459,7 @@ const ControlLarvaMolida = () => {
         life: 3000,
       });
     }
-  }, [registro, lotes, skus, fechaSKU, fetchRegistros, fetchLotes, fetchSKU]);
-
+  }, [registro, lotes, skus, fechaSKU, fetchRegistros, fetchLotes, fetchSKU, fetchSkusAnteriores]);
   const dateEditor = (options) => {
     const convertToInputFormat = (date) => {
       if (!date) return "";
@@ -556,6 +623,7 @@ const ControlLarvaMolida = () => {
 
   const openNew = () => {
     setRegistro(emptyRegister);
+    setSelectedSkusAnteriores([]);
     setSubmitted(false);
     setRegistroDialog(true);
   };
@@ -584,6 +652,7 @@ const ControlLarvaMolida = () => {
     { field: "hora_fin", header: "Hora Fin" },
     { field: "tipo_control", header: "Tipo de Control" },
     { field: "sku", header: "SKU Base" },
+    { field: "sku_anterior", header: "SKU Anterior" },
     { field: "lotes", header: "Lotes" },
     { field: "larva_entera_seca", header: "Larva Entera Seca (kg)" },
     { field: "larva_molida", header: "Larva Molida (kg)" },
@@ -802,6 +871,12 @@ const ControlLarvaMolida = () => {
               style={{ minWidth: "10rem" }}
             ></Column>
             <Column
+              field="sku_anterior"
+              header="SKU Anterior"
+              sortable
+              style={{ minWidth: "15rem" }}
+            ></Column>
+            <Column
               field="lotes"
               header="Lotes"
               sortable
@@ -840,6 +915,18 @@ const ControlLarvaMolida = () => {
               sortable
               style={{ minWidth: "15rem" }}
               editor={(options) => textEditor(options)}
+            ></Column>
+            <Column
+              field="fecha_registro"
+              header="Fecha Registro"
+              sortable
+              style={{ minWidth: "12rem" }}
+            ></Column>
+            <Column
+              field="hora_registro"
+              header="Hora Registro"
+              sortable
+              style={{ minWidth: "10rem" }}
             ></Column>
             <Column
               header="Herramientas"
@@ -900,6 +987,7 @@ const ControlLarvaMolida = () => {
             </>
           )}
           <br />
+          
           <label htmlFor="tipo_control" className="font-bold">
             Tipo de Control{" "}
             {submitted && !registro.tipo_control && (
@@ -959,6 +1047,28 @@ const ControlLarvaMolida = () => {
             onChange={(e) => onInputChange(e, "hora_fin")}
           />
           <br />
+          <label htmlFor="sku_anterior" className="font-bold">
+            SKU Anterior (Opcional)
+          </label>
+          <MultiSelect
+            value={registro.sku_anterior}
+            onChange={(e) => {
+              // Si selecciona "No aplica", limpiamos los demás SKUs
+              const tieneNoAplica = e.value.includes("No aplica");
+              const nuevosSkus = tieneNoAplica 
+                ? ["No aplica"] 
+                : e.value.filter(sku => sku !== "No aplica");
+              
+              setRegistro({ ...registro, sku_anterior: nuevosSkus });
+            }}
+            options={skusAnteriores}
+            optionLabel="numero_sku"
+            optionValue="numero_sku"
+            placeholder="Seleccione SKUs anteriores"
+            className="w-full"
+            display="chip"
+            filter
+          />
           <label htmlFor="lotes" className="font-bold">
             Lotes{" "}
             {submitted && registro.lotes.length === 0 && (
@@ -967,18 +1077,21 @@ const ControlLarvaMolida = () => {
           </label>
           <MultiSelect
             value={registro.lotes}
-            onChange={(e) =>
-              onInputChange({ target: { value: e.value } }, "lotes")
-            }
-            options={lotes}
+            options={lotes} // Usa la variable lotes en lugar de skusAnteriores
             optionLabel="base_numero_lote"
-            placeholder="Seleccione Lotes"
-            maxSelectedLabels={3}
+            onChange={(e) => {
+              // Si selecciona "No aplica", limpiamos los demás lotes
+              const tieneNoAplica = e.value.some(item => item.base_numero_lote === "No aplica");
+              const nuevosLotes = tieneNoAplica 
+                ? [{ base_numero_lote: "No aplica" }] 
+                : e.value.filter(item => item.base_numero_lote !== "No aplica");
+              
+              setRegistro({ ...registro, lotes: nuevosLotes });
+            }}
+            placeholder="Seleccione lotes"
             className="w-full"
+            display="chip"
             filter
-            filterBy="base_numero_lote"
-            filterPlaceholder="Buscar lotes..."
-            showFilterClear
           />
           <br />
           <Divider />
