@@ -1,8 +1,8 @@
 import React from 'react';
 import ReactDOM from 'react-dom/client';
 import './index.css';
-import { PrimeReactProvider } from 'primereact/api';   
-import { createBrowserRouter, Outlet, RouterProvider } from 'react-router-dom';  
+import { PrimeReactProvider } from 'primereact/api';
+import { createBrowserRouter, Outlet, RouterProvider } from 'react-router-dom';
 
 //imports de las paginas principales
 import Login from './pages/Login/PagesLogin.jsx';
@@ -74,7 +74,7 @@ import PagesControlLarvaMolida from './pages/Horno/Registros/PagesControlLarvaMo
 const Layout = () => {
   return (
     <div>
-      <Outlet/>
+      <Outlet />
     </div>
   )
 }
@@ -114,7 +114,7 @@ const router = createBrowserRouter([{
       ],
     },
 
-    
+
     // Grupo de rutas de Dieta
     {
       path: `/Dieta`,
@@ -145,7 +145,7 @@ const router = createBrowserRouter([{
           path: `GestionUsuarios`,
           element: <GestionUsuarios />,
         }
-        
+
       ],
     },
 
@@ -173,137 +173,139 @@ const router = createBrowserRouter([{
       ],
     },
 
-   // Grupo de rutas de Control de Tiempos
-   {
-    path: `/ControlTiempos`,
-    element: <ControlTiempos />, // único componente registro de ControlTiempos
-  },
+    // Grupo de rutas de Control de Tiempos
+    {
+      path: `/ControlTiempos`,
+      element: <ControlTiempos />, // único componente registro de ControlTiempos
+    },
 
 
-  // Grupo de rutas de Horno
-  {
-    path: `/Horno`,
-    element: <Horno />, // Componente principal de Horno
-    children: [
-      {
-        path: `ControlRendimientoSecadoHornoMultilevel`,
-        element: <ControlRendimientoSecadoHornoMultilevel />,
-      },
-      {
-        path: `ControlRendimientoSecadoHornoMicroondas`,
-        element: <ControlRendimientoSecadoHornoMicroondas />,
-      },
-      {
-        path: `ControlOperativoHornoMultilevel`,
-        element: <ControlOperativoHornoMultilevel />,
-      },
-      {
-        path: `ControlRendimientoProductoTerminado`,
-        element: <ControlRendimientoProductoTerminado />,
-      },
-      {
-        path: `ControlReempaque`,
-        element: <ControlReempaque />,
-      },
-      {
-        path: `ControlLarvaMolida`,
-        element: <PagesControlLarvaMolida />,
-      },
-    ],
-  },
-  
-
-  // Grupo de rutas de Calidad
-  {
-    path: `/Calidad`,
-    element: <Calidad />, // Componente principal de Calidad
-    children: [
-      {
-        path: `ControlCalidadCosecha`,
-        element: <ControlCalidadCosecha />,
-      },
-      {
-        path: `RecepcionMateriasPrimas`,
-        element: <RecepcionMateriasPrimas />,
-      },
-      {
-        path: `ControlNeonatos`,
-        element: <ControlNeonatos />,
-      },
-      {
-        path: `ControlCalidadEngordeHatchery`,
-        element: <ControlCalidadEngordeHatchery />,
-      },
-      
-      {
-        path: `ControlCalidadHornoMicroondas`,
-        element: <ControlCalidadHornoMicroondas />,
-      },
-
-      {
-        path: `ControlCalidadHornoMultilevel`,
-        element: <ControlCalidadHornoMultilevel />,
-      },
-      {
-        path: `ControlCalidadDietaSiembra`,
-        element: <ControlCalidadDietaSiembra />,
-      },
-      
-    ],
-  },
+    // Grupo de rutas de Horno
+    {
+      path: `/Horno`,
+      element: <Horno />, // Componente principal de Horno
+      children: [
+        {
+          path: `ControlRendimientoSecadoHornoMultilevel`,
+          element: <ControlRendimientoSecadoHornoMultilevel />,
+        },
+        {
+          path: `ControlRendimientoSecadoHornoMicroondas`,
+          element: <ControlRendimientoSecadoHornoMicroondas />,
+        },
+        {
+          path: `ControlOperativoHornoMultilevel`,
+          element: <ControlOperativoHornoMultilevel />,
+        },
+        {
+          path: `ControlRendimientoProductoTerminado`,
+          element: <ControlRendimientoProductoTerminado />,
+        },
+        {
+          path: `ControlReempaque`,
+          element: <ControlReempaque />,
+        },
+        {
+          path: `ControlLarvaMolida`,
+          element: <PagesControlLarvaMolida />,
+        },
+      ],
+    },
 
 
-  // Grupo de rutas de Mantenimiento
-  {
-    path: `/Mantenimiento`,
-    element: <Mantenimiento />, // Componente principal de Mantenimiento
-    children: [
-      {
-        path: `LimpiezaDesinfeccionEquiposMaquinariaPesada`,
-        element: <LimpiezaDesinfeccionEquiposMaquinariaPesada />,
-      },
-      {
-        path: `ReporteInspeccion`,
-        element: <ReporteInspeccion />,
-      },
-      {
-        path: `ReporteInspeccionSemanal`,
-        element: <ReporteInspeccionSemanal />,
-      },
-      {
-        path: `PreoperacionalTeletruk`,
-        element: <PreoperacionalTeletruk/>,
-      }
+    // Grupo de rutas de Calidad
+    {
+      path: `/Calidad`,
+      element: <Calidad />, // Componente principal de Calidad
+      children: [
+        {
+          path: `ControlCalidadCosecha`,
+          element: <ControlCalidadCosecha />,
+        },
+        {
+          path: `RecepcionMateriasPrimas`,
+          element: <RecepcionMateriasPrimas />,
+        },
+        {
+          path: `ControlNeonatos`,
+          element: <ControlNeonatos />,
+        },
+        {
+          path: `ControlCalidadEngordeHatchery`,
+          element: <ControlCalidadEngordeHatchery />,
+        },
+
+        {
+          path: `ControlCalidadHornoMicroondas`,
+          element: <ControlCalidadHornoMicroondas />,
+        },
+
+        {
+          path: `ControlCalidadHornoMultilevel`,
+          element: <ControlCalidadHornoMultilevel />,
+        },
+        {
+          path: `ControlCalidadDietaSiembra`,
+          element: <ControlCalidadDietaSiembra />,
+        },
+
+      ],
+    },
 
 
-    ],
-  },
+    // Grupo de rutas de Mantenimiento
+    {
+      path: `/Mantenimiento`,
+      element: <Mantenimiento />, // Componente principal de Mantenimiento
+      children: [
+        {
+          path: `LimpiezaDesinfeccionEquiposMaquinariaPesada`,
+          element: <LimpiezaDesinfeccionEquiposMaquinariaPesada />,
+        },
+        {
+          path: `ReporteInspeccion`,
+          element: <ReporteInspeccion />,
+        },
+        {
+          path: `ReporteInspeccionSemanal`,
+          element: <ReporteInspeccionSemanal />,
+        },
+        {
+          path: `PreoperacionalTeletruk`,
+          element: <PreoperacionalTeletruk />,
+        }
 
-  {
-    path: `/Cosecha`,
-    element: <Cosecha />, // Componente principal de Gerencia
-    children: [
-      {
-        path: `ControlRendimientoCosechayFrass`,
-        element: <ControlRendimientoCosechayFrass />,
-      },
-      {
-        path: `ControlIngresoySalidaRacks`,
-        element: <ControlIngresoySalidaRacks />,
-      },
-      
-    ],
-  },
 
-    
-]
-}],{ basename: "/ProNuvo" } ) // 👈 Importante: Se establece la base para todas las rutas )
+      ],
+    },
+
+    {
+      path: `/Cosecha`,
+      element: <Cosecha />, // Componente principal de Gerencia
+      children: [
+        {
+          path: `ControlRendimientoCosechayFrass`,
+          element: <ControlRendimientoCosechayFrass />,
+        },
+        {
+          path: `ControlIngresoySalidaRacks`,
+          element: <ControlIngresoySalidaRacks />,
+        },
+
+      ],
+    },
+
+
+  ]
+}], { basename: "/ProNuvo" }) // 👈 Importante: Se establece la base para todas las rutas )
 
 
 const root = ReactDOM.createRoot(document.getElementById('root'));
 root.render(
   <PrimeReactProvider>
-    <RouterProvider router={router}/>
-    </PrimeReactProvider>
-  
+    <RouterProvider router={router} />
+  </PrimeReactProvider>
+
 );
+
+//PRUEBA PULL
