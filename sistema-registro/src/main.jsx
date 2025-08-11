@@ -26,7 +26,6 @@ import ControlMovimientosCajasProceso from './pages/Dieta/Registros/PagesControl
 import Gerencia from './pages/Gerencia/PagesGerencia.jsx';
 import GestionUsuarios from './pages/Gerencia/Registros/PagesGestionUsuarios.jsx';
 
-
 //control de tiempos imports
 import ControlTiempos from './pages/ControlTiempos/PagesControlTiempos.jsx';
 
@@ -55,6 +54,7 @@ import LimpiezaDesinfeccionEquiposMaquinariaPesada from './pages/Mantenimiento/R
 import ReporteInspeccion from './pages/Mantenimiento/Registros/PagesReporteInspeccion.jsx'
 import ReporteInspeccionSemanal from './pages/Mantenimiento/Registros/PagesReporteInspeccionSemanal.jsx'
 import PreoperacionalTeletruk from './pages/Mantenimiento/Registros/PagesPreoperacionalTeletruk.jsx'
+import PagesLimpiezaAreaCosecha from './pages/Mantenimiento/Registros/PagesLimpiezaAreaCosecha.jsx';
 
 //imports de paginas de Cosecha
 import Cosecha from './pages/Cosecha/PagesCosecha.jsx';
@@ -69,7 +69,6 @@ import VisualizarLotes from './pages/Visualizar/Registros/PagesVisualizarLotes';
 import VisualizarSKUs from './pages/Visualizar/Registros/PagesVisuazlizarSKUs';
 import FlashReport from './pages/Visualizar/Registros/PagesFlashReport';
 import PagesControlLarvaMolida from './pages/Horno/Registros/PagesControlLarvaMolida.jsx';
-
 
 const Layout = () => {
   return (
@@ -114,7 +113,6 @@ const router = createBrowserRouter([{
       ],
     },
 
-
     // Grupo de rutas de Dieta
     {
       path: `/Dieta`,
@@ -134,7 +132,6 @@ const router = createBrowserRouter([{
         },
       ],
     },
-
 
     // Grupo de rutas de Gerencia
     {
@@ -179,7 +176,6 @@ const router = createBrowserRouter([{
       element: <ControlTiempos />, // único componente registro de ControlTiempos
     },
 
-
     // Grupo de rutas de Horno
     {
       path: `/Horno`,
@@ -211,7 +207,6 @@ const router = createBrowserRouter([{
         },
       ],
     },
-
 
     // Grupo de rutas de Calidad
     {
@@ -252,7 +247,6 @@ const router = createBrowserRouter([{
       ],
     },
 
-
     // Grupo de rutas de Mantenimiento
     {
       path: `/Mantenimiento`,
@@ -273,8 +267,8 @@ const router = createBrowserRouter([{
         {
           path: `PreoperacionalTeletruk`,
           element: <PreoperacionalTeletruk />,
-        }
-
+        },
+        { path: `LimpiezaAreaCosecha`, element: <PagesLimpiezaAreaCosecha /> },
 
       ],
     },
@@ -295,10 +289,8 @@ const router = createBrowserRouter([{
       ],
     },
 
-
   ]
 }], { basename: "/ProNuvo" }) // 👈 Importante: Se establece la base para todas las rutas )
-
 
 const root = ReactDOM.createRoot(document.getElementById('root'));
 root.render(
@@ -307,5 +299,3 @@ root.render(
   </PrimeReactProvider>
 
 );
-
-//PRUEBA PULL

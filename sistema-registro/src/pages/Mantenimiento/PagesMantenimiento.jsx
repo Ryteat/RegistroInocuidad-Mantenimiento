@@ -1,13 +1,10 @@
-import React from 'react'
-import Mantenimiento from '../../Components/Mantenimiento/Mantenimiento'
+import React from 'react';
+import Mantenimiento from '../../Components/Mantenimiento/Mantenimiento.jsx';
 
+const PagesMantenimiento = () => (
+  <div>
+    <Mantenimiento />
+  </div>
+);
 
-const PagesMantenimiento = () => {
-  return (
-    <div>
-        <Mantenimiento/>
-    </div>
-  )
-}
-
-export default PagesMantenimiento
+export default PagesMantenimiento;
