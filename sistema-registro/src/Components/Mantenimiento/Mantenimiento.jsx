@@ -41,6 +41,13 @@ export default function Mantenimiento() {
       cols: 1,
       className: "boton-grid",
     },
+    {
+      texto: 'Registro de Limpieza del Área de Hatchery',
+      ruta: '/Mantenimiento/LimpiezaAreaHatchery',
+      cols: 1,
+      className: 'boton-grid'
+    },
+
 
     {
       texto: "Volver al Menú Principal",

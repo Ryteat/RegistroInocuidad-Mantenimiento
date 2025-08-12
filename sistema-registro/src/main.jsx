@@ -26,6 +26,7 @@ import ControlMovimientosCajasProceso from './pages/Dieta/Registros/PagesControl
 import Gerencia from './pages/Gerencia/PagesGerencia.jsx';
 import GestionUsuarios from './pages/Gerencia/Registros/PagesGestionUsuarios.jsx';
 
+
 //control de tiempos imports
 import ControlTiempos from './pages/ControlTiempos/PagesControlTiempos.jsx';
 
@@ -55,6 +56,8 @@ import ReporteInspeccion from './pages/Mantenimiento/Registros/PagesReporteInspe
 import ReporteInspeccionSemanal from './pages/Mantenimiento/Registros/PagesReporteInspeccionSemanal.jsx'
 import PreoperacionalTeletruk from './pages/Mantenimiento/Registros/PagesPreoperacionalTeletruk.jsx'
 import PagesLimpiezaAreaCosecha from './pages/Mantenimiento/Registros/PagesLimpiezaAreaCosecha.jsx';
+import PagesLimpiezaAreaHatchery from './pages/Mantenimiento/Registros/PagesLimpiezaAreaHatchery.jsx';
+
 
 //imports de paginas de Cosecha
 import Cosecha from './pages/Cosecha/PagesCosecha.jsx';
@@ -269,6 +272,11 @@ const router = createBrowserRouter([{
           element: <PreoperacionalTeletruk />,
         },
         { path: `LimpiezaAreaCosecha`, element: <PagesLimpiezaAreaCosecha /> },
+
+        {
+          path: `LimpiezaAreaHatchery`,
+          element: <PagesLimpiezaAreaHatchery />,
+        },
 
       ],
     },
