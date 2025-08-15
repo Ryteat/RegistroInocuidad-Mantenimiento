@@ -1,5 +1,6 @@
 import React, { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
+import supabase from "../../../supabaseClient";
 import logo2 from "../../../assets/mosca.png";
 
 import "primereact/resources/themes/lara-light-indigo/theme.css";
@@ -14,7 +15,7 @@ import { InputText } from "primereact/inputtext";
 import { Dropdown } from "primereact/dropdown";
 
 // -----------------------------
-// Utilidades
+// Catálogos / utilidades
 // -----------------------------
 const ESTADOS = [
     { label: "C (Cumple)", value: "C" },
@@ -35,24 +36,18 @@ const ITEMS = [
     { key: "cuarto_oscuro", label: "Cuarto oscuro", frecuencia: "Diario" },
 ];
 
+const TABLE = "limpieza_area_hatchery"; // 👈 coincide con la tabla creada en PUBLIC
+
 const todayISO = () => {
     const d = new Date();
     return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 };
+
 const nowHM = () =>
     new Date().toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit", hour12: false });
 
-const uid = () => {
-    try {
-        // algunos entornos no exponen crypto directamente
-        const c = (typeof window !== "undefined" ? window.crypto : undefined) || crypto;
-        if (c?.randomUUID) return c.randomUUID();
-    } catch { }
-    return `${Math.random().toString(36).slice(2)}_${Date.now()}`;
-};
-
 const emptyRegistro = () => ({
-    id: uid(),
+    // id lo genera la BD (uuid default)
     fecha_registro: todayISO(),
     hora_registro: nowHM(),
     responsable: "",
@@ -64,6 +59,74 @@ const emptyRegistro = () => ({
         return acc;
     }, {}),
 });
+
+// Aplanar form -> columnas BD
+const toDb = (form) => ({
+    fecha_registro: form.fecha_registro,
+    hora_registro: form.hora_registro,
+    responsable: form.responsable,
+    firma_encargado: form.firma_encargado || null,
+    fecha_correccion: form.fecha_correccion || null,
+    observaciones_generales: form.observaciones_generales || null,
+
+    pisos_estado: form.items.pisos?.estado || null,
+    pisos_comentario: form.items.pisos?.comentario || null,
+
+    paredes_estado: form.items.paredes?.estado || null,
+    paredes_comentario: form.items.paredes?.comentario || null,
+
+    cajas_colores_estado: form.items.cajas_colores?.estado || null,
+    cajas_colores_comentario: form.items.cajas_colores?.comentario || null,
+
+    cajas_plasticas_estado: form.items.cajas_plasticas?.estado || null,
+    cajas_plasticas_comentario: form.items.cajas_plasticas?.comentario || null,
+
+    mesas_laboratorio_estado: form.items.mesas_laboratorio?.estado || null,
+    mesas_laboratorio_comentario: form.items.mesas_laboratorio?.comentario || null,
+
+    equipo_laboratorio_estado: form.items.equipo_laboratorio?.estado || null,
+    equipo_laboratorio_comentario: form.items.equipo_laboratorio?.comentario || null,
+
+    estante_neonatos_estado: form.items.estante_neonatos?.estado || null,
+    estante_neonatos_comentario: form.items.estante_neonatos?.comentario || null,
+
+    cuarto_oscuro_estado: form.items.cuarto_oscuro?.estado || null,
+    cuarto_oscuro_comentario: form.items.cuarto_oscuro?.comentario || null,
+});
+
+// Desaplanar BD -> shape UI
+const fromDb = (row) => ({
+    id: row.id,
+    fecha_registro: row.fecha_registro,
+    hora_registro: row.hora_registro,
+    responsable: row.responsable,
+    firma_encargado: row.firma_encargado,
+    fecha_correccion: row.fecha_correccion,
+    observaciones_generales: row.observaciones_generales,
+    items: {
+        pisos: { estado: row.pisos_estado || "", comentario: row.pisos_comentario || "" },
+        paredes: { estado: row.paredes_estado || "", comentario: row.paredes_comentario || "" },
+        cajas_colores: { estado: row.cajas_colores_estado || "", comentario: row.cajas_colores_comentario || "" },
+        cajas_plasticas: { estado: row.cajas_plasticas_estado || "", comentario: row.cajas_plasticas_comentario || "" },
+        mesas_laboratorio: { estado: row.mesas_laboratorio_estado || "", comentario: row.mesas_laboratorio_comentario || "" },
+        equipo_laboratorio: { estado: row.equipo_laboratorio_estado || "", comentario: row.equipo_laboratorio_comentario || "" },
+        estante_neonatos: { estado: row.estante_neonatos_estado || "", comentario: row.estante_neonatos_comentario || "" },
+        cuarto_oscuro: { estado: row.cuarto_oscuro_estado || "", comentario: row.cuarto_oscuro_comentario || "" },
+    },
+});
+
+const validateRegistro = (form) => {
+    const errs = [];
+    if (!form.responsable?.trim()) errs.push("Responsable es requerido.");
+    ITEMS.forEach((it) => {
+        const v = form.items?.[it.key]?.estado;
+        if (!v) errs.push(`Seleccione estado para: ${it.label}`);
+        if (v && v !== "C" && !form.items[it.key].comentario?.trim()) {
+            errs.push(`Comentario requerido en ${it.label} (NC/NA).`);
+        }
+    });
+    return errs;
+};
 
 const flattenForExport = (row) => {
     const base = {
@@ -81,19 +144,6 @@ const flattenForExport = (row) => {
     return base;
 };
 
-const validateRegistro = (form) => {
-    const errs = [];
-    if (!form.responsable?.trim()) errs.push("Responsable es requerido.");
-    ITEMS.forEach((it) => {
-        const v = form.items?.[it.key]?.estado;
-        if (!v) errs.push(`Seleccione estado para: ${it.label}`);
-        if (v && v !== "C" && !form.items[it.key].comentario?.trim()) {
-            errs.push(`Comentario requerido en ${it.label} (NC/NA).`);
-        }
-    });
-    return errs;
-};
-
 // -----------------------------
 // Componente
 // -----------------------------
@@ -101,7 +151,7 @@ export default function LimpiezaAreaHatchery() {
     const toast = useRef(null);
     const navigate = useNavigate();
 
-    const [rows, setRows] = useState([]);          // local por ahora
+    const [rows, setRows] = useState([]);
     const [selected, setSelected] = useState([]);
     const [globalFilter, setGlobalFilter] = useState("");
     const [loading, setLoading] = useState(false);
@@ -115,9 +165,29 @@ export default function LimpiezaAreaHatchery() {
         Diario: ITEMS.filter((i) => i.frecuencia === "Diario"),
     };
 
+    const showToast = (severity, summary, detail, life = 3000) =>
+        toast.current?.show({ severity, summary, detail, life });
+
+    // Cargar registros existentes
+    const fetchRegistros = async () => {
+        try {
+            setLoading(true);
+            const { data, error } = await supabase
+                .from(TABLE)
+                .select("*")
+                .order("fecha_registro", { ascending: false });
+            if (error) throw error;
+            setRows((data || []).map(fromDb));
+        } catch (err) {
+            console.error(err);
+            showToast("error", "Error", "Error al cargar registros");
+        } finally {
+            setLoading(false);
+        }
+    };
+
     useEffect(() => {
-        console.log("[DEBUG] LimpiezaAreaHatchery montado");
-        setRows([]); // cuando conectemos a Supabase, haremos el fetch aquí
+        fetchRegistros();
     }, []);
 
     const openNew = () => {
@@ -125,6 +195,7 @@ export default function LimpiezaAreaHatchery() {
         setSubmitted(false);
         setDialogOpen(true);
     };
+
     const hideDialog = () => {
         setDialogOpen(false);
         setSubmitted(false);
@@ -141,15 +212,28 @@ export default function LimpiezaAreaHatchery() {
         setSubmitted(true);
         const errs = validateRegistro(form);
         if (errs.length) {
-            toast.current.show({ severity: "error", summary: "Validación", detail: errs[0], life: 3000 });
+            showToast("error", "Validación", errs[0]);
             return;
         }
-        setRows((prev) => [form, ...prev]);
-        toast.current.show({ severity: "success", summary: "Guardado", detail: "Registro creado (local)", life: 2000 });
-        setDialogOpen(false);
+
+        try {
+            const payload = toDb(form);
+            const { error } = await supabase.from(TABLE).insert([payload]);
+            if (error) throw error;
+
+            showToast("success", "Guardado", "Registro creado correctamente");
+            setDialogOpen(false);
+            setForm(emptyRegistro());
+            await fetchRegistros();
+        } catch (err) {
+            console.error(err);
+            showToast("error", "Error", err.message || "No se pudo guardar");
+        }
     };
 
-    const countBy = (row, val) => ITEMS.reduce((acc, it) => acc + (row.items?.[it.key]?.estado === val ? 1 : 0), 0);
+    const countBy = (row, val) =>
+        ITEMS.reduce((acc, it) => acc + (row.items?.[it.key]?.estado === val ? 1 : 0), 0);
+
     const dynamicColumns = ITEMS.map((it) => ({ header: it.label, body: (row) => row.items?.[it.key]?.estado || "" }));
 
     const header = (
@@ -166,10 +250,10 @@ export default function LimpiezaAreaHatchery() {
         </div>
     );
 
-    // Import dinámico -> evita que un problema de librería tumbe la app
+    // Exportaciones (mismo patrón que usas en otros módulos)
     const exportPdf = async () => {
         if (selected.length === 0) {
-            toast.current.show({ severity: "warn", summary: "Advertencia", detail: "Seleccione registros", life: 2500 });
+            showToast("warn", "Advertencia", "Seleccione registros");
             return;
         }
         try {
@@ -184,25 +268,25 @@ export default function LimpiezaAreaHatchery() {
             doc.save(`Limpieza_Hatchery_${new Date().toISOString().slice(0, 10)}.pdf`);
         } catch (err) {
             console.error(err);
-            toast.current.show({ severity: "error", summary: "Exportación", detail: "No se pudo exportar a PDF", life: 3000 });
+            showToast("error", "Exportación", "No se pudo exportar a PDF");
         }
     };
 
     const exportXlsx = async () => {
         if (selected.length === 0) {
-            toast.current.show({ severity: "warn", summary: "Advertencia", detail: "Seleccione registros", life: 2500 });
+            showToast("warn", "Advertencia", "Seleccione registros");
             return;
         }
         try {
             const XLSX = await import("xlsx");
-            const rows = selected.map(flattenForExport);
-            const ws = XLSX.utils.json_to_sheet(rows);
+            const rowsToExport = selected.map(flattenForExport);
+            const ws = XLSX.utils.json_to_sheet(rowsToExport);
             const wb = XLSX.utils.book_new();
             XLSX.utils.book_append_sheet(wb, ws, "Limpieza Hatchery");
             XLSX.writeFile(wb, `Limpieza_Hatchery_${new Date().toISOString().slice(0, 10)}.xlsx`);
         } catch (err) {
             console.error(err);
-            toast.current.show({ severity: "error", summary: "Exportación", detail: "No se pudo exportar a Excel", life: 3000 });
+            showToast("error", "Exportación", "No se pudo exportar a Excel");
         }
     };
 
@@ -228,8 +312,8 @@ export default function LimpiezaAreaHatchery() {
 
             <div className="welcome-message">
                 <p>
-                    Selecciona <b>C</b> (Cumple), <b>NC</b> (No cumple) o <b>NA</b> (No aplica). Para <b>NC/NA</b>, el comentario es
-                    obligatorio. <i>Pisos</i> y <i>Paredes</i> son <b>Semestrales</b>.
+                    Selecciona <b>C</b> (Cumple), <b>NC</b> (No cumple) o <b>NA</b> (No aplica). Para <b>NC/NA</b>, el comentario es obligatorio.
+                    <i> Pisos</i> y <i>Paredes</i> son <b>Semestrales</b>.
                 </p>
             </div>
 
@@ -261,12 +345,11 @@ export default function LimpiezaAreaHatchery() {
                 <Column header="#C" body={(r) => countBy(r, "C")} />
                 <Column header="#NC" body={(r) => countBy(r, "NC")} />
                 <Column header="#NA" body={(r) => countBy(r, "NA")} />
-                {dynamicColumns.map((c, i) => (
-                    <Column key={i} header={c.header} body={c.body} />
+                {ITEMS.map((it) => (
+                    <Column key={it.key} header={it.label} body={(row) => row.items?.[it.key]?.estado || ""} />
                 ))}
             </DataTable>
 
-            {/* Dialog Nuevo Registro */}
             <Dialog
                 visible={dialogOpen}
                 style={{ width: "70vw", maxWidth: 1100 }}
@@ -301,7 +384,7 @@ export default function LimpiezaAreaHatchery() {
                         <div key={freq} className="col-12">
                             <div className="font-bold text-lg mb-2">{freq}</div>
                             <div className="grid">
-                                {grupos[freq].map((it) => {
+                                {ITEMS.filter((i) => i.frecuencia === freq).map((it) => {
                                     const val = form.items[it.key] || { estado: "", comentario: "" };
                                     const necesitaComentario = val.estado && val.estado !== "C";
                                     return (
@@ -339,10 +422,12 @@ export default function LimpiezaAreaHatchery() {
                         <label className="font-bold">Firma del encargado de la limpieza</label>
                         <InputText value={form.firma_encargado} onChange={(e) => onHeaderChange(e, "firma_encargado")} />
                     </div>
+
                     <div className="field col-12 md:col-6">
                         <label className="font-bold">Fecha de corrección</label>
                         <InputText type="date" value={form.fecha_correccion} onChange={(e) => onHeaderChange(e, "fecha_correccion")} />
                     </div>
+
                     <div className="field col-12">
                         <label className="font-bold">Observaciones</label>
                         <InputText
