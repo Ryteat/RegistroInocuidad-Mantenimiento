@@ -1,0 +1,7 @@
+.p-datatable-wrapper {
+	overflow-x: auto !important;
+	width: 100%;
+}
+.p-datatable-table {
+	min-width: 1200px;
+}

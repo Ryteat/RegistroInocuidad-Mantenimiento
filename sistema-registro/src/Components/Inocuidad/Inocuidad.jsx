@@ -33,6 +33,12 @@ function Inocuidad() {
             cols: 2,
             className: 'boton-grid oven-button'
         },
+        {
+            titulo: 'Registro de Limpieza Horno Multilevel',
+            ruta: '/Inocuidad/LimpiezaHornoMultilevel',
+            cols: 2,
+            className: 'boton-grid oven-button'
+        },
 
     ];
 

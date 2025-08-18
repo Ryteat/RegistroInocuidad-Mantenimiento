@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import supabase from "../../../supabaseClient";
+import supabase from "../../../supabaseClient"; // igual que tu Tarimas/Cajas
 import logo2 from "../../../assets/mosca.png";
 
 import "primereact/resources/themes/lara-light-indigo/theme.css";
@@ -14,10 +14,8 @@ import { Dialog } from "primereact/dialog";
 import { InputText } from "primereact/inputtext";
 import { Dropdown } from "primereact/dropdown";
 import * as XLSX from "xlsx";
+import "./LimpiezaHornoMultilevel.css";
 
-import "./LimpiezaDietaSiembra.css";
-
-// ---------- Catálogos ----------
 const ESTADOS = [
     { label: "C (Cumple)", value: "C" },
     { label: "NC (No cumple)", value: "NC" },
@@ -25,31 +23,24 @@ const ESTADOS = [
 ];
 
 const ITEMS = [
-    { key: "pisos", label: "Pisos" },
-    { key: "maquina_mezcladora_1", label: "Máquina mezcladora 1" },
-    { key: "maquina_mezcladora_2", label: "Máquina mezcladora 2" },
-    { key: "pila", label: "Pila" },
-    { key: "herramientas_limpieza", label: "Herramientas de limpieza" },
-    { key: "mesanine", label: "Mesanine" },
-    { key: "romana", label: "Romana" },
-    { key: "baldes_melaza", label: "Baldes de melaza" },
-    { key: "recoleccion_basura", label: "Recolección de basura" },
-    { key: "carcamo_bombeo", label: "Cárcamo de bombeo" },
-    { key: "tornillo_sin_fin", label: "Tornillo sin fin" },
-    { key: "banda_plana", label: "Banda plana" },
-    { key: "banda_inclinada", label: "Banda inclinada" },
-    { key: "triturador", label: "Triturador" },
-    { key: "tolva_cascara_1", label: "Tolva de cáscara 1" },
-    { key: "tolva_cascara_2", label: "Tolva de cáscara 2" },
-    { key: "tolva_cascara_3", label: "Tolva de cáscara 3" },
-    { key: "cano", label: "Caño" },               // sin ñ en key por DB
-    { key: "rampa_pila", label: "Rampa de la pila" },
-    { key: "pila_cascara", label: "Pila de cáscara" },
+    { key: "bandas_transportadoras", label: "Bandas transportadoras" },
+    { key: "dosificador_larva", label: "Dosificador de larva" },
+    { key: "banda_1", label: "Banda 1" },
+    { key: "banda_2", label: "Banda 2" },
+    { key: "banda_3", label: "Banda 3" },
+    { key: "banda_4", label: "Banda 4" },
+    { key: "banda_5", label: "Banda 5" },
+    { key: "compuertas_limpieza", label: "Compuertas de limpieza" },
+    { key: "bandas_enfriamiento", label: "Bandas de enfriamiento" },
+    { key: "canguilones", label: "Canguilones" },
+    { key: "piso", label: "Piso" },
 ];
 
 const todayISO = () => {
     const d = new Date();
-    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(
+        d.getDate()
+    ).padStart(2, "0")}`;
 };
 const nowHM = () =>
     new Date().toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit", hour12: false });
@@ -59,13 +50,15 @@ const emptyForm = () => ({
     hora_registro: nowHM(),
     firma_encargado: "",
     verificacion_inocuidad: "",
-    fecha_correccion_preview: new Date().toLocaleString(), // solo vista
+    // solo visual; la columna real se completa en DB (default now())
+    fecha_correccion_preview: new Date().toLocaleString(),
     items: ITEMS.reduce((acc, it) => {
         acc[it.key] = { estado: "", comentario: "" };
         return acc;
     }, {}),
 });
 
+// Mapea array de items -> objeto por clave (para DataTable)
 const packRow = (dbRow) => {
     const itemsMap = ITEMS.reduce((acc, it) => {
         const found = (dbRow.items || []).find((x) => x.item_key === it.key);
@@ -83,7 +76,7 @@ const packRow = (dbRow) => {
     };
 };
 
-export default function LimpiezaDietaSiembra() {
+export default function LimpiezaHornoMultilevel() {
     const toast = useRef(null);
     const navigate = useNavigate();
 
@@ -91,7 +84,6 @@ export default function LimpiezaDietaSiembra() {
     const [selected, setSelected] = useState([]);
     const [globalFilter, setGlobalFilter] = useState("");
     const [loading, setLoading] = useState(false);
-    const [saving, setSaving] = useState(false);
 
     const [dialogOpen, setDialogOpen] = useState(false);
     const [submitted, setSubmitted] = useState(false);
@@ -107,25 +99,25 @@ export default function LimpiezaDietaSiembra() {
                 hora_registro: row.hora_registro,
                 firma_encargado: row.firma_encargado,
                 verificacion_inocuidad: row.verificacion_inocuidad,
-                fecha_correccion: row.fecha_correccion ? new Date(row.fecha_correccion).toLocaleString() : "",
+                fecha_correccion: new Date(row.fecha_correccion).toLocaleString(),
             };
-            Object.keys(row.items).forEach((key) => {
-                base[`${key}_estado`] = row.items[key]?.estado || "";
-                base[`${key}_comentario`] = row.items[key]?.comentario || "";
+            Object.keys(row.items || {}).forEach((k) => {
+                base[`${k}_estado`] = row.items[k]?.estado || "";
+                base[`${k}_comentario`] = row.items[k]?.comentario || "";
             });
             return base;
         });
         const ws = XLSX.utils.json_to_sheet(rowsToExport);
         const wb = XLSX.utils.book_new();
-        XLSX.utils.book_append_sheet(wb, ws, "Limpieza Dieta-Siembra");
-        XLSX.writeFile(wb, `Limpieza_Dieta_Siembra_${new Date().toISOString().slice(0, 10)}.xlsx`);
+        XLSX.utils.book_append_sheet(wb, ws, "Limpieza Horno ML");
+        XLSX.writeFile(wb, `Limpieza_Horno_Multilevel_${new Date().toISOString().slice(0, 10)}.xlsx`);
     };
 
     const fetchRegistros = async () => {
         try {
             setLoading(true);
             const { data, error } = await supabase
-                .from("limpieza_dieta_siembra")
+                .from("limpieza_horno_ml")
                 .select(`
           id,
           fecha_registro,
@@ -133,7 +125,7 @@ export default function LimpiezaDietaSiembra() {
           firma_encargado,
           verificacion_inocuidad,
           fecha_correccion,
-          items:limpieza_dieta_siembra_items!limpieza_dieta_siembra_items_id_registro_fkey (
+          items:limpieza_horno_ml_items!limpieza_horno_ml_items_id_registro_fkey (
             item_key, estado, comentario
           )
         `)
@@ -149,7 +141,9 @@ export default function LimpiezaDietaSiembra() {
         }
     };
 
-    useEffect(() => { fetchRegistros(); }, []);
+    useEffect(() => {
+        fetchRegistros();
+    }, []);
 
     const openNew = () => {
         setForm(emptyForm());
@@ -188,17 +182,16 @@ export default function LimpiezaDietaSiembra() {
             return;
         }
         try {
-            setSaving(true);
-            // 1) header
+            // 1) Encabezado
             const { data: enc, error: errEnc } = await supabase
-                .from("limpieza_dieta_siembra")
+                .from("limpieza_horno_ml")
                 .insert([
                     {
                         fecha_registro: form.fecha_registro,
                         hora_registro: form.hora_registro,
                         firma_encargado: form.firma_encargado || null,
                         verificacion_inocuidad: form.verificacion_inocuidad || null,
-                        // fecha_correccion -> DB default now()
+                        // fecha_correccion la pone la DB (default now())
                     },
                 ])
                 .select("id")
@@ -207,7 +200,7 @@ export default function LimpiezaDietaSiembra() {
             if (errEnc) throw errEnc;
             const newId = enc.id;
 
-            // 2) items
+            // 2) Detalle
             const itemsInsert = ITEMS.map((it) => ({
                 id_registro: newId,
                 item_key: it.key,
@@ -216,7 +209,7 @@ export default function LimpiezaDietaSiembra() {
             }));
 
             const { error: errDet } = await supabase
-                .from("limpieza_dieta_siembra_items")
+                .from("limpieza_horno_ml_items")
                 .insert(itemsInsert);
 
             if (errDet) throw errDet;
@@ -229,8 +222,6 @@ export default function LimpiezaDietaSiembra() {
         } catch (error) {
             console.error(error);
             showToast("error", "Error", error.message || "No se pudo guardar el registro");
-        } finally {
-            setSaving(false);
         }
     };
 
@@ -261,7 +252,7 @@ export default function LimpiezaDietaSiembra() {
             <Toast ref={toast} />
             <h1>
                 <img src={logo2} alt="mosca" className="logo2" />
-                Registro de Limpieza del Área de Dieta y Siembra
+                Registro de Limpieza Horno Multilevel
             </h1>
 
             <div className="welcome-message">
@@ -301,7 +292,7 @@ export default function LimpiezaDietaSiembra() {
                 <Column field="fecha_registro" header="Fecha" sortable />
                 <Column field="hora_registro" header="Hora" />
                 <Column field="firma_encargado" header="Firma encargado" />
-                <Column field="verificacion_inocuidad" header="Verificación (Inocuidad)" />
+                <Column field="verificacion_inocuidad" header="Verificación Inocuidad" />
                 <Column
                     field="fecha_correccion"
                     header="Fecha de corrección"
@@ -318,48 +309,38 @@ export default function LimpiezaDietaSiembra() {
 
             <Dialog
                 visible={dialogOpen}
-                style={{ width: "68vw", maxWidth: 1050 }}
+                style={{ width: "60vw", maxWidth: 900 }}
                 header="Nuevo registro"
                 modal
                 onHide={hideDialog}
                 footer={
                     <div className="flex gap-2 justify-content-end">
                         <Button label="Cancelar" icon="pi pi-times" outlined onClick={hideDialog} />
-                        <Button label="Guardar" icon="pi pi-check" onClick={save} disabled={saving} loading={saving} />
+                        <Button label="Guardar" icon="pi pi-check" onClick={save} />
                     </div>
                 }
             >
                 <div className="p-fluid grid">
                     <div className="field col-12 md:col-4">
                         <label className="font-bold">Fecha</label>
-                        <InputText
-                            type="date"
-                            value={form.fecha_registro}
-                            onChange={(e) => onHeaderChange(e, "fecha_registro")}
-                        />
+                        <InputText type="date" value={form.fecha_registro}
+                            onChange={(e) => onHeaderChange(e, "fecha_registro")} />
                     </div>
                     <div className="field col-12 md:col-4">
                         <label className="font-bold">Hora</label>
-                        <InputText
-                            type="time"
-                            value={form.hora_registro}
-                            onChange={(e) => onHeaderChange(e, "hora_registro")}
-                        />
+                        <InputText type="time" value={form.hora_registro}
+                            onChange={(e) => onHeaderChange(e, "hora_registro")} />
                     </div>
                     <div className="field col-12 md:col-4">
                         <label className="font-bold">Firma del encargado</label>
-                        <InputText
-                            value={form.firma_encargado}
-                            onChange={(e) => onHeaderChange(e, "firma_encargado")}
-                        />
+                        <InputText value={form.firma_encargado}
+                            onChange={(e) => onHeaderChange(e, "firma_encargado")} />
                     </div>
 
                     <div className="field col-12 md:col-6">
                         <label className="font-bold">Verificación (Coordinación de Inocuidad)</label>
-                        <InputText
-                            value={form.verificacion_inocuidad}
-                            onChange={(e) => onHeaderChange(e, "verificacion_inocuidad")}
-                        />
+                        <InputText value={form.verificacion_inocuidad}
+                            onChange={(e) => onHeaderChange(e, "verificacion_inocuidad")} />
                     </div>
 
                     {ITEMS.map((it) => {

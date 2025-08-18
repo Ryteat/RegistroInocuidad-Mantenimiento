@@ -32,6 +32,8 @@ import LimpiezaAreaCosecha from './Components/Inocuidad/LimpiezaAreaCosecha.jsx'
 import LimpiezaTarimasCajas from './Components/Inocuidad/LimpiezaTarimasCajas.jsx';
 import PagesLimpiezaDietaSiembra from './pages/Inocuidad/Registros/PagesLimpiezaDietaSiembra.jsx';
 
+import PagesLimpiezaHornoMultilevel from './pages/Inocuidad/Registros/PagesLimpiezaHornoMultilevel.jsx';
+
 
 
 //control de tiempos imports
@@ -102,6 +104,7 @@ const router = createBrowserRouter([{
         { path: 'RegistroLimpiezaCosecha', element: <LimpiezaAreaCosecha /> },
         { path: 'LimpiezaTarimasCajas', element: <LimpiezaTarimasCajas /> },
         { path: `LimpiezaDietaSiembra`, element: <PagesLimpiezaDietaSiembra /> },
+        { path: `LimpiezaHornoMultilevel`, element: <PagesLimpiezaHornoMultilevel /> },
       ],
     },
 
