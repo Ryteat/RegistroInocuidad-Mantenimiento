@@ -27,6 +27,11 @@ function Inocuidad() {
             ruta: "/Inocuidad/LimpiezaTarimasCajas",
             cols: 2,
             className: "boton-grid oven-button", // usa tu clase global de botones
+        }, {
+            titulo: 'Registro de Limpieza del Area de Dieta y Siembra',
+            ruta: '/Inocuidad/LimpiezaDietaSiembra',
+            cols: 2,
+            className: 'boton-grid oven-button'
         },
 
     ];

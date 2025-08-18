@@ -30,6 +30,7 @@ import PagesInocuidad from './pages/Inocuidad/PagesInocuidad.jsx';
 import LimpiezaAreaHatchery from './Components/Inocuidad/LimpiezaAreaHatchery.jsx';
 import LimpiezaAreaCosecha from './Components/Inocuidad/LimpiezaAreaCosecha.jsx';
 import LimpiezaTarimasCajas from './Components/Inocuidad/LimpiezaTarimasCajas.jsx';
+import PagesLimpiezaDietaSiembra from './pages/Inocuidad/Registros/PagesLimpiezaDietaSiembra.jsx';
 
 
 
@@ -100,6 +101,7 @@ const router = createBrowserRouter([{
         { path: 'RegistroLimpiezaHatchery', element: <LimpiezaAreaHatchery /> },
         { path: 'RegistroLimpiezaCosecha', element: <LimpiezaAreaCosecha /> },
         { path: 'LimpiezaTarimasCajas', element: <LimpiezaTarimasCajas /> },
+        { path: `LimpiezaDietaSiembra`, element: <PagesLimpiezaDietaSiembra /> },
       ],
     },
 
