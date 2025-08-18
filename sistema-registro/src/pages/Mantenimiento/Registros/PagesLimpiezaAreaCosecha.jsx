@@ -1,5 +1,5 @@
 import React from "react";
-import LimpiezaAreaCosecha from "../../../Components/Mantenimiento/Registros/LimpiezaAreaCosecha.jsx";
+import LimpiezaAreaCosecha from "../../../Components/Inocuidad/LimpiezaAreaCosecha.jsx";
 
 export default function PagesLimpiezaAreaCosecha() {
   console.log("[DEBUG] PagesLimpiezaAreaCosecha cargada");

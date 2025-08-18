@@ -25,6 +25,10 @@ import ControlMovimientosCajasProceso from './pages/Dieta/Registros/PagesControl
 //imports paginas Gerencia
 import Gerencia from './pages/Gerencia/PagesGerencia.jsx';
 import GestionUsuarios from './pages/Gerencia/Registros/PagesGestionUsuarios.jsx';
+// import de Inocuidad
+import PagesInocuidad from './pages/Inocuidad/PagesInocuidad.jsx';
+import LimpiezaAreaHatchery from './Components/Inocuidad/LimpiezaAreaHatchery.jsx';
+import LimpiezaAreaCosecha from './Components/Inocuidad/LimpiezaAreaCosecha.jsx';
 
 
 //control de tiempos imports
@@ -55,8 +59,7 @@ import LimpiezaDesinfeccionEquiposMaquinariaPesada from './pages/Mantenimiento/R
 import ReporteInspeccion from './pages/Mantenimiento/Registros/PagesReporteInspeccion.jsx'
 import ReporteInspeccionSemanal from './pages/Mantenimiento/Registros/PagesReporteInspeccionSemanal.jsx'
 import PreoperacionalTeletruk from './pages/Mantenimiento/Registros/PagesPreoperacionalTeletruk.jsx'
-import PagesLimpiezaAreaCosecha from './pages/Mantenimiento/Registros/PagesLimpiezaAreaCosecha.jsx';
-import PagesLimpiezaAreaHatchery from './pages/Mantenimiento/Registros/PagesLimpiezaAreaHatchery.jsx';
+
 
 
 //imports de paginas de Cosecha
@@ -87,6 +90,15 @@ const router = createBrowserRouter([{
   children: [
     { path: `/`, element: <Login /> }, // Página principal (login)
     { path: `/MenuPrincipal`, element: <MenuPrincipal /> },
+    // Ruta de Inocuidad
+    {
+      path: `/Inocuidad`,
+      element: <PagesInocuidad />,
+      children: [
+        { path: 'RegistroLimpiezaHatchery', element: <LimpiezaAreaHatchery /> },
+        { path: 'RegistroLimpiezaCosecha', element: <LimpiezaAreaCosecha /> },
+      ],
+    },
 
     // Grupo de rutas de Hatchery
     {
@@ -270,14 +282,8 @@ const router = createBrowserRouter([{
         {
           path: `PreoperacionalTeletruk`,
           element: <PreoperacionalTeletruk />,
-        },
-        { path: `LimpiezaAreaCosecha`, element: <PagesLimpiezaAreaCosecha /> },
-
-        {
-          path: `LimpiezaAreaHatchery`,
-          element: <PagesLimpiezaAreaHatchery />,
-        },
-
+        }
+        // Eliminados: LimpiezaAreaHatchery y LimpiezaAreaCosecha
       ],
     },
 

@@ -13,16 +13,16 @@ function MenuPrincipal() {
   const hasDepartment = (requiredDepartments) => {
     try {
       if (!departamento) return false;
-      
-      const userDepartments = Array.isArray(departamento) 
-        ? departamento 
+
+      const userDepartments = Array.isArray(departamento)
+        ? departamento
         : typeof departamento === 'string'
           ? departamento.split(',')
           : [];
 
       const normalizedUserDepartments = userDepartments.map(d => d.trim().toLowerCase());
-      
-      return requiredDepartments.some(rd => 
+
+      return requiredDepartments.some(rd =>
         normalizedUserDepartments.includes(rd.trim().toLowerCase())
       );
     } catch (error) {
@@ -74,6 +74,12 @@ function MenuPrincipal() {
       cols: 1
     },
     {
+      texto: 'Registros Inocuidad',
+      ruta: '/Inocuidad',
+      departamentos: ['Inocuidad'],
+      cols: 1
+    },
+    {
       texto: 'Información Gerencia',
       ruta: '/Gerencia',
       departamentos: ['Gerencia'],
@@ -105,9 +111,9 @@ function MenuPrincipal() {
             </button>
           )
         ))}
-        
-        <button 
-          onClick={handleLogout} 
+
+        <button
+          onClick={handleLogout}
           className="boton-grid logout-button cols-2"
         >
           Cerrar Sesión

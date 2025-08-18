@@ -5,7 +5,7 @@ import MenuPrincipal from '../../Components/MenuPrincipal/MenuPrincipal'
 const PageMenuPrinciapl = () => {
   return (
     <div>
-        <MenuPrincipal/>
+      <MenuPrincipal />
     </div>
   )
 }

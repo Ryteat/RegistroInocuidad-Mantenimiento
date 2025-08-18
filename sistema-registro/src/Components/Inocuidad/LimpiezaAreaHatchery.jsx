@@ -1,7 +1,7 @@
 import React, { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import supabase from "../../../supabaseClient";
-import logo2 from "../../../assets/mosca.png";
+import supabase from "../../supabaseClient";
+import logo2 from "../../assets/mosca.png";
 
 import "primereact/resources/themes/lara-light-indigo/theme.css";
 import "primeicons/primeicons.css";
