@@ -29,6 +29,8 @@ import GestionUsuarios from './pages/Gerencia/Registros/PagesGestionUsuarios.jsx
 import PagesInocuidad from './pages/Inocuidad/PagesInocuidad.jsx';
 import LimpiezaAreaHatchery from './Components/Inocuidad/LimpiezaAreaHatchery.jsx';
 import LimpiezaAreaCosecha from './Components/Inocuidad/LimpiezaAreaCosecha.jsx';
+import LimpiezaTarimasCajas from './Components/Inocuidad/LimpiezaTarimasCajas.jsx';
+
 
 
 //control de tiempos imports
@@ -97,6 +99,7 @@ const router = createBrowserRouter([{
       children: [
         { path: 'RegistroLimpiezaHatchery', element: <LimpiezaAreaHatchery /> },
         { path: 'RegistroLimpiezaCosecha', element: <LimpiezaAreaCosecha /> },
+        { path: 'LimpiezaTarimasCajas', element: <LimpiezaTarimasCajas /> },
       ],
     },
 

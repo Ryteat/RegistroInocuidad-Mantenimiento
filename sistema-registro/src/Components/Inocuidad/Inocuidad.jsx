@@ -22,6 +22,12 @@ function Inocuidad() {
             cols: 2,
             className: 'boton-grid oven-button'
         },
+        {
+            titulo: "Registro de Limpieza de Tarimas y Cajas de Colores",
+            ruta: "/Inocuidad/LimpiezaTarimasCajas",
+            cols: 2,
+            className: "boton-grid oven-button", // usa tu clase global de botones
+        },
 
     ];
 
