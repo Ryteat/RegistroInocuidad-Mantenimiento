@@ -45,6 +45,13 @@ function Inocuidad() {
             cols: 2,
             className: "boton-grid"
         },
+        {
+            titulo: "Registro de Limpieza de Oficina, Reuniones y Comedor",
+            ruta: "/Inocuidad/LimpiezaOficinaReunionesComedor", // SOLO el nombre, sin slash inicial
+            cols: 2,
+            className: "boton-grid"
+        }
+
 
     ];
 
