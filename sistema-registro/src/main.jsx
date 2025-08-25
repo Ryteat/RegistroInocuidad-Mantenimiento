@@ -35,6 +35,7 @@ import PagesLimpiezaDietaSiembra from './pages/Inocuidad/Registros/PagesLimpieza
 import PagesLimpiezaHornoMultilevel from './pages/Inocuidad/Registros/PagesLimpiezaHornoMultilevel.jsx';
 import PagesLimpiezaBanosCasillerosPediluvios from './pages/Inocuidad/Registros/PagesLimpiezaBanosCasillerosPediluvios.jsx';
 import PagesLimpiezaOficinaReunionesComedor from './pages/Inocuidad/Registros/PagesLimpiezaOficinaReunionesComedor.jsx';
+import PagesControlPlagasRoedores from './pages/Inocuidad/Registros/PagesControlPlagasRoedores.jsx';
 
 
 
@@ -113,6 +114,7 @@ const router = createBrowserRouter([{
           path: 'LimpiezaOficinaReunionesComedor',
           element: <PagesLimpiezaOficinaReunionesComedor />,
         },
+        { path: `ControlPlagasRoedores`, element: <PagesControlPlagasRoedores /> },
       ],
     },
 

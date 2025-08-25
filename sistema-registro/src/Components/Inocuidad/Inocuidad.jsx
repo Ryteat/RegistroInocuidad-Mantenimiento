@@ -12,45 +12,52 @@ function Inocuidad() {
     const botones = [
         {
             titulo: 'Registro de Limpieza del Area de Hatchery',
-            ruta: '/Inocuidad/RegistroLimpiezaHatchery',
+            ruta: 'RegistroLimpiezaHatchery',
             cols: 2,
             className: 'boton-grid oven-button'
         },
         {
             titulo: 'Registro de Limpieza del Area de Cosecha',
-            ruta: '/Inocuidad/RegistroLimpiezaCosecha',
+            ruta: 'RegistroLimpiezaCosecha',
             cols: 2,
             className: 'boton-grid oven-button'
         },
         {
             titulo: "Registro de Limpieza de Tarimas y Cajas de Colores",
-            ruta: "/Inocuidad/LimpiezaTarimasCajas",
+            ruta: "LimpiezaTarimasCajas",
             cols: 2,
-            className: "boton-grid oven-button", // usa tu clase global de botones
-        }, {
+            className: "boton-grid oven-button",
+        },
+        {
             titulo: 'Registro de Limpieza del Area de Dieta y Siembra',
-            ruta: '/Inocuidad/LimpiezaDietaSiembra',
+            ruta: 'LimpiezaDietaSiembra',
             cols: 2,
             className: 'boton-grid oven-button'
         },
         {
             titulo: 'Registro de Limpieza Horno Multilevel',
-            ruta: '/Inocuidad/LimpiezaHornoMultilevel',
+            ruta: 'LimpiezaHornoMultilevel',
             cols: 2,
             className: 'boton-grid oven-button'
         },
         {
             titulo: "Registro de Limpieza de Baños, Casilleros y Pediluvios",
-            ruta: "/Inocuidad/LimpiezaBanosCasillerosPediluvios",
+            ruta: "LimpiezaBanosCasillerosPediluvios",
             cols: 2,
             className: "boton-grid"
         },
         {
             titulo: "Registro de Limpieza de Oficina, Reuniones y Comedor",
-            ruta: "/Inocuidad/LimpiezaOficinaReunionesComedor", // SOLO el nombre, sin slash inicial
+            ruta: "LimpiezaOficinaReunionesComedor",
             cols: 2,
             className: "boton-grid"
-        }
+        },
+        {
+            titulo: "Registro de Control de Plagas",
+            ruta: "ControlPlagasRoedores",
+            cols: 2,
+            className: "boton-grid"
+        },
 
 
     ];
