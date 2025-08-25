@@ -58,6 +58,12 @@ function Inocuidad() {
             cols: 2,
             className: "boton-grid"
         },
+        {
+            titulo: "Registro Limpieza y Desinfección de Tanque de Agua",
+            ruta: "LimpiezaTanqueAgua",
+            cols: 2,
+            className: "boton-grid"
+        },
 
 
     ];
