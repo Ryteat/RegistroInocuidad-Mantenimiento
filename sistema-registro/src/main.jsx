@@ -33,6 +33,7 @@ import LimpiezaTarimasCajas from './Components/Inocuidad/LimpiezaTarimasCajas.js
 import PagesLimpiezaDietaSiembra from './pages/Inocuidad/Registros/PagesLimpiezaDietaSiembra.jsx';
 
 import PagesLimpiezaHornoMultilevel from './pages/Inocuidad/Registros/PagesLimpiezaHornoMultilevel.jsx';
+import PagesLimpiezaBanosCasillerosPediluvios from './pages/Inocuidad/Registros/PagesLimpiezaBanosCasillerosPediluvios.jsx';
 
 
 
@@ -105,6 +106,7 @@ const router = createBrowserRouter([{
         { path: 'LimpiezaTarimasCajas', element: <LimpiezaTarimasCajas /> },
         { path: `LimpiezaDietaSiembra`, element: <PagesLimpiezaDietaSiembra /> },
         { path: `LimpiezaHornoMultilevel`, element: <PagesLimpiezaHornoMultilevel /> },
+        { path: `LimpiezaBanosCasillerosPediluvios`, element: <PagesLimpiezaBanosCasillerosPediluvios /> },
       ],
     },
 

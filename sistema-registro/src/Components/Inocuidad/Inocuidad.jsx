@@ -39,6 +39,12 @@ function Inocuidad() {
             cols: 2,
             className: 'boton-grid oven-button'
         },
+        {
+            titulo: "Registro de Limpieza de Baños, Casilleros y Pediluvios",
+            ruta: "/Inocuidad/LimpiezaBanosCasillerosPediluvios",
+            cols: 2,
+            className: "boton-grid"
+        },
 
     ];
 
