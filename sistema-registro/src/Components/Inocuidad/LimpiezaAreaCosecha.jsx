@@ -1,3 +1,4 @@
+// Components/Inocuidad/LimpiezaAreaCosecha.jsx
 import React, { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import supabase from "../../supabaseClient";
@@ -13,9 +14,13 @@ import { Column } from "primereact/column";
 import { Dialog } from "primereact/dialog";
 import { InputText } from "primereact/inputtext";
 import { Dropdown } from "primereact/dropdown";
+import { Checkbox } from "primereact/checkbox";
 import * as XLSX from "xlsx";
 import jsPDF from "jspdf";
 import "jspdf-autotable";
+
+// ✅ Import ÚNICO del hook (ruta según tu árbol)
+import useCanReview from "./Registros/Hooks/useCanReview.js";
 
 /** Ítems + frecuencia (solo informativa para agrupar en el modal) */
 const LIMPIEZA_ITEMS = [
@@ -75,6 +80,10 @@ const packRow = (dbRow) => {
     firma_encargado: dbRow.firma_encargado,
     observaciones_generales: dbRow.observaciones_generales,
     fecha_correccion: dbRow.fecha_correccion,
+    // nuevos campos de revisión
+    revisado: dbRow.revisado ?? false,
+    revisado_por_username: dbRow.revisado_por_username ?? null,
+    revisado_fecha: dbRow.revisado_fecha ?? null,
     items: itemsMap,
   };
 };
@@ -84,9 +93,15 @@ function LimpiezaAreaCosecha() {
   const toast = useRef(null);
 
   const [rows, setRows] = useState([]);
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(false); // ✅ corregido (antes decía 'the')
   const [selected, setSelected] = useState([]);
   const [globalFilter, setGlobalFilter] = useState("");
+
+  // Filtro por revisado
+  const [filtroRevisado, setFiltroRevisado] = useState("all"); // 'all' | 'checked' | 'unchecked'
+
+  // Permisos (solo Mantenimiento01 / Produccion01 pueden ver/marcar)
+  const { canReview, username } = useCanReview();
 
   const [dialogOpen, setDialogOpen] = useState(false);
   const [submitted, setSubmitted] = useState(false);
@@ -103,7 +118,7 @@ function LimpiezaAreaCosecha() {
   const fetchRows = async () => {
     setLoading(true);
     try {
-      const { data, error } = await supabase
+      let query = supabase
         .from("limpieza_cosecha")
         .select(`
           id,
@@ -114,12 +129,19 @@ function LimpiezaAreaCosecha() {
           firma_encargado,
           observaciones_generales,
           fecha_correccion,
+          revisado,
+          revisado_por_username,
+          revisado_fecha,
           items:limpieza_cosecha_items!limpieza_cosecha_items_id_registro_fkey (
             item_key, estado, comentario
           )
         `)
         .order("fecha_registro", { ascending: false });
 
+      if (filtroRevisado === "checked") query = query.eq("revisado", true);
+      if (filtroRevisado === "unchecked") query = query.eq("revisado", false);
+
+      const { data, error } = await query;
       if (error) throw error;
       setRows((data || []).map(packRow));
     } catch (e) {
@@ -130,9 +152,7 @@ function LimpiezaAreaCosecha() {
     }
   };
 
-  useEffect(() => {
-    fetchRows();
-  }, []);
+  useEffect(() => { fetchRows(); }, [filtroRevisado]);
 
   const openNew = () => {
     setForm(emptyForm());
@@ -180,8 +200,7 @@ function LimpiezaAreaCosecha() {
           responsable: form.responsable,
           verificador_inocuidad: form.verificador_inocuidad || null,
           firma_encargado: form.firma_encargado || null,
-          observaciones_generales: form.observaciones_generales || null,
-          // fecha_correccion: la pone la DB (default now())
+          observaciones_generales: form.observaciones_generales || null
         }])
         .select("id")
         .single();
@@ -223,6 +242,7 @@ function LimpiezaAreaCosecha() {
       "firma encargado": r.firma_encargado || "",
       "fecha corrección": r.fecha_correccion ? new Date(r.fecha_correccion).toLocaleString() : "",
       observaciones: r.observaciones_generales || "",
+      revisado: r.revisado ? "Sí" : "No",
     };
     LIMPIEZA_ITEMS.forEach((it) => {
       const v = r.items?.[it.key] || {};
@@ -261,6 +281,50 @@ function LimpiezaAreaCosecha() {
   const countBy = (row, val) =>
     LIMPIEZA_ITEMS.reduce((acc, it) => acc + (row.items?.[it.key]?.estado === val ? 1 : 0), 0);
 
+  // Columna final: checkbox de Revisado (solo si canReview)
+  const revisadoTemplate = (row) => {
+    if (!canReview) return <span>{row.revisado ? "Sí" : "No"}</span>;
+
+    const onToggle = async (next) => {
+      if (!username) {
+        showToast("warn", "Sesión", "No se detectó el usuario actual.");
+        return;
+      }
+      const { error } = await supabase
+        .from("limpieza_cosecha")
+        .update({
+          revisado: next,
+          revisado_por_username: next ? username : null,
+          revisado_fecha: next ? new Date().toISOString() : null,
+        })
+        .eq("id", row.id);
+
+      if (error) {
+        showToast("error", "No se guardó", error.message);
+        return;
+      }
+
+      setRows(prev => prev.map(r =>
+        r.id === row.id
+          ? { ...r, revisado: next, revisado_por_username: next ? username : null, revisado_fecha: next ? new Date().toISOString() : null }
+          : r
+      ));
+      showToast("success", "OK", next ? "Marcado revisado" : "Marcado no revisado");
+    };
+
+    return (
+      <div className="flex align-items-center justify-content-center gap-2">
+        <Checkbox
+          inputId={`chk-rev-${row.id}`}
+          checked={!!row.revisado}
+          onChange={(e) => onToggle(e.checked)}
+        />
+        <label htmlFor={`chk-rev-${row.id}`} className="text-sm">Revisado</label>
+      </div>
+    );
+  };
+
+  // Header con búsqueda + filtro de revisado
   const header = (
     <div className="flex flex-wrap gap-2 align-items-center justify-content-between">
       <span className="p-input-icon-left">
@@ -272,6 +336,20 @@ function LimpiezaAreaCosecha() {
           placeholder="Buscar por responsable o fecha..."
         />
       </span>
+
+      <div className="flex align-items-center gap-2">
+        <span className="text-sm font-medium">Filtro:</span>
+        <Dropdown
+          value={filtroRevisado}
+          onChange={(e) => setFiltroRevisado(e.value)}
+          options={[
+            { label: "Todos", value: "all" },
+            { label: "Con check", value: "checked" },
+            { label: "Sin check", value: "unchecked" },
+          ]}
+          style={{ minWidth: 160 }}
+        />
+      </div>
     </div>
   );
 
@@ -334,6 +412,8 @@ function LimpiezaAreaCosecha() {
         {dynamicColumns.map((c, i) => (
           <Column key={i} header={c.header} body={c.body} />
         ))}
+        {/* Última columna: checkbox de revisado */}
+        <Column header="Revisado" body={revisadoTemplate} style={{ width: "10rem", textAlign: "center" }} />
       </DataTable>
 
       {/* Dialog Nuevo Registro */}

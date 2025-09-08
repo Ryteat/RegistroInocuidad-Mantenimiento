@@ -1,69 +1,82 @@
-import { useState, useEffect } from 'react';
-import './Login.css';
-import { useNavigate } from 'react-router-dom';
-import logo from '../../assets/Pronuvo_logos_sin_fondo_6.png green.png';
-import logo2 from '../../assets/mosca.png';
-import supabase from '../../supabaseClient';
-import { Password } from 'primereact/password';
+import { useState, useEffect } from "react";
+import "./Login.css";
+import { useNavigate } from "react-router-dom";
+import logo from "../../assets/Pronuvo_logos_sin_fondo_6.png green.png";
+import logo2 from "../../assets/mosca.png";
+import supabase from "../../supabaseClient";
+import { Password } from "primereact/password";
+
+// ⬅️ GUARDA el username en storage para que useCanReview lo lea
+import { setCurrentUsername } from "../Inocuidad/Registros/session/userSession.js";
 
 function App() {
   const [usuarios, setUsuarios] = useState([]);
+  const [cargando, setCargando] = useState(false);
+  const [mensaje, setMensaje] = useState("");
 
+  // Estados del formulario
+  const [username, setUsername] = useState("");
+  const [password, setPassword] = useState("");
+
+  const navigate = useNavigate();
+
+  // Carga usuarios desde Supabase
   const getUsuarios = async () => {
-    const { data, error } = await supabase
-    .from('Usuarios')
-    .select()
+    try {
+      setCargando(true);
+      const { data, error } = await supabase.from("Usuarios").select("id, username, password, departamento");
+      if (error) throw error;
+      setUsuarios(data || []);
+    } catch (err) {
+      console.error(err);
+      setMensaje("No se pudo cargar usuarios.");
+    } finally {
+      setCargando(false);
+    }
+  };
 
-    setUsuarios(data)
-
-  }
-    
   useEffect(() => {
     getUsuarios();
   }, []);
 
-  // Estados para el formulario
-  const [username, setUsername] = useState('');
-  const [password, setPassword] = useState('');
-  const [departamento, setDepartamento] = useState('');
-  const [mensaje, setMensaje] = useState('');
-
-  const navigate = useNavigate();
-
-  // Función de autenticación
+  // Autenticación local contra la tabla Usuarios
   const autenticarUsuario = (e) => {
-    e.preventDefault(); // Evitar que la página se recargue
+    e.preventDefault();
+
     const usuarioValido = usuarios.find(
-      (usuario) => usuario.username === username && usuario.password === password
+      (u) => u?.username === username && u?.password === password
     );
 
     if (usuarioValido) {
-      setMensaje(`¡Bienvenido, ${username}!`);
-      // Obtener el departamento del usuario autenticado
-      const departamentoUsuario = usuarioValido.departamento;
+      // ⬇️ Guarda el username para que el hook pueda habilitar el checkbox
+      setCurrentUsername(usuarioValido.username);
+      // (opcional) refuerzo adicional por si quieres sesión por pestaña:
+      sessionStorage.setItem("username", usuarioValido.username);
 
-      // Redirigir al menú principal y pasar el departamento
-      navigate('/MenuPrincipal', { state: { departamento: departamentoUsuario } });
+      const departamentoUsuario = usuarioValido.departamento || ""; // CSV de departamentos
 
-      // Limpiar los campos de usuario y contraseña
-      setUsername('');
-      setPassword('');
+      setMensaje(`¡Bienvenido, ${usuarioValido.username}!`);
+      // Redirige al menú principal con el/los departamentos
+      navigate("/MenuPrincipal", { state: { departamento: departamentoUsuario } });
 
+      // Limpia campos
+      setUsername("");
+      setPassword("");
     } else {
-      setMensaje('Usuario o contraseña incorrectos.');
-      // Limpiar los campos de usuario y contraseña
-      setUsername('');
-      setPassword('');
+      setMensaje("Usuario o contraseña incorrectos.");
+      setUsername("");
+      setPassword("");
     }
   };
 
   return (
-    <div className='Login'>
+    <div className="Login">
       <div className="login-container">
         <h1>
           <img src={logo2} alt="mosca" className="logo2" />
           Acceso
         </h1>
+
         <form onSubmit={autenticarUsuario}>
           <div>
             <label htmlFor="username">Usuario:</label>
@@ -74,24 +87,31 @@ function App() {
               onChange={(e) => setUsername(e.target.value)}
               placeholder="Ingrese su usuario"
               required
+              autoComplete="username"
             />
           </div>
+
           <div>
             <label htmlFor="password">Contraseña:</label>
             <Password
-              id='password'
+              id="password"
               required
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               placeholder="Ingrese su contraseña"
               feedback={false}
               toggleMask
-              className="p-password" // Aplica la clase personalizada
-              inputClassName="p-password-input" // Aplica la clase al input
+              className="p-password"
+              inputClassName="p-password-input"
+              inputProps={{ autoComplete: "current-password" }}
             />
           </div>
-          <button type="submit">Iniciar Sesión</button>
+
+          <button type="submit" disabled={cargando}>
+            {cargando ? "Cargando..." : "Iniciar Sesión"}
+          </button>
         </form>
+
         {mensaje && <p className="mensaje">{mensaje}</p>}
       </div>
 
