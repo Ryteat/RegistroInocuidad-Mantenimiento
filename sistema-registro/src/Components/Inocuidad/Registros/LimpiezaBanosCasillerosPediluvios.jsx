@@ -1,6 +1,7 @@
+// Components/Inocuidad/Registros/LimpiezaBanosCasillerosPediluvios.jsx
 import React, { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import supabase from "../../../supabaseClient"; // <-- AJUSTA si tu ruta es distinta
+import supabase from "../../../supabaseClient";
 import logo2 from "../../../assets/mosca.png";
 
 import "primereact/resources/themes/lara-light-indigo/theme.css";
@@ -13,42 +14,48 @@ import { Column } from "primereact/column";
 import { Dialog } from "primereact/dialog";
 import { InputText } from "primereact/inputtext";
 import { Dropdown } from "primereact/dropdown";
-import * as XLSX from "xlsx";
+import { Checkbox } from "primereact/checkbox";
 
-/** Rubrica */
+
+// 👇 importa tu CSS común de Inocuidad
+import "../Inocuidad.css";
+
+// Permisos (Mantenimiento01 / Produccion01)
+import useCanReview from "./Hooks/useCanReview.js";
+
 const ESTADOS = [
     { label: "C (Cumple)", value: "C" },
     { label: "NC (No cumple)", value: "NC" },
-    { label: "NA (No aplica)", value: "NA" }, // Cambia label a "NED (No aplica)" si así lo quieres
+    { label: "NA (No aplica)", value: "NA" },
 ];
 
-/** Ítems por sub-área */
 const ITEMS = [
     // Baños
-    { key: "banos_sanitarios", label: "Baños - Sanitarios", grupo: "Banos" },
-    { key: "banos_pisos", label: "Baños - Pisos", grupo: "Banos" },
-    { key: "banos_lavamanos", label: "Baños - Lavamanos", grupo: "Banos" },
-    { key: "banos_orinales", label: "Baños - Orinales", grupo: "Banos" },
-    { key: "banos_recoleccion_basura", label: "Baños - Recolección de basura", grupo: "Banos" },
-    { key: "banos_paredes", label: "Baños - Paredes", grupo: "Banos" },
+    { key: "banos_sanitarios", label: "Sanitarios (Diario)", grupo: "Banos" },
+    { key: "banos_pisos", label: "Pisos (Diario)", grupo: "Banos" },
+    { key: "banos_lavamanos", label: "Lavamanos (Diario)", grupo: "Banos" },
+    { key: "banos_orinales", label: "Orinales (Diario)", grupo: "Banos" },
+    { key: "banos_recoleccion_basura", label: "Recolección de basura (Diario)", grupo: "Banos" },
+    { key: "banos_paredes", label: "Paredes (Quincenal)", grupo: "Banos" },
+    { key: "banos_techos", label: "Techos (Semestral)", grupo: "Banos" }, // nuevo
 
     // Camerinos
-    { key: "camerinos_pisos", label: "Camerinos - Pisos", grupo: "Camerinos" },
-    { key: "camerinos_lavamanos", label: "Camerinos - Lavamanos", grupo: "Camerinos" },
-    { key: "camerinos_paredes", label: "Camerinos - Paredes", grupo: "Camerinos" },
-    { key: "camerinos_casilleros_exterior", label: "Camerinos - Limpieza de casilleros (por fuera)", grupo: "Camerinos" },
+    { key: "camerinos_pisos", label: "Pisos (Diario)", grupo: "Camerinos" },
+    { key: "camerinos_lavamanos", label: "Lavamanos (Diario)", grupo: "Camerinos" },
+    { key: "camerinos_paredes", label: "Paredes (Quincenal)", grupo: "Camerinos" },
+    { key: "camerinos_casilleros_exterior", label: "Limpieza de casilleros por fuera (Mensual)", grupo: "Camerinos" },
 
     // Cuarto de crecimiento
-    { key: "crecimiento_piso", label: "Cuarto de crecimiento - Piso", grupo: "Crecimiento" },
-    { key: "crecimiento_muebles", label: "Cuarto de crecimiento - Muebles", grupo: "Crecimiento" },
-    { key: "crecimiento_paredes", label: "Cuarto de crecimiento - Paredes", grupo: "Crecimiento" },
-    { key: "crecimiento_techo", label: "Cuarto de crecimiento - Techo", grupo: "Crecimiento" },
+    { key: "crecimiento_piso", label: "Piso (Semanal)", grupo: "Crecimiento" },
+    { key: "crecimiento_muebles", label: "Muebles (Semanal)", grupo: "Crecimiento" },
+    { key: "crecimiento_paredes", label: "Paredes (Mensual)", grupo: "Crecimiento" },
+    { key: "crecimiento_techo", label: "Techo (Mensual)", grupo: "Crecimiento" },
 
     // Pediluvios
-    { key: "pediluvios_area_externa", label: "Pediluvios - Área externa", grupo: "Pediluvios" },
-    { key: "pediluvios_area_interna", label: "Pediluvios - Área interna", grupo: "Pediluvios" },
-    { key: "pediluvios_solucion", label: "Pediluvios - Solución", grupo: "Pediluvios" },
-    { key: "pediluvios_techo", label: "Pediluvios - Techo", grupo: "Pediluvios" },
+    { key: "pediluvios_area_externa", label: "Área externa (Diario)", grupo: "Pediluvios" },
+    { key: "pediluvios_area_interna", label: "Área interna (Diario)", grupo: "Pediluvios" },
+    { key: "pediluvios_solucion", label: "Solución (Diario)", grupo: "Pediluvios" },
+    { key: "pediluvios_techo", label: "Techo (Semanal)", grupo: "Pediluvios" },
 ];
 
 const GROUP_LABEL = {
@@ -62,22 +69,20 @@ const todayISO = () => {
     const d = new Date();
     return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 };
-const nowHM = () =>
-    new Date().toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit", hour12: false });
+const nowHM = () => new Date().toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit", hour12: false });
 
 const emptyForm = () => ({
     fecha_registro: todayISO(),
     hora_registro: nowHM(),
     firma_encargado: "",
     verificacion_investigacion_desarrollo: "",
-    fecha_correccion_preview: new Date().toLocaleString(), // solo visual; DB guarda la real (default now())
+    fecha_correccion_preview: new Date().toLocaleString(), // visual
     items: ITEMS.reduce((acc, it) => {
         acc[it.key] = { estado: "", comentario: "" };
         return acc;
     }, {}),
 });
 
-/** Mapea el array de items (BD) a objeto {key: {estado, comentario}} para la grilla */
 const packRow = (dbRow) => {
     const itemsMap = ITEMS.reduce((acc, it) => {
         const found = (dbRow.items || []).find((x) => x.item_key === it.key);
@@ -91,6 +96,9 @@ const packRow = (dbRow) => {
         firma_encargado: dbRow.firma_encargado,
         verificacion_investigacion_desarrollo: dbRow.verificacion_investigacion_desarrollo,
         fecha_correccion: dbRow.fecha_correccion,
+        revisado: dbRow.revisado ?? false,
+        revisado_por_username: dbRow.revisado_por_username ?? null,
+        revisado_fecha: dbRow.revisado_fecha ?? null,
         items: itemsMap,
     };
 };
@@ -108,6 +116,10 @@ export default function LimpiezaBanosCasillerosPediluvios() {
     const [submitted, setSubmitted] = useState(false);
     const [form, setForm] = useState(emptyForm());
 
+    // Filtro + permisos
+    const [filtroRevisado, setFiltroRevisado] = useState("all");
+    const { canReview, username } = useCanReview();
+
     const grupos = {
         Banos: ITEMS.filter((i) => i.grupo === "Banos"),
         Camerinos: ITEMS.filter((i) => i.grupo === "Camerinos"),
@@ -118,31 +130,52 @@ export default function LimpiezaBanosCasillerosPediluvios() {
     const showToast = (severity, summary, detail, life = 3000) =>
         toast.current?.show({ severity, summary, detail, life });
 
-    const exportXlsx = () => {
-        const rowsToExport = (Array.isArray(rows) ? rows : []).map((row) => {
-            const base = {
-                fecha_registro: row.fecha_registro,
-                hora_registro: row.hora_registro,
-                firma_encargado: row.firma_encargado,
-                verificacion_investigacion_desarrollo: row.verificacion_investigacion_desarrollo,
-                fecha_correccion: new Date(row.fecha_correccion).toLocaleString(),
+    const exportXlsx = async () => {
+        const data = selected.length > 0 ? selected : rows;
+        if (!data || data.length === 0) {
+            showToast("warn", "Exportación", "No hay registros para exportar.");
+            return;
+        }
+
+        try {
+            // import dinámico (más compatible con Vite)
+            const XLSX = await import("xlsx");
+
+            // aplanar fila para Excel
+            const toFlat = (row) => {
+                const base = {
+                    fecha_registro: row.fecha_registro,
+                    hora_registro: row.hora_registro,
+                    firma_encargado: row.firma_encargado || "",
+                    verificacion_investigacion_desarrollo: row.verificacion_investigacion_desarrollo || "",
+                    fecha_registro_sistema: row.fecha_correccion ? new Date(row.fecha_correccion).toLocaleString() : "",
+                    revisado: row.revisado ? "Sí" : "No",
+                };
+                // columnas por ítem (mismo criterio que usamos en otros módulos)
+                ITEMS.forEach((it) => {
+                    const v = row.items?.[it.key] || {};
+                    base[`${it.label}`] = v.estado || "";
+                    base[`${it.label} - comentario`] = v.comentario || "";
+                });
+                return base;
             };
-            Object.keys(row.items).forEach((k) => {
-                base[`${k}_estado`] = row.items[k]?.estado || "";
-                base[`${k}_comentario`] = row.items[k]?.comentario || "";
-            });
-            return base;
-        });
-        const ws = XLSX.utils.json_to_sheet(rowsToExport);
-        const wb = XLSX.utils.book_new();
-        XLSX.utils.book_append_sheet(wb, ws, "Limpieza B/C/P");
-        XLSX.writeFile(wb, `Limpieza_Banos_Casilleros_Pediluvios_${new Date().toISOString().slice(0, 10)}.xlsx`);
+
+            const rowsToExport = data.map(toFlat);
+            const ws = XLSX.utils.json_to_sheet(rowsToExport);
+            const wb = XLSX.utils.book_new();
+            XLSX.utils.book_append_sheet(wb, ws, "Banos_Casilleros_Pediluvios");
+            XLSX.writeFile(wb, `Limpieza_Banos_Casilleros_Pediluvios_${new Date().toISOString().slice(0, 10)}.xlsx`);
+        } catch (err) {
+            console.error(err);
+            showToast("error", "Exportación", "No se pudo exportar a Excel");
+        }
     };
 
     const fetchRows = async () => {
         try {
             setLoading(true);
-            const { data, error } = await supabase
+
+            let query = supabase
                 .from("limpieza_banos_casilleros_pediluvios")
                 .select(`
           id,
@@ -151,12 +184,17 @@ export default function LimpiezaBanosCasillerosPediluvios() {
           firma_encargado,
           verificacion_investigacion_desarrollo,
           fecha_correccion,
+          revisado, revisado_por_username, revisado_fecha,
           items:limpieza_banos_casilleros_pediluvios_items!limpieza_banos_casilleros_pediluvios_items_id_registro_fkey (
             item_key, estado, comentario
           )
         `)
                 .order("fecha_registro", { ascending: false });
 
+            if (filtroRevisado === "checked") query = query.eq("revisado", true);
+            if (filtroRevisado === "unchecked") query = query.eq("revisado", false);
+
+            const { data, error } = await query;
             if (error) throw error;
             setRows((data || []).map(packRow));
         } catch (err) {
@@ -167,28 +205,14 @@ export default function LimpiezaBanosCasillerosPediluvios() {
         }
     };
 
-    useEffect(() => {
-        fetchRows();
-    }, []);
+    useEffect(() => { fetchRows(); }, [filtroRevisado]);
 
-    const openNew = () => {
-        setForm(emptyForm());
-        setSubmitted(false);
-        setDialogOpen(true);
-    };
-
-    const hideDialog = () => {
-        setDialogOpen(false);
-        setSubmitted(false);
-    };
+    const openNew = () => { setForm(emptyForm()); setSubmitted(false); setDialogOpen(true); };
+    const hideDialog = () => { setDialogOpen(false); setSubmitted(false); };
 
     const onHeaderChange = (e, field) => setForm((p) => ({ ...p, [field]: e.target.value }));
-
     const onItemChange = (key, field, value) =>
-        setForm((p) => ({
-            ...p,
-            items: { ...p.items, [key]: { ...(p.items[key] || {}), [field]: value } },
-        }));
+        setForm((p) => ({ ...p, items: { ...p.items, [key]: { ...(p.items[key] || {}), [field]: value } } }));
 
     const validate = () => {
         const errs = [];
@@ -205,30 +229,22 @@ export default function LimpiezaBanosCasillerosPediluvios() {
     const save = async () => {
         setSubmitted(true);
         const errs = validate();
-        if (errs.length) {
-            showToast("error", "Validación", errs[0]);
-            return;
-        }
+        if (errs.length) { showToast("error", "Validación", errs[0]); return; }
         try {
-            // 1) Encabezado
             const { data: enc, error: errEnc } = await supabase
                 .from("limpieza_banos_casilleros_pediluvios")
-                .insert([
-                    {
-                        fecha_registro: form.fecha_registro,
-                        hora_registro: form.hora_registro,
-                        firma_encargado: form.firma_encargado || null,
-                        verificacion_investigacion_desarrollo: form.verificacion_investigacion_desarrollo || null,
-                        // fecha_correccion la pone la DB (default now())
-                    },
-                ])
+                .insert([{
+                    fecha_registro: form.fecha_registro,
+                    hora_registro: form.hora_registro,
+                    firma_encargado: form.firma_encargado || null,
+                    verificacion_investigacion_desarrollo: form.verificacion_investigacion_desarrollo || null,
+                }])
                 .select("id")
                 .single();
 
             if (errEnc) throw errEnc;
             const newId = enc.id;
 
-            // 2) Detalle
             const itemsInsert = ITEMS.map((it) => ({
                 id_registro: newId,
                 item_key: it.key,
@@ -253,13 +269,44 @@ export default function LimpiezaBanosCasillerosPediluvios() {
         }
     };
 
-    const countBy = (row, val) =>
-        ITEMS.reduce((acc, it) => acc + (row.items?.[it.key]?.estado === val ? 1 : 0), 0);
+    const countBy = (row, val) => ITEMS.reduce((acc, it) => acc + (row.items?.[it.key]?.estado === val ? 1 : 0), 0);
 
     const dynamicColumns = ITEMS.map((it) => ({
         header: it.label,
         body: (row) => row.items?.[it.key]?.estado || "",
     }));
+
+    const revisadoTemplate = (row) => {
+        if (!canReview) return <span>{row.revisado ? "Sí" : "No"}</span>;
+
+        const onToggle = async (next) => {
+            if (!username) { showToast("warn", "Sesión", "No se detectó el usuario actual."); return; }
+            const { error } = await supabase
+                .from("limpieza_banos_casilleros_pediluvios")
+                .update({
+                    revisado: next,
+                    revisado_por_username: next ? username : null,
+                    revisado_fecha: next ? new Date().toISOString() : null,
+                })
+                .eq("id", row.id);
+
+            if (error) { showToast("error", "No se guardó", error.message); return; }
+
+            setRows((prev) => prev.map((r) =>
+                r.id === row.id
+                    ? { ...r, revisado: next, revisado_por_username: next ? username : null, revisado_fecha: next ? new Date().toISOString() : null }
+                    : r
+            ));
+            showToast("success", "OK", next ? "Marcado revisado" : "Marcado no revisado");
+        };
+
+        return (
+            <div className="flex align-items-center justify-content-center gap-2">
+                <Checkbox inputId={`chk-rev-bcp-${row.id}`} checked={!!row.revisado} onChange={(e) => onToggle(e.checked)} />
+                <label htmlFor={`chk-rev-bcp-${row.id}`} className="text-sm">Revisado</label>
+            </div>
+        );
+    };
 
     const header = (
         <div className="flex flex-wrap gap-2 align-items-center justify-content-between">
@@ -272,6 +319,20 @@ export default function LimpiezaBanosCasillerosPediluvios() {
                     placeholder="Buscar por fecha..."
                 />
             </span>
+
+            <div className="flex align-items-center gap-2">
+                <span className="text-sm font-medium">Filtro:</span>
+                <Dropdown
+                    value={filtroRevisado}
+                    onChange={(e) => setFiltroRevisado(e.value)}
+                    options={[
+                        { label: "Todos", value: "all" },
+                        { label: "Con check", value: "checked" },
+                        { label: "Sin check", value: "unchecked" },
+                    ]}
+                    style={{ minWidth: 160 }}
+                />
+            </div>
         </div>
     );
 
@@ -284,9 +345,9 @@ export default function LimpiezaBanosCasillerosPediluvios() {
             </h1>
 
             <div className="welcome-message">
-                <p>
-                    Rúbrica: <b>C</b> (Cumple), <b>NC</b> (No cumple), <b>NA</b> (No aplica). Para <b>NC/NA</b> el comentario es obligatorio.
-                    La “Fecha de corrección” se genera automáticamente al guardar.
+                <p style={{ textAlign: "center" }}>
+                    Rúbrica: <b>C</b> (Cumple), <b>NC</b> (No cumple), <b>NA</b> (No aplica). Para <b>NC/NA</b> el comentario es
+                    obligatorio. La <b>Fecha de registro</b> se genera automáticamente al guardar.
                 </p>
             </div>
 
@@ -320,16 +381,21 @@ export default function LimpiezaBanosCasillerosPediluvios() {
                 <Column field="hora_registro" header="Hora" />
                 <Column field="firma_encargado" header="Firma encargado" />
                 <Column field="verificacion_investigacion_desarrollo" header="Verificación I+D" />
-                <Column field="fecha_correccion" header="Fecha de corrección" body={(r) => new Date(r.fecha_correccion).toLocaleString()} sortable />
+                <Column
+                    field="fecha_correccion"
+                    header="Fecha de Registro"
+                    body={(r) => (r.fecha_correccion ? new Date(r.fecha_correccion).toLocaleString() : "")}
+                    sortable
+                />
                 <Column header="#C" body={(r) => countBy(r, "C")} />
                 <Column header="#NC" body={(r) => countBy(r, "NC")} />
                 <Column header="#NA" body={(r) => countBy(r, "NA")} />
                 {dynamicColumns.map((c, i) => (
                     <Column key={i} header={c.header} body={c.body} />
                 ))}
+                <Column header="Revisado" body={revisadoTemplate} style={{ width: "10rem", textAlign: "center" }} />
             </DataTable>
 
-            {/* Dialog Nuevo Registro */}
             <Dialog
                 visible={dialogOpen}
                 style={{ width: "70vw", maxWidth: 1100 }}
@@ -359,7 +425,8 @@ export default function LimpiezaBanosCasillerosPediluvios() {
 
                     {["Banos", "Camerinos", "Crecimiento", "Pediluvios"].map((grp) => (
                         <div key={grp} className="col-12">
-                            <div className="font-bold text-lg mb-2">{GROUP_LABEL[grp]}</div>
+                            {/* 👇 MISMO formato que el registro de Oficinas/Sala/Comedor */}
+                            <div className="subarea-title">{GROUP_LABEL[grp]}</div>
                             <div className="grid">
                                 {grupos[grp].map((it) => {
                                     const val = form.items[it.key] || { estado: "", comentario: "" };
@@ -367,8 +434,7 @@ export default function LimpiezaBanosCasillerosPediluvios() {
                                     return (
                                         <div className="field col-12 md:col-6" key={it.key}>
                                             <label className="font-bold">
-                                                {it.label}*
-                                                {submitted && !val.estado && <small className="p-error"> Requerido</small>}
+                                                {it.label}* {submitted && !val.estado && <small className="p-error"> Requerido</small>}
                                             </label>
                                             <Dropdown
                                                 value={val.estado}
@@ -404,7 +470,7 @@ export default function LimpiezaBanosCasillerosPediluvios() {
                     </div>
 
                     <div className="field col-12 md:col-6">
-                        <label className="font-bold">Fecha de corrección (auto)</label>
+                        <label className="font-bold">Fecha de Registro (auto)</label>
                         <InputText value={form.fecha_correccion_preview} disabled />
                     </div>
                 </div>

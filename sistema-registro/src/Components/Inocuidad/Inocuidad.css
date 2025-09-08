@@ -24,3 +24,19 @@
 .back-button:hover {
     background-color: #6b8e23;
 }
+
+/* Subtítulos de secciones dentro de los modales */
+.subarea-title {
+    font-weight: 700;
+    font-size: 1.35rem;
+    /* móvil */
+    line-height: 1.25;
+    margin: 0.25rem 0 0.75rem;
+}
+
+@media (min-width: 768px) {
+    .subarea-title {
+        /* desktop */
+        font-size: 1.6rem;
+    }
+}

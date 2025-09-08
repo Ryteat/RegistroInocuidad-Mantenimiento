@@ -1,3 +1,4 @@
+// Components/Inocuidad/LimpiezaTarimasCajas.jsx
 import React, { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import supabase from "../../supabaseClient";
@@ -7,7 +8,6 @@ import "primereact/resources/themes/lara-light-indigo/theme.css";
 import "primeicons/primeicons.css";
 import { Toast } from "primereact/toast";
 import { Toolbar } from "primereact/toolbar";
-// Exportación a Excel
 import * as XLSX from "xlsx";
 import { Button } from "primereact/button";
 import { DataTable } from "primereact/datatable";
@@ -15,6 +15,10 @@ import { Column } from "primereact/column";
 import { Dialog } from "primereact/dialog";
 import { InputText } from "primereact/inputtext";
 import { Dropdown } from "primereact/dropdown";
+import { Checkbox } from "primereact/checkbox";
+
+// ⬅️ Hook de permisos (ruta igual que en Cosecha/Hatchery/Oficinas)
+import useCanReview from "./Registros/Hooks/useCanReview.js";
 
 const ESTADOS = [
     { label: "C (Cumple)", value: "C" },
@@ -23,18 +27,15 @@ const ESTADOS = [
 ];
 
 const ITEMS = [
-    { key: "lavado_cajas_1x1", label: "Lavado de cajas de 1×1" },
-    { key: "lavado_tarimas", label: "Lavado de tarimas" },
+    { key: "lavado_cajas_1x1", label: "Lavado de cajas de 1×1 (Diario)" },
+    { key: "lavado_tarimas", label: "Lavado de tarimas (Diario)" },
 ];
 
 const todayISO = () => {
     const d = new Date();
-    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(
-        d.getDate()
-    ).padStart(2, "0")}`;
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 };
-const nowHM = () =>
-    new Date().toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit", hour12: false });
+const nowHM = () => new Date().toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit", hour12: false });
 
 const emptyForm = () => ({
     fecha_registro: todayISO(),
@@ -64,7 +65,11 @@ const packRow = (dbRow) => {
         cant_tarimas_limpias: dbRow.cant_tarimas_limpias,
         cant_cajas_colores_limpias: dbRow.cant_cajas_colores_limpias,
         firma_encargado: dbRow.firma_encargado,
-        fecha_correccion: dbRow.fecha_correccion, // lo muestra la grilla
+        fecha_correccion: dbRow.fecha_correccion, // usado como "Fecha de Registro" en pantalla
+        // campos de revisión
+        revisado: dbRow.revisado ?? false,
+        revisado_por_username: dbRow.revisado_por_username ?? null,
+        revisado_fecha: dbRow.revisado_fecha ?? null,
         items: itemsMap,
     };
 };
@@ -82,7 +87,12 @@ export default function LimpiezaTarimasCajas() {
     const [submitted, setSubmitted] = useState(false);
     const [form, setForm] = useState(emptyForm());
 
-    // Exportar a Excel (igual que LimpiezaAreaHatchery)
+    // Filtro por revisado
+    const [filtroRevisado, setFiltroRevisado] = useState("all"); // 'all' | 'checked' | 'unchecked'
+    // Permisos
+    const { canReview, username } = useCanReview();
+
+    // Exportar a Excel
     const exportXlsx = () => {
         const rowsToExport = (Array.isArray(rows) ? rows : []).map((row) => {
             const base = {
@@ -91,7 +101,8 @@ export default function LimpiezaTarimasCajas() {
                 cant_tarimas_limpias: row.cant_tarimas_limpias,
                 cant_cajas_colores_limpias: row.cant_cajas_colores_limpias,
                 firma_encargado: row.firma_encargado,
-                fecha_correccion: row.fecha_correccion,
+                fecha_registro_sistema: row.fecha_correccion ? new Date(row.fecha_correccion).toLocaleString() : "",
+                revisado: row.revisado ? "Sí" : "No",
             };
             Object.keys(row.items).forEach((key) => {
                 base[`${key}_estado`] = row.items[key]?.estado || "";
@@ -111,7 +122,8 @@ export default function LimpiezaTarimasCajas() {
     const fetchRegistros = async () => {
         try {
             setLoading(true);
-            const { data, error } = await supabase
+
+            let query = supabase
                 .from("limpieza_tarimas_cajas")
                 .select(`
           id,
@@ -121,12 +133,19 @@ export default function LimpiezaTarimasCajas() {
           cant_cajas_colores_limpias,
           firma_encargado,
           fecha_correccion,
+          revisado,
+          revisado_por_username,
+          revisado_fecha,
           items:limpieza_tarimas_cajas_items!limpieza_tarimas_cajas_items_id_registro_fkey (
             item_key, estado, comentario
           )
         `)
                 .order("fecha_registro", { ascending: false });
 
+            if (filtroRevisado === "checked") query = query.eq("revisado", true);
+            if (filtroRevisado === "unchecked") query = query.eq("revisado", false);
+
+            const { data, error } = await query;
             if (error) throw error;
             setRows((data || []).map(packRow));
         } catch (err) {
@@ -139,7 +158,7 @@ export default function LimpiezaTarimasCajas() {
 
     useEffect(() => {
         fetchRegistros();
-    }, []);
+    }, [filtroRevisado]);
 
     const openNew = () => {
         setForm(emptyForm());
@@ -174,7 +193,6 @@ export default function LimpiezaTarimasCajas() {
         if (!Number.isInteger(n2) || n2 < 0) errs.push("Cantidad de cajas de colores limpias debe ser un entero ≥ 0.");
 
         return errs;
-        // firma_encargado opcional; agrega como requerido si lo necesitas
     };
 
     const save = async () => {
@@ -212,10 +230,7 @@ export default function LimpiezaTarimasCajas() {
                 comentario: form.items[it.key]?.comentario || null,
             }));
 
-            const { error: errDet } = await supabase
-                .from("limpieza_tarimas_cajas_items")
-                .insert(itemsInsert);
-
+            const { error: errDet } = await supabase.from("limpieza_tarimas_cajas_items").insert(itemsInsert);
             if (errDet) throw errDet;
 
             showToast("success", "Éxito", "Registro guardado correctamente");
@@ -229,14 +244,62 @@ export default function LimpiezaTarimasCajas() {
         }
     };
 
-    const countBy = (row, val) =>
-        ITEMS.reduce((acc, it) => acc + (row.items?.[it.key]?.estado === val ? 1 : 0), 0);
+    const countBy = (row, val) => ITEMS.reduce((acc, it) => acc + (row.items?.[it.key]?.estado === val ? 1 : 0), 0);
 
     const dynamicColumns = ITEMS.map((it) => ({
         header: it.label,
         body: (row) => row.items?.[it.key]?.estado || "",
     }));
 
+    // plantilla de checkbox revisado
+    const revisadoTemplate = (row) => {
+        if (!canReview) return <span>{row.revisado ? "Sí" : "No"}</span>;
+
+        const onToggle = async (next) => {
+            if (!username) {
+                showToast("warn", "Sesión", "No se detectó el usuario actual.");
+                return;
+            }
+            const { error } = await supabase
+                .from("limpieza_tarimas_cajas")
+                .update({
+                    revisado: next,
+                    revisado_por_username: next ? username : null,
+                    revisado_fecha: next ? new Date().toISOString() : null,
+                })
+                .eq("id", row.id);
+
+            if (error) {
+                showToast("error", "No se guardó", error.message);
+                return;
+            }
+
+            setRows((prev) =>
+                prev.map((r) =>
+                    r.id === row.id
+                        ? {
+                            ...r,
+                            revisado: next,
+                            revisado_por_username: next ? username : null,
+                            revisado_fecha: next ? new Date().toISOString() : null,
+                        }
+                        : r
+                )
+            );
+            showToast("success", "OK", next ? "Marcado revisado" : "Marcado no revisado");
+        };
+
+        return (
+            <div className="flex align-items-center justify-content-center gap-2">
+                <Checkbox inputId={`chk-rev-tc-${row.id}`} checked={!!row.revisado} onChange={(e) => onToggle(e.checked)} />
+                <label htmlFor={`chk-rev-tc-${row.id}`} className="text-sm">
+                    Revisado
+                </label>
+            </div>
+        );
+    };
+
+    // header con búsqueda + filtro
     const header = (
         <div className="flex flex-wrap gap-2 align-items-center justify-content-between">
             <span className="p-input-icon-left">
@@ -248,6 +311,20 @@ export default function LimpiezaTarimasCajas() {
                     placeholder="Buscar por fecha..."
                 />
             </span>
+
+            <div className="flex align-items-center gap-2">
+                <span className="text-sm font-medium">Filtro:</span>
+                <Dropdown
+                    value={filtroRevisado}
+                    onChange={(e) => setFiltroRevisado(e.value)}
+                    options={[
+                        { label: "Todos", value: "all" },
+                        { label: "Con check", value: "checked" },
+                        { label: "Sin check", value: "unchecked" },
+                    ]}
+                    style={{ minWidth: 160 }}
+                />
+            </div>
         </div>
     );
 
@@ -261,15 +338,18 @@ export default function LimpiezaTarimasCajas() {
 
             <div className="welcome-message">
                 <p>
-                    Rúbrica: <b>C</b> (Cumple), <b>NC</b> (No cumple), <b>NA</b> (No aplica).
-                    Para <b>NC/NA</b> el comentario es obligatorio. La “Fecha de corrección” se genera
-                    automáticamente al guardar (momento exacto del registro).
+                    Rúbrica: <b>C</b> (Cumple), <b>NC</b> (No cumple), <b>NA</b> (No aplica). Para <b>NC/NA</b> el comentario es
+                    obligatorio. La “Fecha de registro” se genera automáticamente al guardar.
                 </p>
             </div>
 
             <div className="buttons-container">
-                <button onClick={() => navigate(-1)} className="return-button">Volver</button>
-                <button onClick={() => navigate(-2)} className="menu-button">Menú principal</button>
+                <button onClick={() => navigate(-1)} className="return-button">
+                    Volver
+                </button>
+                <button onClick={() => navigate(-2)} className="menu-button">
+                    Menú principal
+                </button>
             </div>
 
             <Toolbar
@@ -286,7 +366,9 @@ export default function LimpiezaTarimasCajas() {
                 selectionMode="multiple"
                 header={header}
                 globalFilter={globalFilter}
-                paginator rows={10} rowsPerPageOptions={[5, 10, 25]}
+                paginator
+                rows={10}
+                rowsPerPageOptions={[5, 10, 25]}
                 paginatorTemplate="FirstPageLink PrevPageLink PageLinks NextPageLink LastPageLink CurrentPageReport RowsPerPageDropdown"
                 currentPageReportTemplate="Mostrando del {first} al {last} de {totalRecords} Registros"
                 dataKey="id"
@@ -298,14 +380,20 @@ export default function LimpiezaTarimasCajas() {
                 <Column field="cant_tarimas_limpias" header="Tarimas limpias" sortable />
                 <Column field="cant_cajas_colores_limpias" header="Cajas colores limpias" sortable />
                 <Column field="firma_encargado" header="Firma encargado" />
-                <Column field="fecha_correccion" header="Fecha de corrección"
-                    body={(r) => new Date(r.fecha_correccion).toLocaleString()} sortable />
+                <Column
+                    field="fecha_correccion"
+                    header="Fecha de Registro"
+                    body={(r) => (r.fecha_correccion ? new Date(r.fecha_correccion).toLocaleString() : "")}
+                    sortable
+                />
                 <Column header="#C" body={(r) => countBy(r, "C")} />
                 <Column header="#NC" body={(r) => countBy(r, "NC")} />
                 <Column header="#NA" body={(r) => countBy(r, "NA")} />
                 {dynamicColumns.map((c, i) => (
                     <Column key={i} header={c.header} body={c.body} />
                 ))}
+                {/* última columna: checkbox revisado */}
+                <Column header="Revisado" body={revisadoTemplate} style={{ width: "10rem", textAlign: "center" }} />
             </DataTable>
 
             <Dialog
@@ -324,18 +412,15 @@ export default function LimpiezaTarimasCajas() {
                 <div className="p-fluid grid">
                     <div className="field col-12 md:col-4">
                         <label className="font-bold">Fecha</label>
-                        <InputText type="date" value={form.fecha_registro}
-                            onChange={(e) => onHeaderChange(e, "fecha_registro")} />
+                        <InputText type="date" value={form.fecha_registro} onChange={(e) => onHeaderChange(e, "fecha_registro")} />
                     </div>
                     <div className="field col-12 md:col-4">
                         <label className="font-bold">Hora</label>
-                        <InputText type="time" value={form.hora_registro}
-                            onChange={(e) => onHeaderChange(e, "hora_registro")} />
+                        <InputText type="time" value={form.hora_registro} onChange={(e) => onHeaderChange(e, "hora_registro")} />
                     </div>
                     <div className="field col-12 md:col-4">
                         <label className="font-bold">Firma del encargado</label>
-                        <InputText value={form.firma_encargado}
-                            onChange={(e) => onHeaderChange(e, "firma_encargado")} />
+                        <InputText value={form.firma_encargado} onChange={(e) => onHeaderChange(e, "firma_encargado")} />
                     </div>
 
                     {ITEMS.map((it) => {
@@ -344,8 +429,7 @@ export default function LimpiezaTarimasCajas() {
                         return (
                             <div className="field col-12 md:col-6" key={it.key}>
                                 <label className="font-bold">
-                                    {it.label}*
-                                    {submitted && !val.estado && <small className="p-error"> Requerido</small>}
+                                    {it.label}* {submitted && !val.estado && <small className="p-error"> Requerido</small>}
                                 </label>
                                 <Dropdown
                                     value={val.estado}
@@ -362,9 +446,7 @@ export default function LimpiezaTarimasCajas() {
                                             onChange={(e) => onItemChange(it.key, "comentario", e.target.value)}
                                             placeholder="Explique la causa/acción correctiva"
                                         />
-                                        {submitted && !val.comentario?.trim() && (
-                                            <small className="p-error"> Requerido</small>
-                                        )}
+                                        {submitted && !val.comentario?.trim() && <small className="p-error"> Requerido</small>}
                                     </>
                                 )}
                             </div>
@@ -378,8 +460,10 @@ export default function LimpiezaTarimasCajas() {
                             value={form.cant_tarimas_limpias}
                             onChange={(e) => onHeaderChange(e, "cant_tarimas_limpias")}
                         />
-                        {submitted && (!Number.isInteger(Number(form.cant_tarimas_limpias)) || Number(form.cant_tarimas_limpias) < 0) &&
-                            <small className="p-error"> Debe ser entero ≥ 0</small>}
+                        {submitted &&
+                            (!Number.isInteger(Number(form.cant_tarimas_limpias)) || Number(form.cant_tarimas_limpias) < 0) && (
+                                <small className="p-error"> Debe ser entero ≥ 0</small>
+                            )}
                     </div>
 
                     <div className="field col-12 md:col-6">
@@ -389,12 +473,13 @@ export default function LimpiezaTarimasCajas() {
                             value={form.cant_cajas_colores_limpias}
                             onChange={(e) => onHeaderChange(e, "cant_cajas_colores_limpias")}
                         />
-                        {submitted && (!Number.isInteger(Number(form.cant_cajas_colores_limpias)) || Number(form.cant_cajas_colores_limpias) < 0) &&
-                            <small className="p-error"> Debe ser entero ≥ 0</small>}
+                        {submitted &&
+                            (!Number.isInteger(Number(form.cant_cajas_colores_limpias)) ||
+                                Number(form.cant_cajas_colores_limpias) < 0) && <small className="p-error"> Debe ser entero ≥ 0</small>}
                     </div>
 
                     <div className="field col-12">
-                        <label className="font-bold">Fecha de corrección (auto)</label>
+                        <label className="font-bold">Fecha de Registro (auto)</label>
                         <InputText value={form.fecha_correccion_preview} disabled />
                     </div>
                 </div>
