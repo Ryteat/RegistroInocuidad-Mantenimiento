@@ -1,3 +1,4 @@
+// Components/Inocuidad/LimpiezaAreaHatchery.jsx
 import React, { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import supabase from "../../supabaseClient";
@@ -13,6 +14,10 @@ import { Column } from "primereact/column";
 import { Dialog } from "primereact/dialog";
 import { InputText } from "primereact/inputtext";
 import { Dropdown } from "primereact/dropdown";
+import { Checkbox } from "primereact/checkbox";
+
+// Permisos (solo Mantenimiento01 / Produccion01)
+import useCanReview from "./Registros/Hooks/useCanReview.js";
 
 // -----------------------------
 // Catálogos / utilidades
@@ -103,6 +108,10 @@ const fromDb = (row) => ({
     firma_encargado: row.firma_encargado,
     fecha_correccion: row.fecha_correccion,
     observaciones_generales: row.observaciones_generales,
+    // campos de revisión
+    revisado: row.revisado ?? false,
+    revisado_por_username: row.revisado_por_username ?? null,
+    revisado_fecha: row.revisado_fecha ?? null,
     items: {
         pisos: { estado: row.pisos_estado || "", comentario: row.pisos_comentario || "" },
         paredes: { estado: row.paredes_estado || "", comentario: row.paredes_comentario || "" },
@@ -141,6 +150,7 @@ const flattenForExport = (row) => {
     base["firma_encargado"] = row.firma_encargado || "";
     base["fecha_correccion"] = row.fecha_correccion || "";
     base["observaciones"] = row.observaciones_generales || "";
+    base["revisado"] = row.revisado ? "Sí" : "No";
     return base;
 };
 
@@ -155,6 +165,12 @@ export default function LimpiezaAreaHatchery() {
     const [selected, setSelected] = useState([]);
     const [globalFilter, setGlobalFilter] = useState("");
     const [loading, setLoading] = useState(false);
+
+    // Filtro por revisado
+    const [filtroRevisado, setFiltroRevisado] = useState("all"); // 'all' | 'checked' | 'unchecked'
+
+    // Permisos (solo Mantenimiento01 / Produccion01 pueden ver/marcar)
+    const { canReview, username } = useCanReview();
 
     const [dialogOpen, setDialogOpen] = useState(false);
     const [submitted, setSubmitted] = useState(false);
@@ -172,10 +188,32 @@ export default function LimpiezaAreaHatchery() {
     const fetchRegistros = async () => {
         try {
             setLoading(true);
-            const { data, error } = await supabase
+            let query = supabase
                 .from(TABLE)
-                .select("*")
+                .select(`
+          id,
+          fecha_registro,
+          hora_registro,
+          responsable,
+          firma_encargado,
+          fecha_correccion,
+          observaciones_generales,
+          pisos_estado, pisos_comentario,
+          paredes_estado, paredes_comentario,
+          cajas_colores_estado, cajas_colores_comentario,
+          cajas_plasticas_estado, cajas_plasticas_comentario,
+          mesas_laboratorio_estado, mesas_laboratorio_comentario,
+          equipo_laboratorio_estado, equipo_laboratorio_comentario,
+          estante_neonatos_estado, estante_neonatos_comentario,
+          cuarto_oscuro_estado, cuarto_oscuro_comentario,
+          revisado, revisado_por_username, revisado_fecha
+        `)
                 .order("fecha_registro", { ascending: false });
+
+            if (filtroRevisado === "checked") query = query.eq("revisado", true);
+            if (filtroRevisado === "unchecked") query = query.eq("revisado", false);
+
+            const { data, error } = await query;
             if (error) throw error;
             setRows((data || []).map(fromDb));
         } catch (err) {
@@ -188,7 +226,7 @@ export default function LimpiezaAreaHatchery() {
 
     useEffect(() => {
         fetchRegistros();
-    }, []);
+    }, [filtroRevisado]);
 
     const openNew = () => {
         setForm(emptyRegistro());
@@ -234,8 +272,57 @@ export default function LimpiezaAreaHatchery() {
     const countBy = (row, val) =>
         ITEMS.reduce((acc, it) => acc + (row.items?.[it.key]?.estado === val ? 1 : 0), 0);
 
-    const dynamicColumns = ITEMS.map((it) => ({ header: it.label, body: (row) => row.items?.[it.key]?.estado || "" }));
+    // Columna final: checkbox de Revisado (solo si canReview)
+    const revisadoTemplate = (row) => {
+        if (!canReview) return <span>{row.revisado ? "Sí" : "No"}</span>;
 
+        const onToggle = async (next) => {
+            if (!username) {
+                showToast("warn", "Sesión", "No se detectó el usuario actual.");
+                return;
+            }
+            const { error } = await supabase
+                .from(TABLE)
+                .update({
+                    revisado: next,
+                    revisado_por_username: next ? username : null,
+                    revisado_fecha: next ? new Date().toISOString() : null,
+                })
+                .eq("id", row.id);
+
+            if (error) {
+                showToast("error", "No se guardó", error.message);
+                return;
+            }
+
+            setRows((prev) =>
+                prev.map((r) =>
+                    r.id === row.id
+                        ? {
+                            ...r,
+                            revisado: next,
+                            revisado_por_username: next ? username : null,
+                            revisado_fecha: next ? new Date().toISOString() : null,
+                        }
+                        : r
+                )
+            );
+            showToast("success", "OK", next ? "Marcado revisado" : "Marcado no revisado");
+        };
+
+        return (
+            <div className="flex align-items-center justify-content-center gap-2">
+                <Checkbox
+                    inputId={`chk-rev-hat-${row.id}`}
+                    checked={!!row.revisado}
+                    onChange={(e) => onToggle(e.checked)}
+                />
+                <label htmlFor={`chk-rev-hat-${row.id}`} className="text-sm">Revisado</label>
+            </div>
+        );
+    };
+
+    // Header con búsqueda + filtro de revisado
     const header = (
         <div className="flex flex-wrap gap-2 align-items-center justify-content-between">
             <span className="p-input-icon-left">
@@ -247,48 +334,22 @@ export default function LimpiezaAreaHatchery() {
                     placeholder="Buscar por responsable o fecha..."
                 />
             </span>
+
+            <div className="flex align-items-center gap-2">
+                <span className="text-sm font-medium">Filtro:</span>
+                <Dropdown
+                    value={filtroRevisado}
+                    onChange={(e) => setFiltroRevisado(e.value)}
+                    options={[
+                        { label: "Todos", value: "all" },
+                        { label: "Con check", value: "checked" },
+                        { label: "Sin check", value: "unchecked" },
+                    ]}
+                    style={{ minWidth: 160 }}
+                />
+            </div>
         </div>
     );
-
-    // Exportaciones (mismo patrón que usas en otros módulos)
-    const exportPdf = async () => {
-        if (selected.length === 0) {
-            showToast("warn", "Advertencia", "Seleccione registros");
-            return;
-        }
-        try {
-            const { default: jsPDF } = await import("jspdf");
-            await import("jspdf-autotable");
-            const doc = new jsPDF({ orientation: "landscape" });
-            doc.setFontSize(14);
-            doc.text("Registro de Limpieza - Área de Hatchery", 14, 14);
-            const body = selected.map((r) => Object.values(flattenForExport(r)));
-            const head = Object.keys(flattenForExport(selected[0]));
-            doc.autoTable({ head: [head], body, styles: { fontSize: 8 }, startY: 20 });
-            doc.save(`Limpieza_Hatchery_${new Date().toISOString().slice(0, 10)}.pdf`);
-        } catch (err) {
-            console.error(err);
-            showToast("error", "Exportación", "No se pudo exportar a PDF");
-        }
-    };
-
-    const exportXlsx = async () => {
-        if (selected.length === 0) {
-            showToast("warn", "Advertencia", "Seleccione registros");
-            return;
-        }
-        try {
-            const XLSX = await import("xlsx");
-            const rowsToExport = selected.map(flattenForExport);
-            const ws = XLSX.utils.json_to_sheet(rowsToExport);
-            const wb = XLSX.utils.book_new();
-            XLSX.utils.book_append_sheet(wb, ws, "Limpieza Hatchery");
-            XLSX.writeFile(wb, `Limpieza_Hatchery_${new Date().toISOString().slice(0, 10)}.xlsx`);
-        } catch (err) {
-            console.error(err);
-            showToast("error", "Exportación", "No se pudo exportar a Excel");
-        }
-    };
 
     const leftToolbarTemplate = () => (
         <div className="flex gap-2">
@@ -297,8 +358,43 @@ export default function LimpiezaAreaHatchery() {
     );
     const rightToolbarTemplate = () => (
         <div className="exportar-container flex flex-wrap gap-2">
-            <Button label="Exportar a Excel" icon="pi pi-upload" className="p-button-help" onClick={exportXlsx} />
-            <Button label="Exportar a PDF" icon="pi pi-file-pdf" className="p-button-danger" onClick={exportPdf} />
+            <Button label="Exportar a Excel" icon="pi pi-upload" className="p-button-help" onClick={async () => {
+                if (selected.length === 0) {
+                    showToast("warn", "Advertencia", "Seleccione registros");
+                    return;
+                }
+                try {
+                    const XLSX = await import("xlsx");
+                    const rowsToExport = selected.map(flattenForExport);
+                    const ws = XLSX.utils.json_to_sheet(rowsToExport);
+                    const wb = XLSX.utils.book_new();
+                    XLSX.utils.book_append_sheet(wb, ws, "Limpieza Hatchery");
+                    XLSX.writeFile(wb, `Limpieza_Hatchery_${new Date().toISOString().slice(0, 10)}.xlsx`);
+                } catch (err) {
+                    console.error(err);
+                    showToast("error", "Exportación", "No se pudo exportar a Excel");
+                }
+            }} />
+            <Button label="Exportar a PDF" icon="pi pi-file-pdf" className="p-button-danger" onClick={async () => {
+                if (selected.length === 0) {
+                    showToast("warn", "Advertencia", "Seleccione registros");
+                    return;
+                }
+                try {
+                    const { default: jsPDF } = await import("jspdf");
+                    await import("jspdf-autotable");
+                    const doc = new jsPDF({ orientation: "landscape" });
+                    doc.setFontSize(14);
+                    doc.text("Registro de Limpieza - Área de Hatchery", 14, 14);
+                    const body = selected.map((r) => Object.values(flattenForExport(r)));
+                    const head = Object.keys(flattenForExport(selected[0]));
+                    doc.autoTable({ head: [head], body, styles: { fontSize: 8 }, startY: 20 });
+                    doc.save(`Limpieza_Hatchery_${new Date().toISOString().slice(0, 10)}.pdf`);
+                } catch (err) {
+                    console.error(err);
+                    showToast("error", "Exportación", "No se pudo exportar a PDF");
+                }
+            }} />
         </div>
     );
 
@@ -348,6 +444,8 @@ export default function LimpiezaAreaHatchery() {
                 {ITEMS.map((it) => (
                     <Column key={it.key} header={it.label} body={(row) => row.items?.[it.key]?.estado || ""} />
                 ))}
+                {/* Última columna: checkbox de revisado */}
+                <Column header="Revisado" body={revisadoTemplate} style={{ width: "10rem", textAlign: "center" }} />
             </DataTable>
 
             <Dialog
