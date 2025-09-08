@@ -19,20 +19,20 @@ import * as XLSX from "xlsx";
 import jsPDF from "jspdf";
 import "jspdf-autotable";
 
-// ✅ Import ÚNICO del hook (ruta según tu árbol)
+// ✅ Hook de permisos
 import useCanReview from "./Registros/Hooks/useCanReview.js";
 
 /** Ítems + frecuencia (solo informativa para agrupar en el modal) */
 const LIMPIEZA_ITEMS = [
-  { key: "romanas", label: "Romanas", frecuencia: "Diario" },
-  { key: "maquina_tamizadora", label: "Máquina Tamizadora", frecuencia: "Diario" },
-  { key: "recipientes_plasticos", label: "Recipientes plásticos", frecuencia: "Diario" },
-  { key: "pisos", label: "Pisos", frecuencia: "Diario" },
-  { key: "zarandas", label: "Zarandas", frecuencia: "Semanal" },
-  { key: "bines", label: "Bines", frecuencia: "Semanal" },
-  { key: "cano", label: "Caño", frecuencia: "Semanal" },
-  { key: "techos", label: "Techos", frecuencia: "Semestral" },
-  { key: "paredes", label: "Paredes", frecuencia: "Semestral" },
+  { key: "romanas", label: "Romanas (Diario)", frecuencia: "Diario" },
+  { key: "maquina_tamizadora", label: "Máquina Tamizadora (Diario)", frecuencia: "Diario" },
+  { key: "recipientes_plasticos", label: "Recipientes plásticos (Diario)", frecuencia: "Diario" },
+  { key: "pisos", label: "Pisos (Diario)", frecuencia: "Diario" },
+  { key: "zarandas", label: "Zarandas (Semanal)", frecuencia: "Semanal" },
+  { key: "bines", label: "Bines (Semanal)", frecuencia: "Semanal" },
+  { key: "cano", label: "Caño (Semanal)", frecuencia: "Semanal" },
+  { key: "techos", label: "Techos (Semestral)", frecuencia: "Semestral" },
+  { key: "paredes", label: "Paredes (Semestral)", frecuencia: "Semestral" },
 ];
 
 const ESTADOS = [
@@ -42,13 +42,14 @@ const ESTADOS = [
 ];
 
 const groups = {
-  Diario: LIMPIEZA_ITEMS.filter(i => i.frecuencia === "Diario"),
-  Semanal: LIMPIEZA_ITEMS.filter(i => i.frecuencia === "Semanal"),
-  Semestral: LIMPIEZA_ITEMS.filter(i => i.frecuencia === "Semestral"),
+  Diario: LIMPIEZA_ITEMS.filter((i) => i.frecuencia === "Diario"),
+  Semanal: LIMPIEZA_ITEMS.filter((i) => i.frecuencia === "Semanal"),
+  Semestral: LIMPIEZA_ITEMS.filter((i) => i.frecuencia === "Semestral"),
 };
 
 const todayISO = () => new Date().toISOString().slice(0, 10);
-const nowHM = () => new Date().toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit", hour12: false });
+const nowHM = () =>
+  new Date().toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit", hour12: false });
 
 const emptyForm = () => ({
   fecha_registro: todayISO(),
@@ -57,7 +58,8 @@ const emptyForm = () => ({
   verificador_inocuidad: "",
   firma_encargado: "",
   observaciones_generales: "",
-  fecha_correccion_preview: new Date().toLocaleString(), // solo visual; DB pone fecha_correccion real
+  // 🔸Texto informativo mientras se crea (la BD pondrá el definitivo al guardar)
+  fecha_registro_preview: new Date().toLocaleString(),
   items: LIMPIEZA_ITEMS.reduce((acc, it) => {
     acc[it.key] = { estado: "", comentario: "" };
     return acc;
@@ -67,7 +69,7 @@ const emptyForm = () => ({
 // Convierte el array de items (embed) a objeto por clave para la grilla
 const packRow = (dbRow) => {
   const itemsMap = LIMPIEZA_ITEMS.reduce((acc, it) => {
-    const found = (dbRow.items || []).find(x => x.item_key === it.key);
+    const found = (dbRow.items || []).find((x) => x.item_key === it.key);
     acc[it.key] = { estado: found?.estado || "", comentario: found?.comentario || "" };
     return acc;
   }, {});
@@ -79,8 +81,12 @@ const packRow = (dbRow) => {
     verificador_inocuidad: dbRow.verificador_inocuidad,
     firma_encargado: dbRow.firma_encargado,
     observaciones_generales: dbRow.observaciones_generales,
-    fecha_correccion: dbRow.fecha_correccion,
-    // nuevos campos de revisión
+
+    // 🟢 La BD guarda el timestamp en 'fecha_correccion' (default now()).
+    //     Lo exponemos como 'fecha_registro_sistema' para el front.
+    fecha_registro_sistema: dbRow.fecha_correccion,
+
+    // campos de revisión
     revisado: dbRow.revisado ?? false,
     revisado_por_username: dbRow.revisado_por_username ?? null,
     revisado_fecha: dbRow.revisado_fecha ?? null,
@@ -93,7 +99,7 @@ function LimpiezaAreaCosecha() {
   const toast = useRef(null);
 
   const [rows, setRows] = useState([]);
-  const [loading, setLoading] = useState(false); // ✅ corregido (antes decía 'the')
+  const [loading, setLoading] = useState(false);
   const [selected, setSelected] = useState([]);
   const [globalFilter, setGlobalFilter] = useState("");
 
@@ -152,7 +158,9 @@ function LimpiezaAreaCosecha() {
     }
   };
 
-  useEffect(() => { fetchRows(); }, [filtroRevisado]);
+  useEffect(() => {
+    fetchRows();
+  }, [filtroRevisado]);
 
   const openNew = () => {
     setForm(emptyForm());
@@ -160,9 +168,9 @@ function LimpiezaAreaCosecha() {
     setDialogOpen(true);
   };
 
-  const onHeaderChange = (e, field) => setForm(prev => ({ ...prev, [field]: e.target.value }));
+  const onHeaderChange = (e, field) => setForm((prev) => ({ ...prev, [field]: e.target.value }));
   const onItemChange = (key, field, value) =>
-    setForm(prev => ({
+    setForm((prev) => ({
       ...prev,
       items: { ...prev.items, [key]: { ...(prev.items[key] || { estado: "", comentario: "" }), [field]: value } },
     }));
@@ -191,18 +199,20 @@ function LimpiezaAreaCosecha() {
     }
 
     try {
-      // 1) Inserta encabezado
+      // 1) Inserta encabezado (BD generará 'fecha_correccion' = now())
       const { data: enc, error: errEnc } = await supabase
         .from("limpieza_cosecha")
-        .insert([{
-          fecha_registro: form.fecha_registro,
-          hora_registro: form.hora_registro,
-          responsable: form.responsable,
-          verificador_inocuidad: form.verificador_inocuidad || null,
-          firma_encargado: form.firma_encargado || null,
-          observaciones_generales: form.observaciones_generales || null
-        }])
-        .select("id")
+        .insert([
+          {
+            fecha_registro: form.fecha_registro,
+            hora_registro: form.hora_registro,
+            responsable: form.responsable,
+            verificador_inocuidad: form.verificador_inocuidad || null,
+            firma_encargado: form.firma_encargado || null,
+            observaciones_generales: form.observaciones_generales || null,
+          },
+        ])
+        .select("id, fecha_correccion") // leemos el timestamp real generado por la BD
         .single();
 
       if (errEnc) throw errEnc;
@@ -216,10 +226,7 @@ function LimpiezaAreaCosecha() {
         comentario: form.items[it.key]?.comentario || null,
       }));
 
-      const { error: errDet } = await supabase
-        .from("limpieza_cosecha_items")
-        .insert(itemsInsert);
-
+      const { error: errDet } = await supabase.from("limpieza_cosecha_items").insert(itemsInsert);
       if (errDet) throw errDet;
 
       showToast("success", "Guardado", "Registro creado");
@@ -240,7 +247,7 @@ function LimpiezaAreaCosecha() {
       responsable: r.responsable,
       "verificación inocuidad": r.verificador_inocuidad || "",
       "firma encargado": r.firma_encargado || "",
-      "fecha corrección": r.fecha_correccion ? new Date(r.fecha_correccion).toLocaleString() : "",
+      "fecha registro (sistema)": r.fecha_registro_sistema ? new Date(r.fecha_registro_sistema).toLocaleString() : "",
       observaciones: r.observaciones_generales || "",
       revisado: r.revisado ? "Sí" : "No",
     };
@@ -304,22 +311,27 @@ function LimpiezaAreaCosecha() {
         return;
       }
 
-      setRows(prev => prev.map(r =>
-        r.id === row.id
-          ? { ...r, revisado: next, revisado_por_username: next ? username : null, revisado_fecha: next ? new Date().toISOString() : null }
-          : r
-      ));
+      setRows((prev) =>
+        prev.map((r) =>
+          r.id === row.id
+            ? {
+              ...r,
+              revisado: next,
+              revisado_por_username: next ? username : null,
+              revisado_fecha: next ? new Date().toISOString() : null,
+            }
+            : r
+        )
+      );
       showToast("success", "OK", next ? "Marcado revisado" : "Marcado no revisado");
     };
 
     return (
       <div className="flex align-items-center justify-content-center gap-2">
-        <Checkbox
-          inputId={`chk-rev-${row.id}`}
-          checked={!!row.revisado}
-          onChange={(e) => onToggle(e.checked)}
-        />
-        <label htmlFor={`chk-rev-${row.id}`} className="text-sm">Revisado</label>
+        <Checkbox inputId={`chk-rev-${row.id}`} checked={!!row.revisado} onChange={(e) => onToggle(e.checked)} />
+        <label htmlFor={`chk-rev-${row.id}`} className="text-sm">
+          Revisado
+        </label>
       </div>
     );
   };
@@ -376,14 +388,18 @@ function LimpiezaAreaCosecha() {
 
       <div className="welcome-message">
         <p>
-          Selecciona <b>C</b> (Cumple), <b>NC</b> (No cumple) o <b>NA</b> (No aplica) por ítem.
-          Si es <b>NC</b> o <b>NA</b>, el comentario es obligatorio.
+          Selecciona <b>C</b> (Cumple), <b>NC</b> (No cumple) o <b>NA</b> (No aplica) por ítem. Si es <b>NC</b> o <b>NA</b>, el
+          comentario es obligatorio.
         </p>
       </div>
 
       <div className="buttons-container">
-        <button onClick={() => navigate(-1)} className="return-button">Volver</button>
-        <button onClick={() => navigate(-2)} className="menu-button">Menú principal</button>
+        <button onClick={() => navigate(-1)} className="return-button">
+          Volver
+        </button>
+        <button onClick={() => navigate(-2)} className="menu-button">
+          Menú principal
+        </button>
       </div>
 
       <Toolbar className="mb-4" left={leftToolbarTemplate} right={rightToolbarTemplate} />
@@ -396,7 +412,9 @@ function LimpiezaAreaCosecha() {
         selectionMode="multiple"
         header={header}
         globalFilter={globalFilter}
-        paginator rows={10} rowsPerPageOptions={[5, 10, 25]}
+        paginator
+        rows={10}
+        rowsPerPageOptions={[5, 10, 25]}
         paginatorTemplate="FirstPageLink PrevPageLink PageLinks NextPageLink LastPageLink CurrentPageReport RowsPerPageDropdown"
         currentPageReportTemplate="Mostrando del {first} al {last} de {totalRecords} Registros"
         dataKey="id"
@@ -406,6 +424,15 @@ function LimpiezaAreaCosecha() {
         <Column field="fecha_registro" header="Fecha" sortable />
         <Column field="hora_registro" header="Hora" />
         <Column field="responsable" header="Responsable" sortable />
+
+        {/* ⬇️ NUEVA COLUMNA visible en pantalla */}
+        <Column
+          field="fecha_registro_sistema"
+          header="Fecha de Registro"
+          body={(r) => (r.fecha_registro_sistema ? new Date(r.fecha_registro_sistema).toLocaleString() : "")}
+          sortable
+        />
+
         <Column header="#C" body={(r) => countBy(r, "C")} />
         <Column header="#NC" body={(r) => countBy(r, "NC")} />
         <Column header="#NA" body={(r) => countBy(r, "NA")} />
@@ -457,8 +484,7 @@ function LimpiezaAreaCosecha() {
                   return (
                     <div className="field col-12 md:col-6" key={it.key}>
                       <label className="font-bold">
-                        {it.label}*
-                        {submitted && !val.estado && <small className="p-error"> Requerido</small>}
+                        {it.label}* {submitted && !val.estado && <small className="p-error"> Requerido</small>}
                       </label>
                       <Dropdown
                         value={val.estado}
@@ -487,16 +513,23 @@ function LimpiezaAreaCosecha() {
 
           <div className="field col-12 md:col-6">
             <label className="font-bold">Verificación (Inocuidad)</label>
-            <InputText value={form.verificador_inocuidad} onChange={(e) => onHeaderChange(e, "verificador_inocuidad")} />
+            <InputText
+              value={form.verificador_inocuidad}
+              onChange={(e) => onHeaderChange(e, "verificador_inocuidad")}
+            />
           </div>
           <div className="field col-12 md:col-6">
             <label className="font-bold">Firma del encargado</label>
             <InputText value={form.firma_encargado} onChange={(e) => onHeaderChange(e, "firma_encargado")} />
           </div>
 
+          {/* Solo lectura; se genera al guardar */}
           <div className="field col-12">
-            <label className="font-bold">Fecha de corrección (auto)</label>
-            <InputText value={form.fecha_correccion_preview} disabled />
+            <label className="font-bold">Fecha de Registro (auto)</label>
+            <InputText value={form.fecha_registro_preview} disabled />
+            <small className="text-color-secondary">
+              Se genera automáticamente al guardar (en la tabla verás el valor real del sistema).
+            </small>
           </div>
 
           <div className="field col-12">

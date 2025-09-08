@@ -1,0 +1,22 @@
+/* Centrado y legibilidad del bloque de rúbrica */
+.welcome-message {
+    display: flex;
+    justify-content: center;
+}
+
+.welcome-message p {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    width: 100%;
+}
+
+@media (min-width: 768px) {
+    .welcome-message p {
+        font-size: 1rem;
+    }
+}
+
+.bold-space {
+    margin-right: 4px;
+}

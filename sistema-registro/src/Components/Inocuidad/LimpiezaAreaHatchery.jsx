@@ -30,26 +30,24 @@ const ESTADOS = [
 
 const ITEMS = [
     // Semestral
-    { key: "pisos", label: "Pisos", frecuencia: "Semestral" },
-    { key: "paredes", label: "Paredes", frecuencia: "Semestral" },
+    { key: "pisos", label: "Pisos (Semestral)", frecuencia: "Semestral" },
+    { key: "paredes", label: "Paredes (Semestral)", frecuencia: "Semestral" },
     // Diario
-    { key: "cajas_colores", label: "Cajas de colores", frecuencia: "Diario" },
-    { key: "cajas_plasticas", label: "Cajas plásticas", frecuencia: "Diario" },
-    { key: "mesas_laboratorio", label: "Mesas de laboratorio", frecuencia: "Diario" },
-    { key: "equipo_laboratorio", label: "Equipo de laboratorio", frecuencia: "Diario" },
-    { key: "estante_neonatos", label: "Estante de neonatos", frecuencia: "Diario" },
-    { key: "cuarto_oscuro", label: "Cuarto oscuro", frecuencia: "Diario" },
+    { key: "cajas_colores", label: "Cajas de colores (Diario)", frecuencia: "Diario" },
+    { key: "cajas_plasticas", label: "Cajas plásticas (Diario)", frecuencia: "Diario" },
+    { key: "mesas_laboratorio", label: "Mesas de laboratorio (Diario)", frecuencia: "Diario" },
+    { key: "equipo_laboratorio", label: "Equipo de laboratorio (Diario)", frecuencia: "Diario" },
+    { key: "estante_neonatos", label: "Estante de neonatos (Diario)", frecuencia: "Diario" },
+    { key: "cuarto_oscuro", label: "Cuarto oscuro (Diario)", frecuencia: "Diario" },
 ];
 
-const TABLE = "limpieza_area_hatchery"; // 👈 coincide con la tabla creada en PUBLIC
+const TABLE = "limpieza_area_hatchery"; // 👈 tabla en PUBLIC
 
 const todayISO = () => {
     const d = new Date();
     return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 };
-
-const nowHM = () =>
-    new Date().toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit", hour12: false });
+const nowHM = () => new Date().toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit", hour12: false });
 
 const emptyRegistro = () => ({
     // id lo genera la BD (uuid default)
@@ -57,8 +55,9 @@ const emptyRegistro = () => ({
     hora_registro: nowHM(),
     responsable: "",
     firma_encargado: "",
-    fecha_correccion: "",
     observaciones_generales: "",
+    // preview informativo; el valor real lo pone la BD en created_at
+    fecha_registro_preview: new Date().toLocaleString(),
     items: ITEMS.reduce((acc, it) => {
         acc[it.key] = { estado: "", comentario: "" };
         return acc;
@@ -71,7 +70,6 @@ const toDb = (form) => ({
     hora_registro: form.hora_registro,
     responsable: form.responsable,
     firma_encargado: form.firma_encargado || null,
-    fecha_correccion: form.fecha_correccion || null,
     observaciones_generales: form.observaciones_generales || null,
 
     pisos_estado: form.items.pisos?.estado || null,
@@ -106,12 +104,16 @@ const fromDb = (row) => ({
     hora_registro: row.hora_registro,
     responsable: row.responsable,
     firma_encargado: row.firma_encargado,
-    fecha_correccion: row.fecha_correccion,
     observaciones_generales: row.observaciones_generales,
+
+    // ⬇️ usamos created_at como "Fecha de Registro (sistema)"
+    fecha_registro_sistema: row.created_at ?? row.fecha_correccion ?? null,
+
     // campos de revisión
     revisado: row.revisado ?? false,
     revisado_por_username: row.revisado_por_username ?? null,
     revisado_fecha: row.revisado_fecha ?? null,
+
     items: {
         pisos: { estado: row.pisos_estado || "", comentario: row.pisos_comentario || "" },
         paredes: { estado: row.paredes_estado || "", comentario: row.paredes_comentario || "" },
@@ -142,15 +144,15 @@ const flattenForExport = (row) => {
         fecha_registro: row.fecha_registro,
         hora_registro: row.hora_registro,
         responsable: row.responsable,
+        "fecha registro (sistema)": row.fecha_registro_sistema ? new Date(row.fecha_registro_sistema).toLocaleString() : "",
+        revisado: row.revisado ? "Sí" : "No",
     };
     ITEMS.forEach((it) => {
         base[`${it.label}`] = row.items?.[it.key]?.estado || "";
         base[`${it.label} - comentario`] = row.items?.[it.key]?.comentario || "";
     });
     base["firma_encargado"] = row.firma_encargado || "";
-    base["fecha_correccion"] = row.fecha_correccion || "";
     base["observaciones"] = row.observaciones_generales || "";
-    base["revisado"] = row.revisado ? "Sí" : "No";
     return base;
 };
 
@@ -196,8 +198,8 @@ export default function LimpiezaAreaHatchery() {
           hora_registro,
           responsable,
           firma_encargado,
-          fecha_correccion,
           observaciones_generales,
+          created_at,
           pisos_estado, pisos_comentario,
           paredes_estado, paredes_comentario,
           cajas_colores_estado, cajas_colores_comentario,
@@ -269,8 +271,7 @@ export default function LimpiezaAreaHatchery() {
         }
     };
 
-    const countBy = (row, val) =>
-        ITEMS.reduce((acc, it) => acc + (row.items?.[it.key]?.estado === val ? 1 : 0), 0);
+    const countBy = (row, val) => ITEMS.reduce((acc, it) => acc + (row.items?.[it.key]?.estado === val ? 1 : 0), 0);
 
     // Columna final: checkbox de Revisado (solo si canReview)
     const revisadoTemplate = (row) => {
@@ -312,12 +313,10 @@ export default function LimpiezaAreaHatchery() {
 
         return (
             <div className="flex align-items-center justify-content-center gap-2">
-                <Checkbox
-                    inputId={`chk-rev-hat-${row.id}`}
-                    checked={!!row.revisado}
-                    onChange={(e) => onToggle(e.checked)}
-                />
-                <label htmlFor={`chk-rev-hat-${row.id}`} className="text-sm">Revisado</label>
+                <Checkbox inputId={`chk-rev-hat-${row.id}`} checked={!!row.revisado} onChange={(e) => onToggle(e.checked)} />
+                <label htmlFor={`chk-rev-hat-${row.id}`} className="text-sm">
+                    Revisado
+                </label>
             </div>
         );
     };
@@ -358,43 +357,53 @@ export default function LimpiezaAreaHatchery() {
     );
     const rightToolbarTemplate = () => (
         <div className="exportar-container flex flex-wrap gap-2">
-            <Button label="Exportar a Excel" icon="pi pi-upload" className="p-button-help" onClick={async () => {
-                if (selected.length === 0) {
-                    showToast("warn", "Advertencia", "Seleccione registros");
-                    return;
-                }
-                try {
-                    const XLSX = await import("xlsx");
-                    const rowsToExport = selected.map(flattenForExport);
-                    const ws = XLSX.utils.json_to_sheet(rowsToExport);
-                    const wb = XLSX.utils.book_new();
-                    XLSX.utils.book_append_sheet(wb, ws, "Limpieza Hatchery");
-                    XLSX.writeFile(wb, `Limpieza_Hatchery_${new Date().toISOString().slice(0, 10)}.xlsx`);
-                } catch (err) {
-                    console.error(err);
-                    showToast("error", "Exportación", "No se pudo exportar a Excel");
-                }
-            }} />
-            <Button label="Exportar a PDF" icon="pi pi-file-pdf" className="p-button-danger" onClick={async () => {
-                if (selected.length === 0) {
-                    showToast("warn", "Advertencia", "Seleccione registros");
-                    return;
-                }
-                try {
-                    const { default: jsPDF } = await import("jspdf");
-                    await import("jspdf-autotable");
-                    const doc = new jsPDF({ orientation: "landscape" });
-                    doc.setFontSize(14);
-                    doc.text("Registro de Limpieza - Área de Hatchery", 14, 14);
-                    const body = selected.map((r) => Object.values(flattenForExport(r)));
-                    const head = Object.keys(flattenForExport(selected[0]));
-                    doc.autoTable({ head: [head], body, styles: { fontSize: 8 }, startY: 20 });
-                    doc.save(`Limpieza_Hatchery_${new Date().toISOString().slice(0, 10)}.pdf`);
-                } catch (err) {
-                    console.error(err);
-                    showToast("error", "Exportación", "No se pudo exportar a PDF");
-                }
-            }} />
+            <Button
+                label="Exportar a Excel"
+                icon="pi pi-upload"
+                className="p-button-help"
+                onClick={async () => {
+                    if (selected.length === 0) {
+                        showToast("warn", "Advertencia", "Seleccione registros");
+                        return;
+                    }
+                    try {
+                        const XLSX = await import("xlsx");
+                        const rowsToExport = selected.map(flattenForExport);
+                        const ws = XLSX.utils.json_to_sheet(rowsToExport);
+                        const wb = XLSX.utils.book_new();
+                        XLSX.utils.book_append_sheet(wb, ws, "Limpieza Hatchery");
+                        XLSX.writeFile(wb, `Limpieza_Hatchery_${new Date().toISOString().slice(0, 10)}.xlsx`);
+                    } catch (err) {
+                        console.error(err);
+                        showToast("error", "Exportación", "No se pudo exportar a Excel");
+                    }
+                }}
+            />
+            <Button
+                label="Exportar a PDF"
+                icon="pi pi-file-pdf"
+                className="p-button-danger"
+                onClick={async () => {
+                    if (selected.length === 0) {
+                        showToast("warn", "Advertencia", "Seleccione registros");
+                        return;
+                    }
+                    try {
+                        const { default: jsPDF } = await import("jspdf");
+                        await import("jspdf-autotable");
+                        const doc = new jsPDF({ orientation: "landscape" });
+                        doc.setFontSize(14);
+                        doc.text("Registro de Limpieza - Área de Hatchery", 14, 14);
+                        const body = selected.map((r) => Object.values(flattenForExport(r)));
+                        const head = Object.keys(flattenForExport(selected[0]));
+                        doc.autoTable({ head: [head], body, styles: { fontSize: 8 }, startY: 20 });
+                        doc.save(`Limpieza_Hatchery_${new Date().toISOString().slice(0, 10)}.pdf`);
+                    } catch (err) {
+                        console.error(err);
+                        showToast("error", "Exportación", "No se pudo exportar a PDF");
+                    }
+                }}
+            />
         </div>
     );
 
@@ -408,14 +417,18 @@ export default function LimpiezaAreaHatchery() {
 
             <div className="welcome-message">
                 <p>
-                    Selecciona <b>C</b> (Cumple), <b>NC</b> (No cumple) o <b>NA</b> (No aplica). Para <b>NC/NA</b>, el comentario es obligatorio.
-                    <i> Pisos</i> y <i>Paredes</i> son <b>Semestrales</b>.
+                    Selecciona <b>C</b> (Cumple), <b>NC</b> (No cumple) o <b>NA</b> (No aplica). Para <b>NC/NA</b>, el comentario es
+                    obligatorio. <i> &nbsp; Pisos </i>&nbsp; y&nbsp; <i>Paredes </i> &nbsp;son <b>&nbsp;Semestrales</b>.
                 </p>
             </div>
 
             <div className="buttons-container">
-                <button onClick={() => navigate(-1)} className="return-button">Volver</button>
-                <button onClick={() => navigate(-2)} className="menu-button">Menú principal</button>
+                <button onClick={() => navigate(-1)} className="return-button">
+                    Volver
+                </button>
+                <button onClick={() => navigate(-2)} className="menu-button">
+                    Menú principal
+                </button>
             </div>
 
             <Toolbar className="mb-4" left={leftToolbarTemplate} right={rightToolbarTemplate} />
@@ -428,7 +441,9 @@ export default function LimpiezaAreaHatchery() {
                 selectionMode="multiple"
                 header={header}
                 globalFilter={globalFilter}
-                paginator rows={10} rowsPerPageOptions={[5, 10, 25]}
+                paginator
+                rows={10}
+                rowsPerPageOptions={[5, 10, 25]}
                 paginatorTemplate="FirstPageLink PrevPageLink PageLinks NextPageLink LastPageLink CurrentPageReport RowsPerPageDropdown"
                 currentPageReportTemplate="Mostrando del {first} al {last} de {totalRecords} Registros"
                 dataKey="id"
@@ -438,6 +453,15 @@ export default function LimpiezaAreaHatchery() {
                 <Column field="fecha_registro" header="Fecha" sortable />
                 <Column field="hora_registro" header="Hora" />
                 <Column field="responsable" header="Responsable" sortable />
+
+                {/* ⬇️ NUEVA COLUMNA visible: Fecha de Registro (sistema) */}
+                <Column
+                    field="fecha_registro_sistema"
+                    header="Fecha de Registro"
+                    body={(r) => (r.fecha_registro_sistema ? new Date(r.fecha_registro_sistema).toLocaleString() : "")}
+                    sortable
+                />
+
                 <Column header="#C" body={(r) => countBy(r, "C")} />
                 <Column header="#NC" body={(r) => countBy(r, "NC")} />
                 <Column header="#NA" body={(r) => countBy(r, "NA")} />
@@ -472,8 +496,7 @@ export default function LimpiezaAreaHatchery() {
                     </div>
                     <div className="field col-12 md:col-4">
                         <label className="font-bold">
-                            Responsable*
-                            {submitted && !form.responsable && <small className="p-error"> Requerido</small>}
+                            Responsable* {submitted && !form.responsable && <small className="p-error"> Requerido</small>}
                         </label>
                         <InputText value={form.responsable} onChange={(e) => onHeaderChange(e, "responsable")} />
                     </div>
@@ -488,8 +511,7 @@ export default function LimpiezaAreaHatchery() {
                                     return (
                                         <div className="field col-12 md:col-6" key={it.key}>
                                             <label className="font-bold">
-                                                {it.label}*
-                                                {submitted && !val.estado && <small className="p-error"> Requerido</small>}
+                                                {it.label}* {submitted && !val.estado && <small className="p-error"> Requerido</small>}
                                             </label>
                                             <Dropdown
                                                 value={val.estado}
@@ -521,9 +543,11 @@ export default function LimpiezaAreaHatchery() {
                         <InputText value={form.firma_encargado} onChange={(e) => onHeaderChange(e, "firma_encargado")} />
                     </div>
 
+                    {/* ⬇️ Fecha de Registro (auto) solo lectura */}
                     <div className="field col-12 md:col-6">
-                        <label className="font-bold">Fecha de corrección</label>
-                        <InputText type="date" value={form.fecha_correccion} onChange={(e) => onHeaderChange(e, "fecha_correccion")} />
+                        <label className="font-bold">Fecha de Registro (auto)</label>
+                        <InputText value={form.fecha_registro_preview} disabled />
+                        <small className="text-color-secondary">Se genera automáticamente al guardar.</small>
                     </div>
 
                     <div className="field col-12">

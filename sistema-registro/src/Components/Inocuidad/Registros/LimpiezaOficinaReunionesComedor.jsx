@@ -2,6 +2,8 @@ import React, { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import supabase from "../../../supabaseClient";
 import logo2 from "../../../assets/mosca.png";
+import "./LimpiezaOficinaReunionesComedor.css";
+
 
 import "primereact/resources/themes/lara-light-indigo/theme.css";
 import "primeicons/primeicons.css";
@@ -13,7 +15,11 @@ import { Column } from "primereact/column";
 import { Dialog } from "primereact/dialog";
 import { InputText } from "primereact/inputtext";
 import { Dropdown } from "primereact/dropdown";
+import { Checkbox } from "primereact/checkbox";
 import * as XLSX from "xlsx";
+
+// Hook de permisos (ajusta la ruta si tu árbol difiere)
+import useCanReview from "../Registros/Hooks/useCanReview.js";
 
 const ESTADOS = [
     { label: "C (Cumple)", value: "C" },
@@ -23,32 +29,31 @@ const ESTADOS = [
 
 const ITEMS = [
     // Oficinas
-    { key: "of_pisos", label: "Pisos", grupo: "Oficinas" },
-    { key: "of_muebles", label: "Muebles", grupo: "Oficinas" },
-    { key: "of_sillas_escritorios", label: "Sillas y escritorios", grupo: "Oficinas" },
-    { key: "of_puerta", label: "Puerta", grupo: "Oficinas" },
-    { key: "of_recoleccion_basura", label: "Recolección de basura", grupo: "Oficinas" },
-    { key: "of_ventanas", label: "Ventanas", grupo: "Oficinas" },
-    { key: "of_cielos_falsos", label: "Cielos falsos", grupo: "Oficinas" },
+    { key: "of_pisos", label: "Pisos (Diario)", grupo: "Oficinas" },
+    { key: "of_muebles", label: "Muebles (Diario)", grupo: "Oficinas" },
+    { key: "of_sillas_escritorios", label: "Sillas y escritorios (Diario)", grupo: "Oficinas" },
+    { key: "of_puerta", label: "Puerta (Diario)", grupo: "Oficinas" },
+    { key: "of_recoleccion_basura", label: "Recolección de basura (Diario)", grupo: "Oficinas" },
+    { key: "of_ventanas", label: "Ventanas (Diario)", grupo: "Oficinas" },
+    { key: "of_cielos_falsos", label: "Cielos falsos (Mensual)", grupo: "Oficinas" },
 
     // Sala de Reuniones
-    { key: "sr_pisos", label: "Pisos", grupo: "Sala de Reuniones" },
-    { key: "sr_muebles", label: "Muebles", grupo: "Sala de Reuniones" },
-    { key: "sr_ventanas", label: "Ventanas", grupo: "Sala de Reuniones" },
-    { key: "sr_cielos_falsos", label: "Cielos falsos", grupo: "Sala de Reuniones" },
+    { key: "sr_pisos", label: "Pisos (Diario)", grupo: "Sala de Reuniones" },
+    { key: "sr_muebles", label: "Muebles (Diario)", grupo: "Sala de Reuniones" },
+    { key: "sr_ventanas", label: "Ventanas (Diario)", grupo: "Sala de Reuniones" },
+    { key: "sr_cielos_falsos", label: "Cielos falsos (Mensual)", grupo: "Sala de Reuniones" },
 
     // Comedor
-    { key: "com_sillas_mesas", label: "Sillas y mesas", grupo: "Comedor" },
-    { key: "com_recoleccion_basura", label: "Recolección de basura", grupo: "Comedor" },
-    { key: "com_dispensadores_agua", label: "Dispensadores de agua", grupo: "Comedor" },
-    { key: "com_pisos", label: "Pisos", grupo: "Comedor" },
-    { key: "com_puerta_entrada", label: "Puerta de entrada", grupo: "Comedor" },
-    { key: "com_microondas", label: "Microondas", grupo: "Comedor" },
-    { key: "com_filtros_aire", label: "Filtros de aire", grupo: "Comedor" },
-    { key: "com_refrigeradoras", label: "Refrigeradoras", grupo: "Comedor" },
-    { key: "com_techo", label: "Techo", grupo: "Comedor" },
-    { key: "com_persianas", label: "Persianas", grupo: "Comedor" },
-    { key: "com_paredes", label: "Paredes", grupo: "Comedor" },
+    { key: "com_sillas_mesas", label: "Sillas y mesas (Diario)", grupo: "Comedor" },
+    { key: "com_recoleccion_basura", label: "Recolección de basura (Diario)", grupo: "Comedor" },
+    { key: "com_dispensadores_agua", label: "Dispensadores de agua (Diario)", grupo: "Comedor" },
+    { key: "com_pisos", label: "Pisos (Diario)", grupo: "Comedor" },
+    { key: "com_puerta_entrada", label: "Puerta de entrada (Diario)", grupo: "Comedor" },
+    { key: "com_microondas", label: "Microondas (Diario)", grupo: "Comedor" },
+    { key: "com_refrigeradoras", label: "Refrigeradoras (Mensual)", grupo: "Comedor" },
+    { key: "com_techo", label: "Techo (Mensual)", grupo: "Comedor" },
+    { key: "com_persianas", label: "Persianas (Mensual)", grupo: "Comedor" },
+    { key: "com_paredes", label: "Paredes (Mensual)", grupo: "Comedor" },
 ];
 
 const todayISO = () => {
@@ -69,9 +74,10 @@ const emptyForm = () => ({
     }, {}),
 });
 
+// DB -> UI
 const packRow = (dbRow) => {
     const map = ITEMS.reduce((acc, it) => {
-        const f = (dbRow.items || []).find(x => x.item_key === it.key);
+        const f = (dbRow.items || []).find((x) => x.item_key === it.key);
         acc[it.key] = { estado: f?.estado || "", comentario: f?.comentario || "" };
         return acc;
     }, {});
@@ -82,6 +88,10 @@ const packRow = (dbRow) => {
         firma_encargado: dbRow.firma_encargado,
         verificacion_inocuidad: dbRow.verificacion_inocuidad,
         fecha_correccion: dbRow.fecha_correccion,
+        // campos revisión
+        revisado: dbRow.revisado ?? false,
+        revisado_por_username: dbRow.revisado_por_username ?? null,
+        revisado_fecha: dbRow.revisado_fecha ?? null,
         items: map,
     };
 };
@@ -99,10 +109,15 @@ export default function LimpiezaOficinaReunionesComedor() {
     const [submitted, setSubmitted] = useState(false);
     const [form, setForm] = useState(emptyForm());
 
+    // filtro revisado
+    const [filtroRevisado, setFiltroRevisado] = useState("all"); // 'all' | 'checked' | 'unchecked'
+    // permisos
+    const { canReview, username } = useCanReview();
+
     const grupos = {
-        Oficinas: ITEMS.filter(i => i.grupo === "Oficinas"),
-        "Sala de Reuniones": ITEMS.filter(i => i.grupo === "Sala de Reuniones"),
-        Comedor: ITEMS.filter(i => i.grupo === "Comedor"),
+        Oficinas: ITEMS.filter((i) => i.grupo === "Oficinas"),
+        "Sala de Reuniones": ITEMS.filter((i) => i.grupo === "Sala de Reuniones"),
+        Comedor: ITEMS.filter((i) => i.grupo === "Comedor"),
     };
 
     const showToast = (severity, summary, detail, life = 3000) =>
@@ -111,7 +126,7 @@ export default function LimpiezaOficinaReunionesComedor() {
     const fetchRegistros = async () => {
         try {
             setLoading(true);
-            const { data, error } = await supabase
+            let query = supabase
                 .from("limpieza_oficina_reuniones_comedor")
                 .select(`
           id,
@@ -120,12 +135,19 @@ export default function LimpiezaOficinaReunionesComedor() {
           firma_encargado,
           verificacion_inocuidad,
           fecha_correccion,
+          revisado,
+          revisado_por_username,
+          revisado_fecha,
           items:limpieza_oficina_reuniones_comedor_items!limpieza_oficina_reuniones_comedor_items_id_registro_fkey (
             item_key, estado, comentario
           )
         `)
                 .order("fecha_registro", { ascending: false });
 
+            if (filtroRevisado === "checked") query = query.eq("revisado", true);
+            if (filtroRevisado === "unchecked") query = query.eq("revisado", false);
+
+            const { data, error } = await query;
             if (error) throw error;
             setRows((data || []).map(packRow));
         } catch (e) {
@@ -136,18 +158,27 @@ export default function LimpiezaOficinaReunionesComedor() {
         }
     };
 
-    useEffect(() => { fetchRegistros(); }, []);
+    useEffect(() => {
+        fetchRegistros();
+    }, [filtroRevisado]);
 
-    const openNew = () => { setForm(emptyForm()); setSubmitted(false); setDialogOpen(true); };
-    const hideDialog = () => { setDialogOpen(false); setSubmitted(false); };
+    const openNew = () => {
+        setForm(emptyForm());
+        setSubmitted(false);
+        setDialogOpen(true);
+    };
+    const hideDialog = () => {
+        setDialogOpen(false);
+        setSubmitted(false);
+    };
 
-    const onHeaderChange = (e, field) => setForm(p => ({ ...p, [field]: e.target.value }));
+    const onHeaderChange = (e, field) => setForm((p) => ({ ...p, [field]: e.target.value }));
     const onItemChange = (key, field, value) =>
-        setForm(p => ({ ...p, items: { ...p.items, [key]: { ...(p.items[key] || {}), [field]: value } } }));
+        setForm((p) => ({ ...p, items: { ...p.items, [key]: { ...(p.items[key] || {}), [field]: value } } }));
 
     const validate = () => {
         const errors = [];
-        ITEMS.forEach(it => {
+        ITEMS.forEach((it) => {
             const v = form.items[it.key]?.estado;
             if (!v) errors.push(`Seleccione estado para: ${it.label}`);
             if (v && v !== "C" && !form.items[it.key]?.comentario?.trim())
@@ -159,26 +190,31 @@ export default function LimpiezaOficinaReunionesComedor() {
     const save = async () => {
         setSubmitted(true);
         const errs = validate();
-        if (errs.length) { showToast("warn", "Validación", errs[0]); return; }
+        if (errs.length) {
+            showToast("warn", "Validación", errs[0]);
+            return;
+        }
 
         try {
-            // 1) Insert encabezado (fecha_correccion la pone la DB)
+            // 1) Encabezado
             const { data: enc, error: errEnc } = await supabase
                 .from("limpieza_oficina_reuniones_comedor")
-                .insert([{
-                    fecha_registro: form.fecha_registro,
-                    hora_registro: form.hora_registro,
-                    firma_encargado: form.firma_encargado || null,
-                    verificacion_inocuidad: form.verificacion_inocuidad || null,
-                }])
+                .insert([
+                    {
+                        fecha_registro: form.fecha_registro,
+                        hora_registro: form.hora_registro,
+                        firma_encargado: form.firma_encargado || null,
+                        verificacion_inocuidad: form.verificacion_inocuidad || null,
+                    },
+                ])
                 .select("id")
                 .single();
 
             if (errEnc) throw errEnc;
             const idReg = enc.id;
 
-            // 2) Insert detalle
-            const detalle = ITEMS.map(it => ({
+            // 2) Detalle
+            const detalle = ITEMS.map((it) => ({
                 id_registro: idReg,
                 item_key: it.key,
                 estado: form.items[it.key]?.estado || "",
@@ -204,24 +240,57 @@ export default function LimpiezaOficinaReunionesComedor() {
 
     const countBy = (row, val) => ITEMS.reduce((acc, it) => acc + (row.items?.[it.key]?.estado === val ? 1 : 0), 0);
 
-    const dynamicColumns = ITEMS.map(it => ({
-        header: `${it.grupo} - ${it.label}`,
-        body: (row) => row.items?.[it.key]?.estado || "",
-    }));
+    // plantilla de checkbox revisado
+    const revisadoTemplate = (row) => {
+        if (!canReview) return <span>{row.revisado ? "Sí" : "No"}</span>;
 
-    const header = (
-        <div className="flex flex-wrap gap-2 align-items-center justify-content-between">
-            <span className="p-input-icon-left">
-                <i className="pi pi-search" />
-                <InputText
-                    type="search"
-                    value={globalFilter}
-                    onInput={(e) => setGlobalFilter(e.target.value)}
-                    placeholder="Buscar por fecha…"
+        const onToggle = async (next) => {
+            if (!username) {
+                showToast("warn", "Sesión", "No se detectó el usuario actual.");
+                return;
+            }
+            const { error } = await supabase
+                .from("limpieza_oficina_reuniones_comedor")
+                .update({
+                    revisado: next,
+                    revisado_por_username: next ? username : null,
+                    revisado_fecha: next ? new Date().toISOString() : null,
+                })
+                .eq("id", row.id);
+
+            if (error) {
+                showToast("error", "No se guardó", error.message);
+                return;
+            }
+
+            setRows((prev) =>
+                prev.map((r) =>
+                    r.id === row.id
+                        ? {
+                            ...r,
+                            revisado: next,
+                            revisado_por_username: next ? username : null,
+                            revisado_fecha: next ? new Date().toISOString() : null,
+                        }
+                        : r
+                )
+            );
+            showToast("success", "OK", next ? "Marcado revisado" : "Marcado no revisado");
+        };
+
+        return (
+            <div className="flex align-items-center justify-content-center gap-2">
+                <Checkbox
+                    inputId={`chk-rev-ofi-${row.id}`}
+                    checked={!!row.revisado}
+                    onChange={(e) => onToggle(e.checked)}
                 />
-            </span>
-        </div>
-    );
+                <label htmlFor={`chk-rev-ofi-${row.id}`} className="text-sm">
+                    Revisado
+                </label>
+            </div>
+        );
+    };
 
     const exportXlsx = () => {
         const rowsToExport = (Array.isArray(rows) ? rows : []).map((r) => {
@@ -230,9 +299,10 @@ export default function LimpiezaOficinaReunionesComedor() {
                 hora_registro: r.hora_registro,
                 firma_encargado: r.firma_encargado,
                 verificacion_inocuidad: r.verificacion_inocuidad,
-                fecha_correccion: new Date(r.fecha_correccion).toLocaleString(),
+                fecha_correccion: r.fecha_correccion ? new Date(r.fecha_correccion).toLocaleString() : "",
+                revisado: r.revisado ? "Sí" : "No",
             };
-            ITEMS.forEach(it => {
+            ITEMS.forEach((it) => {
                 base[`${it.grupo} - ${it.label}`] = r.items?.[it.key]?.estado || "";
                 base[`${it.grupo} - ${it.label} (comentario)`] = r.items?.[it.key]?.comentario || "";
             });
@@ -244,6 +314,35 @@ export default function LimpiezaOficinaReunionesComedor() {
         XLSX.writeFile(wb, `Limpieza_Oficina_Reuniones_Comedor_${new Date().toISOString().slice(0, 10)}.xlsx`);
     };
 
+    // header con búsqueda + filtro
+    const header = (
+        <div className="flex flex-wrap gap-2 align-items-center justify-content-between">
+            <span className="p-input-icon-left">
+                <i className="pi pi-search" />
+                <InputText
+                    type="search"
+                    value={globalFilter}
+                    onInput={(e) => setGlobalFilter(e.target.value)}
+                    placeholder="Buscar por fecha…"
+                />
+            </span>
+
+            <div className="flex align-items-center gap-2">
+                <span className="text-sm font-medium">Filtro:</span>
+                <Dropdown
+                    value={filtroRevisado}
+                    onChange={(e) => setFiltroRevisado(e.value)}
+                    options={[
+                        { label: "Todos", value: "all" },
+                        { label: "Con check", value: "checked" },
+                        { label: "Sin check", value: "unchecked" },
+                    ]}
+                    style={{ minWidth: 160 }}
+                />
+            </div>
+        </div>
+    );
+
     return (
         <div className="controlrendcosechayfrass-container">
             <Toast ref={toast} />
@@ -254,14 +353,22 @@ export default function LimpiezaOficinaReunionesComedor() {
 
             <div className="welcome-message">
                 <p>
-                    Rúbrica: <b>C</b> (Cumple), <b>NC</b> (No cumple), <b>NA</b> (No aplica). Para <b>NC/NA</b> el comentario es obligatorio.
-                    La “Fecha de corrección” se genera automáticamente al guardar.
+                    Rúbrica:
+                    <b className="bold-space">C</b> (Cumple),
+                    <b className="bold-space">NC</b> (No cumple),
+                    <b className="bold-space">NA</b> (No aplica).
+                    Para <b className="bold-space">NC/NA</b> el comentario es obligatorio.
+                    La “Fecha de Registro” se genera automáticamente al guardar.
                 </p>
             </div>
 
             <div className="buttons-container">
-                <button onClick={() => navigate(-1)} className="return-button">Volver</button>
-                <button onClick={() => navigate(-2)} className="menu-button">Menú principal</button>
+                <button onClick={() => navigate(-1)} className="return-button">
+                    Volver
+                </button>
+                <button onClick={() => navigate(-2)} className="menu-button">
+                    Menú principal
+                </button>
             </div>
 
             <Toolbar
@@ -278,7 +385,9 @@ export default function LimpiezaOficinaReunionesComedor() {
                 selectionMode="multiple"
                 header={header}
                 globalFilter={globalFilter}
-                paginator rows={10} rowsPerPageOptions={[5, 10, 25]}
+                paginator
+                rows={10}
+                rowsPerPageOptions={[5, 10, 25]}
                 paginatorTemplate="FirstPageLink PrevPageLink PageLinks NextPageLink LastPageLink CurrentPageReport RowsPerPageDropdown"
                 currentPageReportTemplate="Mostrando del {first} al {last} de {totalRecords} Registros"
                 dataKey="id"
@@ -291,16 +400,18 @@ export default function LimpiezaOficinaReunionesComedor() {
                 <Column field="verificacion_inocuidad" header="Verificación (I&D)" />
                 <Column
                     field="fecha_correccion"
-                    header="Fecha de corrección"
-                    body={(r) => new Date(r.fecha_correccion).toLocaleString()}
+                    header="Fecha de Registro"
+                    body={(r) => (r.fecha_correccion ? new Date(r.fecha_correccion).toLocaleString() : "")}
                     sortable
                 />
                 <Column header="#C" body={(r) => countBy(r, "C")} />
                 <Column header="#NC" body={(r) => countBy(r, "NC")} />
                 <Column header="#NA" body={(r) => countBy(r, "NA")} />
-                {dynamicColumns.map((c, i) => (
-                    <Column key={i} header={c.header} body={c.body} />
+                {ITEMS.map((it) => (
+                    <Column key={it.key} header={`${it.grupo} - ${it.label}`} body={(row) => row.items?.[it.key]?.estado || ""} />
                 ))}
+                {/* última columna: checkbox revisado */}
+                <Column header="Revisado" body={revisadoTemplate} style={{ width: "10rem", textAlign: "center" }} />
             </DataTable>
 
             <Dialog
@@ -330,9 +441,20 @@ export default function LimpiezaOficinaReunionesComedor() {
                         <InputText value={form.firma_encargado} onChange={(e) => onHeaderChange(e, "firma_encargado")} />
                     </div>
 
+                    {/* Títulos MÁS GRANDES para diferenciar secciones en el modal */}
                     {["Oficinas", "Sala de Reuniones", "Comedor"].map((g) => (
                         <div key={g} className="col-12">
-                            <div className="font-bold text-lg mb-2">{g}</div>
+                            <div
+                                className="mb-3"
+                                style={{
+                                    fontSize: "1.6rem",
+                                    fontWeight: 800,
+                                    padding: "6px 0",
+                                    borderBottom: "2px solid #e9ecef",
+                                }}
+                            >
+                                {g}
+                            </div>
                             <div className="grid">
                                 {grupos[g].map((it) => {
                                     const val = form.items[it.key] || { estado: "", comentario: "" };
@@ -373,7 +495,7 @@ export default function LimpiezaOficinaReunionesComedor() {
                     </div>
 
                     <div className="field col-12 md:col-6">
-                        <label className="font-bold">Fecha de corrección (auto)</label>
+                        <label className="font-bold">Fecha de Registro (auto)</label>
                         <InputText value={form.fecha_correccion_preview} disabled />
                     </div>
                 </div>
