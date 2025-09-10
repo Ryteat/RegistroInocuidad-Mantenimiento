@@ -341,8 +341,8 @@ export default function LimpiezaAreaHatchery() {
                     onChange={(e) => setFiltroRevisado(e.value)}
                     options={[
                         { label: "Todos", value: "all" },
-                        { label: "Con check", value: "checked" },
-                        { label: "Sin check", value: "unchecked" },
+                        { label: "Revisado", value: "checked" },
+                        { label: "Sin revisar", value: "unchecked" },
                     ]}
                     style={{ minWidth: 160 }}
                 />
@@ -417,8 +417,17 @@ export default function LimpiezaAreaHatchery() {
 
             <div className="welcome-message">
                 <p>
-                    Selecciona <b>C</b> (Cumple), <b>NC</b> (No cumple) o <b>NA</b> (No aplica). Para <b>NC/NA</b>, el comentario es
-                    obligatorio. <i> &nbsp; Pisos </i>&nbsp; y&nbsp; <i>Paredes </i> &nbsp;son <b>&nbsp;Semestrales</b>.
+                    <span>
+                        Selecciona: <b className="bold-space">C</b> (Cumple),
+                        <b className="bold-space">NC</b> (No cumple) o
+                        <b className="bold-space">NA</b> (No aplica).
+                    </span>
+                    <br />
+                    <span>
+                        Para <b className="bold-space">NC/NA</b> el comentario es obligatorio.
+                    </span>
+                    <br />
+
                 </p>
             </div>
 

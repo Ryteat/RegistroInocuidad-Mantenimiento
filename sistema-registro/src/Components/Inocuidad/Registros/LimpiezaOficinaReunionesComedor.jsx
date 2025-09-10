@@ -323,7 +323,7 @@ export default function LimpiezaOficinaReunionesComedor() {
                     type="search"
                     value={globalFilter}
                     onInput={(e) => setGlobalFilter(e.target.value)}
-                    placeholder="Buscar por fecha…"
+                    placeholder="Buscar Registros"
                 />
             </span>
 
@@ -334,8 +334,8 @@ export default function LimpiezaOficinaReunionesComedor() {
                     onChange={(e) => setFiltroRevisado(e.value)}
                     options={[
                         { label: "Todos", value: "all" },
-                        { label: "Con check", value: "checked" },
-                        { label: "Sin check", value: "unchecked" },
+                        { label: "Revisado", value: "checked" },
+                        { label: "Sin revisar", value: "unchecked" },
                     ]}
                     style={{ minWidth: 160 }}
                 />
@@ -353,12 +353,18 @@ export default function LimpiezaOficinaReunionesComedor() {
 
             <div className="welcome-message">
                 <p>
-                    Rúbrica:
-                    <b className="bold-space">C</b> (Cumple),
-                    <b className="bold-space">NC</b> (No cumple),
-                    <b className="bold-space">NA</b> (No aplica).
-                    Para <b className="bold-space">NC/NA</b> el comentario es obligatorio.
-                    La “Fecha de Registro” se genera automáticamente al guardar.
+                    <span>
+                        <b className="bold-space">Rúbrica:</b>
+                        <b className="bold-space">C</b> (Cumple),
+                        <b className="bold-space">NC</b> (No cumple),
+                        <b className="bold-space">NA</b> (No aplica).
+                    </span>
+                    <br />
+                    <span>
+                        Para <b className="bold-space">NC/NA</b> el comentario es obligatorio.
+                    </span>
+                    <br />
+
                 </p>
             </div>
 

@@ -1,6 +1,7 @@
+// Components/Inocuidad/Registros/LimpiezaHornoMultilevel.jsx
 import React, { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import supabase from "../../../supabaseClient"; // igual que tu Tarimas/Cajas
+import supabase from "../../../supabaseClient";
 import logo2 from "../../../assets/mosca.png";
 
 import "primereact/resources/themes/lara-light-indigo/theme.css";
@@ -13,8 +14,12 @@ import { Column } from "primereact/column";
 import { Dialog } from "primereact/dialog";
 import { InputText } from "primereact/inputtext";
 import { Dropdown } from "primereact/dropdown";
+import { Checkbox } from "primereact/checkbox";
 import * as XLSX from "xlsx";
 import "./LimpiezaHornoMultilevel.css";
+
+// ✅ Permisos (ajusta la ruta si tu árbol difiere)
+import useCanReview from "./Hooks/useCanReview.js";
 
 const ESTADOS = [
     { label: "C (Cumple)", value: "C" },
@@ -23,17 +28,17 @@ const ESTADOS = [
 ];
 
 const ITEMS = [
-    { key: "bandas_transportadoras", label: "Bandas transportadoras" },
-    { key: "dosificador_larva", label: "Dosificador de larva" },
-    { key: "banda_1", label: "Banda 1" },
-    { key: "banda_2", label: "Banda 2" },
-    { key: "banda_3", label: "Banda 3" },
-    { key: "banda_4", label: "Banda 4" },
-    { key: "banda_5", label: "Banda 5" },
-    { key: "compuertas_limpieza", label: "Compuertas de limpieza" },
-    { key: "bandas_enfriamiento", label: "Bandas de enfriamiento" },
-    { key: "canguilones", label: "Canguilones" },
-    { key: "piso", label: "Piso" },
+    { key: "bandas_transportadoras", label: "Bandas transportadoras (Diario)" },
+    { key: "dosificador_larva", label: "Dosificador de larva (Diario)" },
+    { key: "banda_1", label: "Banda 1 (Diario)" },
+    { key: "banda_2", label: "Banda 2 (Diario)" },
+    { key: "banda_3", label: "Banda 3 (Diario)" },
+    { key: "banda_4", label: "Banda 4 (Diario)" },
+    { key: "banda_5", label: "Banda 5 (Diario)" },
+    { key: "compuertas_limpieza", label: "Compuertas de limpieza (Diario)" },
+    { key: "bandas_enfriamiento", label: "Bandas de enfriamiento (Diario)" },
+    { key: "canguilones", label: "Canguilones (Diario)" },
+    { key: "piso", label: "Piso (Diario)" },
 ];
 
 const todayISO = () => {
@@ -42,15 +47,17 @@ const todayISO = () => {
         d.getDate()
     ).padStart(2, "0")}`;
 };
-const nowHM = () =>
-    new Date().toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit", hour12: false });
+const nowHM = () => new Date().toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit", hour12: false });
 
 const emptyForm = () => ({
     fecha_registro: todayISO(),
     hora_registro: nowHM(),
     firma_encargado: "",
     verificacion_inocuidad: "",
-    // solo visual; la columna real se completa en DB (default now())
+    // nuevo: tipo de limpieza (Profundo | Ligero)
+    tipo_limpieza: "",
+
+    // solo visual; la columna real (fecha_correccion) la pone la BD con now()
     fecha_correccion_preview: new Date().toLocaleString(),
     items: ITEMS.reduce((acc, it) => {
         acc[it.key] = { estado: "", comentario: "" };
@@ -58,7 +65,7 @@ const emptyForm = () => ({
     }, {}),
 });
 
-// Mapea array de items -> objeto por clave (para DataTable)
+// DB -> UI
 const packRow = (dbRow) => {
     const itemsMap = ITEMS.reduce((acc, it) => {
         const found = (dbRow.items || []).find((x) => x.item_key === it.key);
@@ -72,6 +79,11 @@ const packRow = (dbRow) => {
         firma_encargado: dbRow.firma_encargado,
         verificacion_inocuidad: dbRow.verificacion_inocuidad,
         fecha_correccion: dbRow.fecha_correccion,
+        // nuevo: tipo limpieza + campos de revisión
+        tipo_limpieza: dbRow.tipo_limpieza || "",
+        revisado: dbRow.revisado ?? false,
+        revisado_por_username: dbRow.revisado_por_username ?? null,
+        revisado_fecha: dbRow.revisado_fecha ?? null,
         items: itemsMap,
     };
 };
@@ -85,6 +97,11 @@ export default function LimpiezaHornoMultilevel() {
     const [globalFilter, setGlobalFilter] = useState("");
     const [loading, setLoading] = useState(false);
 
+    // filtro de revisado
+    const [filtroRevisado, setFiltroRevisado] = useState("all"); // 'all' | 'checked' | 'unchecked'
+    // permisos
+    const { canReview, username } = useCanReview();
+
     const [dialogOpen, setDialogOpen] = useState(false);
     const [submitted, setSubmitted] = useState(false);
     const [form, setForm] = useState(emptyForm());
@@ -92,6 +109,7 @@ export default function LimpiezaHornoMultilevel() {
     const showToast = (severity, summary, detail, life = 3000) =>
         toast.current?.show({ severity, summary, detail, life });
 
+    // Exportar a Excel
     const exportXlsx = () => {
         const rowsToExport = (Array.isArray(rows) ? rows : []).map((row) => {
             const base = {
@@ -99,7 +117,11 @@ export default function LimpiezaHornoMultilevel() {
                 hora_registro: row.hora_registro,
                 firma_encargado: row.firma_encargado,
                 verificacion_inocuidad: row.verificacion_inocuidad,
-                fecha_correccion: new Date(row.fecha_correccion).toLocaleString(),
+                fecha_registro_sistema: row.fecha_correccion ? new Date(row.fecha_correccion).toLocaleString() : "",
+                tipo_limpieza: row.tipo_limpieza || "",
+                revisado: row.revisado ? "Sí" : "No",
+                revisado_por: row.revisado_por_username || "",
+                revisado_fecha: row.revisado_fecha ? new Date(row.revisado_fecha).toLocaleString() : "",
             };
             Object.keys(row.items || {}).forEach((k) => {
                 base[`${k}_estado`] = row.items[k]?.estado || "";
@@ -116,7 +138,7 @@ export default function LimpiezaHornoMultilevel() {
     const fetchRegistros = async () => {
         try {
             setLoading(true);
-            const { data, error } = await supabase
+            let query = supabase
                 .from("limpieza_horno_ml")
                 .select(`
           id,
@@ -125,12 +147,20 @@ export default function LimpiezaHornoMultilevel() {
           firma_encargado,
           verificacion_inocuidad,
           fecha_correccion,
+          tipo_limpieza,
+          revisado,
+          revisado_por_username,
+          revisado_fecha,
           items:limpieza_horno_ml_items!limpieza_horno_ml_items_id_registro_fkey (
             item_key, estado, comentario
           )
         `)
                 .order("fecha_registro", { ascending: false });
 
+            if (filtroRevisado === "checked") query = query.eq("revisado", true);
+            if (filtroRevisado === "unchecked") query = query.eq("revisado", false);
+
+            const { data, error } = await query;
             if (error) throw error;
             setRows((data || []).map(packRow));
         } catch (err) {
@@ -143,7 +173,7 @@ export default function LimpiezaHornoMultilevel() {
 
     useEffect(() => {
         fetchRegistros();
-    }, []);
+    }, [filtroRevisado]);
 
     const openNew = () => {
         setForm(emptyForm());
@@ -162,6 +192,14 @@ export default function LimpiezaHornoMultilevel() {
             items: { ...p.items, [key]: { ...(p.items[key] || {}), [field]: value } },
         }));
 
+    // check exclusivo: Profundo/Ligero
+    const toggleTipo = (tipo) => {
+        setForm((p) => ({
+            ...p,
+            tipo_limpieza: p.tipo_limpieza === tipo ? "" : tipo, // desmarcar si vuelven a pulsar la misma
+        }));
+    };
+
     const validate = () => {
         const errs = [];
         ITEMS.forEach((it) => {
@@ -171,6 +209,8 @@ export default function LimpiezaHornoMultilevel() {
                 errs.push(`Comentario requerido en ${it.label} (NC/NA).`);
             }
         });
+        // Tipo de limpieza obligatorio (ajústalo si quieres que sea opcional)
+        if (!form.tipo_limpieza) errs.push("Seleccione el Tipo de Limpieza (Profundo/Ligero).");
         return errs;
     };
 
@@ -191,7 +231,8 @@ export default function LimpiezaHornoMultilevel() {
                         hora_registro: form.hora_registro,
                         firma_encargado: form.firma_encargado || null,
                         verificacion_inocuidad: form.verificacion_inocuidad || null,
-                        // fecha_correccion la pone la DB (default now())
+                        tipo_limpieza: form.tipo_limpieza || null, // 👈 nuevo
+                        // fecha_correccion la pone la DB (DEFAULT now())
                     },
                 ])
                 .select("id")
@@ -208,10 +249,7 @@ export default function LimpiezaHornoMultilevel() {
                 comentario: form.items[it.key]?.comentario || null,
             }));
 
-            const { error: errDet } = await supabase
-                .from("limpieza_horno_ml_items")
-                .insert(itemsInsert);
-
+            const { error: errDet } = await supabase.from("limpieza_horno_ml_items").insert(itemsInsert);
             if (errDet) throw errDet;
 
             showToast("success", "Éxito", "Registro guardado correctamente");
@@ -233,6 +271,59 @@ export default function LimpiezaHornoMultilevel() {
         body: (row) => row.items?.[it.key]?.estado || "",
     }));
 
+    // plantilla checkbox revisado
+    const revisadoTemplate = (row) => {
+        if (!canReview) return <span>{row.revisado ? "Sí" : "No"}</span>;
+
+        const onToggle = async (next) => {
+            if (!username) {
+                showToast("warn", "Sesión", "No se detectó el usuario actual.");
+                return;
+            }
+            const { error } = await supabase
+                .from("limpieza_horno_ml")
+                .update({
+                    revisado: next,
+                    revisado_por_username: next ? username : null,
+                    revisado_fecha: next ? new Date().toISOString() : null,
+                })
+                .eq("id", row.id);
+
+            if (error) {
+                showToast("error", "No se guardó", error.message);
+                return;
+            }
+
+            setRows((prev) =>
+                prev.map((r) =>
+                    r.id === row.id
+                        ? {
+                            ...r,
+                            revisado: next,
+                            revisado_por_username: next ? username : null,
+                            revisado_fecha: next ? new Date().toISOString() : null,
+                        }
+                        : r
+                )
+            );
+            showToast("success", "OK", next ? "Marcado revisado" : "Marcado no revisado");
+        };
+
+        return (
+            <div className="flex align-items-center justify-content-center gap-2">
+                <Checkbox
+                    inputId={`chk-rev-horno-${row.id}`}
+                    checked={!!row.revisado}
+                    onChange={(e) => onToggle(e.checked)}
+                />
+                <label htmlFor={`chk-rev-horno-${row.id}`} className="text-sm">
+                    Revisado
+                </label>
+            </div>
+        );
+    };
+
+    // Header con búsqueda + filtro de revisado
     const header = (
         <div className="flex flex-wrap gap-2 align-items-center justify-content-between">
             <span className="p-input-icon-left">
@@ -241,9 +332,23 @@ export default function LimpiezaHornoMultilevel() {
                     type="search"
                     value={globalFilter}
                     onInput={(e) => setGlobalFilter(e.target.value)}
-                    placeholder="Buscar por fecha..."
+                    placeholder="Busca Registros"
                 />
             </span>
+
+            <div className="flex align-items-center gap-2">
+                <span className="text-sm font-medium">Filtro:</span>
+                <Dropdown
+                    value={filtroRevisado}
+                    onChange={(e) => setFiltroRevisado(e.value)}
+                    options={[
+                        { label: "Todos", value: "all" },
+                        { label: "Revisado", value: "checked" },
+                        { label: "Sin Revisar", value: "unchecked" },
+                    ]}
+                    style={{ minWidth: 160 }}
+                />
+            </div>
         </div>
     );
 
@@ -257,15 +362,28 @@ export default function LimpiezaHornoMultilevel() {
 
             <div className="welcome-message">
                 <p>
-                    Rúbrica: <b>C</b> (Cumple), <b>NC</b> (No cumple), <b>NA</b> (No aplica).
-                    Para <b>NC/NA</b> el comentario es obligatorio. La “Fecha de corrección” se genera
-                    automáticamente al guardar (momento exacto del registro).
+                    <span>
+                        <b className="bold-space">Rúbrica:</b>
+                        <b className="bold-space">C</b> (Cumple),
+                        <b className="bold-space">NC</b> (No cumple),
+                        <b className="bold-space">NA</b> (No aplica).
+                    </span>
+                    <br />
+                    <span>
+                        Para <b className="bold-space">NC/NA</b> el comentario es obligatorio.
+                    </span>
+                    <br />
+
                 </p>
             </div>
 
             <div className="buttons-container">
-                <button onClick={() => navigate(-1)} className="return-button">Volver</button>
-                <button onClick={() => navigate(-2)} className="menu-button">Menú principal</button>
+                <button onClick={() => navigate(-1)} className="return-button">
+                    Volver
+                </button>
+                <button onClick={() => navigate(-2)} className="menu-button">
+                    Menú principal
+                </button>
             </div>
 
             <Toolbar
@@ -282,7 +400,9 @@ export default function LimpiezaHornoMultilevel() {
                 selectionMode="multiple"
                 header={header}
                 globalFilter={globalFilter}
-                paginator rows={10} rowsPerPageOptions={[5, 10, 25]}
+                paginator
+                rows={10}
+                rowsPerPageOptions={[5, 10, 25]}
                 paginatorTemplate="FirstPageLink PrevPageLink PageLinks NextPageLink LastPageLink CurrentPageReport RowsPerPageDropdown"
                 currentPageReportTemplate="Mostrando del {first} al {last} de {totalRecords} Registros"
                 dataKey="id"
@@ -293,10 +413,13 @@ export default function LimpiezaHornoMultilevel() {
                 <Column field="hora_registro" header="Hora" />
                 <Column field="firma_encargado" header="Firma encargado" />
                 <Column field="verificacion_inocuidad" header="Verificación Inocuidad" />
+                {/* nuevo: tipo de limpieza */}
+                <Column field="tipo_limpieza" header="Tipo de Limpieza" />
+                {/* renombrado: Fecha de Registro (muestra fecha_correccion) */}
                 <Column
                     field="fecha_correccion"
-                    header="Fecha de corrección"
-                    body={(r) => (r?.fecha_correccion ? new Date(r.fecha_correccion).toLocaleString() : "-")}
+                    header="Fecha de Registro"
+                    body={(r) => (r?.fecha_correccion ? new Date(r.fecha_correccion).toLocaleString() : "")}
                     sortable
                 />
                 <Column header="#C" body={(r) => countBy(r, "C")} />
@@ -305,6 +428,8 @@ export default function LimpiezaHornoMultilevel() {
                 {dynamicColumns.map((c, i) => (
                     <Column key={i} header={c.header} body={c.body} />
                 ))}
+                {/* última columna: checkbox revisado */}
+                <Column header="Revisado" body={revisadoTemplate} style={{ width: "10rem", textAlign: "center" }} />
             </DataTable>
 
             <Dialog
@@ -323,25 +448,55 @@ export default function LimpiezaHornoMultilevel() {
                 <div className="p-fluid grid">
                     <div className="field col-12 md:col-4">
                         <label className="font-bold">Fecha</label>
-                        <InputText type="date" value={form.fecha_registro}
-                            onChange={(e) => onHeaderChange(e, "fecha_registro")} />
+                        <InputText type="date" value={form.fecha_registro} onChange={(e) => onHeaderChange(e, "fecha_registro")} />
                     </div>
                     <div className="field col-12 md:col-4">
                         <label className="font-bold">Hora</label>
-                        <InputText type="time" value={form.hora_registro}
-                            onChange={(e) => onHeaderChange(e, "hora_registro")} />
+                        <InputText type="time" value={form.hora_registro} onChange={(e) => onHeaderChange(e, "hora_registro")} />
                     </div>
                     <div className="field col-12 md:col-4">
                         <label className="font-bold">Firma del encargado</label>
-                        <InputText value={form.firma_encargado}
-                            onChange={(e) => onHeaderChange(e, "firma_encargado")} />
+                        <InputText value={form.firma_encargado} onChange={(e) => onHeaderChange(e, "firma_encargado")} />
                     </div>
 
                     <div className="field col-12 md:col-6">
                         <label className="font-bold">Verificación (Coordinación de Inocuidad)</label>
-                        <InputText value={form.verificacion_inocuidad}
-                            onChange={(e) => onHeaderChange(e, "verificacion_inocuidad")} />
+                        <InputText value={form.verificacion_inocuidad} onChange={(e) => onHeaderChange(e, "verificacion_inocuidad")} />
                     </div>
+
+                    {/* Tipo de Limpieza */}
+                    <div className="col-12">
+                        <div className="subarea-title subarea-title--xl">Tipo de Limpieza*</div>
+
+                        <div className="tipo-limpieza-row">
+                            <label className="tipo-limpieza-option">
+                                <Checkbox
+                                    inputId="tipo-ligero"
+                                    checked={form.tipo_limpieza === "Ligero"}
+                                    onChange={(e) =>
+                                        setForm((p) => ({ ...p, tipo_limpieza: e.checked ? "Ligero" : "" }))
+                                    }
+                                />
+                                <span>Ligero</span>
+                            </label>
+
+                            <label className="tipo-limpieza-option">
+                                <Checkbox
+                                    inputId="tipo-profundo"
+                                    checked={form.tipo_limpieza === "Profundo"}
+                                    onChange={(e) =>
+                                        setForm((p) => ({ ...p, tipo_limpieza: e.checked ? "Profundo" : "" }))
+                                    }
+                                />
+                                <span>Profundo</span>
+                            </label>
+                        </div>
+
+                        {submitted && !form.tipo_limpieza && (
+                            <small className="p-error">Seleccione el tipo de limpieza.</small>
+                        )}
+                    </div>
+
 
                     {ITEMS.map((it) => {
                         const val = form.items[it.key] || { estado: "", comentario: "" };
@@ -367,9 +522,7 @@ export default function LimpiezaHornoMultilevel() {
                                             onChange={(e) => onItemChange(it.key, "comentario", e.target.value)}
                                             placeholder="Explique la causa/acción correctiva"
                                         />
-                                        {submitted && !val.comentario?.trim() && (
-                                            <small className="p-error"> Requerido</small>
-                                        )}
+                                        {submitted && !val.comentario?.trim() && <small className="p-error"> Requerido</small>}
                                     </>
                                 )}
                             </div>
@@ -377,7 +530,7 @@ export default function LimpiezaHornoMultilevel() {
                     })}
 
                     <div className="field col-12">
-                        <label className="font-bold">Fecha de corrección (auto)</label>
+                        <label className="font-bold">Fecha de Registro (auto)</label>
                         <InputText value={form.fecha_correccion_preview} disabled />
                     </div>
                 </div>

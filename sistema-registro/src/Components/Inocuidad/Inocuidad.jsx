@@ -13,57 +13,58 @@ function Inocuidad() {
         {
             titulo: 'Registro de Limpieza del Area de Hatchery',
             ruta: 'RegistroLimpiezaHatchery',
-            cols: 2,
+            cols: 1,
             className: 'boton-grid oven-button'
         },
         {
             titulo: 'Registro de Limpieza del Area de Cosecha',
             ruta: 'RegistroLimpiezaCosecha',
-            cols: 2,
+            cols: 1,
             className: 'boton-grid oven-button'
         },
         {
             titulo: "Registro de Limpieza de Tarimas y Cajas de Colores",
             ruta: "LimpiezaTarimasCajas",
-            cols: 2,
+            cols: 1,
             className: "boton-grid oven-button",
         },
         {
             titulo: 'Registro de Limpieza del Area de Dieta y Siembra',
             ruta: 'LimpiezaDietaSiembra',
-            cols: 2,
+            cols: 1,
             className: 'boton-grid oven-button'
         },
         {
             titulo: 'Registro de Limpieza Horno Multilevel',
             ruta: 'LimpiezaHornoMultilevel',
-            cols: 2,
+            cols: 1,
             className: 'boton-grid oven-button'
         },
         {
             titulo: "Registro de Limpieza de Baños, Casilleros y Pediluvios",
             ruta: "LimpiezaBanosCasillerosPediluvios",
-            cols: 2,
+            cols: 1,
             className: "boton-grid"
         },
         {
             titulo: "Registro de Limpieza de Oficina, Reuniones y Comedor",
             ruta: "LimpiezaOficinaReunionesComedor",
-            cols: 2,
+            cols: 1,
             className: "boton-grid"
         },
         {
             titulo: "Registro de Control de Plagas",
             ruta: "ControlPlagasRoedores",
-            cols: 2,
+            cols: 1,
             className: "boton-grid"
         },
         {
             titulo: "Registro Limpieza y Desinfección de Tanque de Agua",
             ruta: "LimpiezaTanqueAgua",
             cols: 2,
-            className: "boton-grid"
+            className: "boton-grid center-one"
         },
+
 
 
     ];
@@ -73,12 +74,14 @@ function Inocuidad() {
             {isRootPath && (
                 <>
                     <header className="inocuidad-header">
-                        <img src={logo2} alt="Logo" className="logo2" />
+                        <div className="logo-inocuidad-container">
+                            <img src={logo2} alt="Logo" className="logo2" />
+                        </div>
                         <h1>Registros de Inocuidad</h1>
                     </header>
 
                     <div className="welcome-message">
-                        <p>Sistema de registro para operaciones de inocuidad</p>
+                        <p>Sistema de registro para operaciones de inocuidad:</p>
                     </div>
 
                     <div className="grid-botones">

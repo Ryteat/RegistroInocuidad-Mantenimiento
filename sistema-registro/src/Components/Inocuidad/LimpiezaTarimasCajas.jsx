@@ -319,8 +319,8 @@ export default function LimpiezaTarimasCajas() {
                     onChange={(e) => setFiltroRevisado(e.value)}
                     options={[
                         { label: "Todos", value: "all" },
-                        { label: "Con check", value: "checked" },
-                        { label: "Sin check", value: "unchecked" },
+                        { label: "Revisado", value: "checked" },
+                        { label: "Sin revisar", value: "unchecked" },
                     ]}
                     style={{ minWidth: 160 }}
                 />
@@ -338,8 +338,18 @@ export default function LimpiezaTarimasCajas() {
 
             <div className="welcome-message">
                 <p>
-                    Rúbrica: <b>C</b> (Cumple), <b>NC</b> (No cumple), <b>NA</b> (No aplica). Para <b>NC/NA</b> el comentario es
-                    obligatorio. La “Fecha de registro” se genera automáticamente al guardar.
+                    <span>
+                        <b className="bold-space">Seleciona:</b>
+                        <b className="bold-space">C</b> (Cumple),
+                        <b className="bold-space">NC</b> (No cumple),
+                        <b className="bold-space">NA</b> (No aplica).
+                    </span>
+                    <br />
+                    <span>
+                        Para <b className="bold-space">NC/NA</b> el comentario es obligatorio.
+                    </span>
+                    <br />
+
                 </p>
             </div>
 

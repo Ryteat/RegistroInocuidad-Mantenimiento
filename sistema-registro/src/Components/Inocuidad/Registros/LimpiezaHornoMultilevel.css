@@ -6,3 +6,35 @@
 .p-datatable-table {
     min-width: 1800px;
 }
+
+
+.subarea-title {
+    font-weight: 700;
+    font-size: 1.35rem;
+    /* móvil */
+    line-height: 1.25;
+    margin: 0.25rem 0 0.75rem;
+}
+
+@media (min-width: 768px) {
+    .subarea-title {
+        font-size: 1.6rem;
+        /* desktop */
+    }
+}
+
+/* Ligero/Profundo */
+.checkbox-row {
+    display: flex;
+    gap: 1rem;
+    align-items: center;
+    flex-wrap: wrap;
+    margin-bottom: 0.5rem;
+}
+
+.tipo-limpieza-row {
+    display: flex;
+    gap: 2rem;
+    margin-bottom: 2rem;
+    /* Espacio inferior para separar de los ítems */
+}
