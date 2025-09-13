@@ -330,7 +330,7 @@ export default function LimpiezaAreaHatchery() {
                     type="search"
                     value={globalFilter}
                     onInput={(e) => setGlobalFilter(e.target.value)}
-                    placeholder="Buscar por responsable o fecha..."
+                    placeholder="Buscar Registros"
                 />
             </span>
 
@@ -461,7 +461,7 @@ export default function LimpiezaAreaHatchery() {
                 <Column selectionMode="multiple" exportable={false} />
                 <Column field="fecha_registro" header="Fecha" sortable />
                 <Column field="hora_registro" header="Hora" />
-                <Column field="responsable" header="Responsable" sortable />
+                <Column field="responsable" header="Operario" sortable />
 
                 {/* ⬇️ NUEVA COLUMNA visible: Fecha de Registro (sistema) */}
                 <Column
@@ -505,7 +505,7 @@ export default function LimpiezaAreaHatchery() {
                     </div>
                     <div className="field col-12 md:col-4">
                         <label className="font-bold">
-                            Responsable* {submitted && !form.responsable && <small className="p-error"> Requerido</small>}
+                            Operario* {submitted && !form.responsable && <small className="p-error"> Requerido</small>}
                         </label>
                         <InputText value={form.responsable} onChange={(e) => onHeaderChange(e, "responsable")} />
                     </div>
@@ -547,11 +547,6 @@ export default function LimpiezaAreaHatchery() {
                         </div>
                     ))}
 
-                    <div className="field col-12 md:col-6">
-                        <label className="font-bold">Firma del encargado de la limpieza</label>
-                        <InputText value={form.firma_encargado} onChange={(e) => onHeaderChange(e, "firma_encargado")} />
-                    </div>
-
                     {/* ⬇️ Fecha de Registro (auto) solo lectura */}
                     <div className="field col-12 md:col-6">
                         <label className="font-bold">Fecha de Registro (auto)</label>
@@ -559,13 +554,14 @@ export default function LimpiezaAreaHatchery() {
                         <small className="text-color-secondary">Se genera automáticamente al guardar.</small>
                     </div>
 
-                    <div className="field col-12">
+
+                    {/*    <div className="field col-12">
                         <label className="font-bold">Observaciones</label>
                         <InputText
                             value={form.observaciones_generales}
                             onChange={(e) => onHeaderChange(e, "observaciones_generales")}
                         />
-                    </div>
+                    </div>*/}
                 </div>
             </Dialog>
         </div>

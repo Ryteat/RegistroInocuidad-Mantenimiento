@@ -371,7 +371,7 @@ export default function ControlPlagasRoedores() {
                     type="search"
                     value={globalFilter}
                     onInput={(e) => setGlobalFilter(e.target.value)}
-                    placeholder="Buscar por fecha..."
+                    placeholder="Buscar Registros"
                 />
             </span>
 

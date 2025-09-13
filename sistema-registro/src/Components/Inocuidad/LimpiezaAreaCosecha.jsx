@@ -430,7 +430,7 @@ function LimpiezaAreaCosecha() {
         <Column selectionMode="multiple" exportable={false} />
         <Column field="fecha_registro" header="Fecha" sortable />
         <Column field="hora_registro" header="Hora" />
-        <Column field="responsable" header="Responsable" sortable />
+        <Column field="responsable" header="Operario" sortable />
 
         {/* ⬇️ NUEVA COLUMNA visible en pantalla */}
         <Column
@@ -475,7 +475,7 @@ function LimpiezaAreaCosecha() {
           </div>
           <div className="field col-12 md:col-4">
             <label className="font-bold">
-              Responsable* {submitted && !form.responsable && <small className="p-error"> Requerido</small>}
+              Operario* {submitted && !form.responsable && <small className="p-error"> Requerido</small>}
             </label>
             <InputText value={form.responsable} onChange={(e) => onHeaderChange(e, "responsable")} />
           </div>
@@ -518,17 +518,18 @@ function LimpiezaAreaCosecha() {
             </div>
           ))}
 
-          <div className="field col-12 md:col-6">
+          {/* <div className="field col-12 md:col-6">
             <label className="font-bold">Verificación (Inocuidad)</label>
             <InputText
               value={form.verificador_inocuidad}
               onChange={(e) => onHeaderChange(e, "verificador_inocuidad")}
             />
+          </div> 
           </div>
           <div className="field col-12 md:col-6">
             <label className="font-bold">Firma del encargado</label>
             <InputText value={form.firma_encargado} onChange={(e) => onHeaderChange(e, "firma_encargado")} />
-          </div>
+          </div>*/}
 
           {/* Solo lectura; se genera al guardar */}
           <div className="field col-12">

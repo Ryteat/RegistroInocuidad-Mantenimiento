@@ -308,7 +308,7 @@ export default function LimpiezaTarimasCajas() {
                     type="search"
                     value={globalFilter}
                     onInput={(e) => setGlobalFilter(e.target.value)}
-                    placeholder="Buscar por fecha..."
+                    placeholder="Buscar Registros"
                 />
             </span>
 
@@ -387,9 +387,10 @@ export default function LimpiezaTarimasCajas() {
                 <Column selectionMode="multiple" exportable={false} />
                 <Column field="fecha_registro" header="Fecha" sortable />
                 <Column field="hora_registro" header="Hora" />
+                <Column field="firma_encargado" header="Operario" />
                 <Column field="cant_tarimas_limpias" header="Tarimas limpias" sortable />
                 <Column field="cant_cajas_colores_limpias" header="Cajas colores limpias" sortable />
-                <Column field="firma_encargado" header="Firma encargado" />
+
                 <Column
                     field="fecha_correccion"
                     header="Fecha de Registro"
@@ -429,7 +430,7 @@ export default function LimpiezaTarimasCajas() {
                         <InputText type="time" value={form.hora_registro} onChange={(e) => onHeaderChange(e, "hora_registro")} />
                     </div>
                     <div className="field col-12 md:col-4">
-                        <label className="font-bold">Firma del encargado</label>
+                        <label className="font-bold">Operario*</label>
                         <InputText value={form.firma_encargado} onChange={(e) => onHeaderChange(e, "firma_encargado")} />
                     </div>
 

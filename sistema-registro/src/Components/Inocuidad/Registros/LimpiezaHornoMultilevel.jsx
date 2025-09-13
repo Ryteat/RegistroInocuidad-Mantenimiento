@@ -332,7 +332,7 @@ export default function LimpiezaHornoMultilevel() {
                     type="search"
                     value={globalFilter}
                     onInput={(e) => setGlobalFilter(e.target.value)}
-                    placeholder="Busca Registros"
+                    placeholder="Buscar Registros"
                 />
             </span>
 
@@ -411,8 +411,8 @@ export default function LimpiezaHornoMultilevel() {
                 <Column selectionMode="multiple" exportable={false} />
                 <Column field="fecha_registro" header="Fecha" sortable />
                 <Column field="hora_registro" header="Hora" />
-                <Column field="firma_encargado" header="Firma encargado" />
-                <Column field="verificacion_inocuidad" header="Verificación Inocuidad" />
+                <Column field="firma_encargado" header="Operario" />
+
                 {/* nuevo: tipo de limpieza */}
                 <Column field="tipo_limpieza" header="Tipo de Limpieza" />
                 {/* renombrado: Fecha de Registro (muestra fecha_correccion) */}
@@ -455,14 +455,11 @@ export default function LimpiezaHornoMultilevel() {
                         <InputText type="time" value={form.hora_registro} onChange={(e) => onHeaderChange(e, "hora_registro")} />
                     </div>
                     <div className="field col-12 md:col-4">
-                        <label className="font-bold">Firma del encargado</label>
+                        <label className="font-bold">Operario*</label>
                         <InputText value={form.firma_encargado} onChange={(e) => onHeaderChange(e, "firma_encargado")} />
                     </div>
 
-                    <div className="field col-12 md:col-6">
-                        <label className="font-bold">Verificación (Coordinación de Inocuidad)</label>
-                        <InputText value={form.verificacion_inocuidad} onChange={(e) => onHeaderChange(e, "verificacion_inocuidad")} />
-                    </div>
+
 
                     {/* Tipo de Limpieza */}
                     <div className="col-12">

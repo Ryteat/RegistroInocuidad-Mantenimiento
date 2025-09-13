@@ -25,21 +25,18 @@ import ControlMovimientosCajasProceso from './pages/Dieta/Registros/PagesControl
 //imports paginas Gerencia
 import Gerencia from './pages/Gerencia/PagesGerencia.jsx';
 import GestionUsuarios from './pages/Gerencia/Registros/PagesGestionUsuarios.jsx';
+
 // import de Inocuidad
 import PagesInocuidad from './pages/Inocuidad/PagesInocuidad.jsx';
 import LimpiezaAreaHatchery from './Components/Inocuidad/LimpiezaAreaHatchery.jsx';
 import LimpiezaAreaCosecha from './Components/Inocuidad/LimpiezaAreaCosecha.jsx';
 import LimpiezaTarimasCajas from './Components/Inocuidad/LimpiezaTarimasCajas.jsx';
 import PagesLimpiezaDietaSiembra from './pages/Inocuidad/Registros/PagesLimpiezaDietaSiembra.jsx';
-
 import PagesLimpiezaHornoMultilevel from './pages/Inocuidad/Registros/PagesLimpiezaHornoMultilevel.jsx';
 import PagesLimpiezaBanosCasillerosPediluvios from './pages/Inocuidad/Registros/PagesLimpiezaBanosCasillerosPediluvios.jsx';
 import PagesLimpiezaOficinaReunionesComedor from './pages/Inocuidad/Registros/PagesLimpiezaOficinaReunionesComedor.jsx';
 import PagesControlPlagasRoedores from './pages/Inocuidad/Registros/PagesControlPlagasRoedores.jsx';
 import PagesLimpiezaTanqueAgua from "./pages/Inocuidad/Registros/PagesLimpiezaTanqueAgua.jsx";
-
-
-
 
 //control de tiempos imports
 import ControlTiempos from './pages/ControlTiempos/PagesControlTiempos.jsx';
@@ -70,8 +67,6 @@ import ReporteInspeccion from './pages/Mantenimiento/Registros/PagesReporteInspe
 import ReporteInspeccionSemanal from './pages/Mantenimiento/Registros/PagesReporteInspeccionSemanal.jsx'
 import PreoperacionalTeletruk from './pages/Mantenimiento/Registros/PagesPreoperacionalTeletruk.jsx'
 
-
-
 //imports de paginas de Cosecha
 import Cosecha from './pages/Cosecha/PagesCosecha.jsx';
 import ControlRendimientoCosechayFrass from './pages/Cosecha/Registros/PagesControlRendimientoCosechayFrass.jsx'
@@ -100,6 +95,9 @@ const router = createBrowserRouter([{
   children: [
     { path: `/`, element: <Login /> }, // Página principal (login)
     { path: `/MenuPrincipal`, element: <MenuPrincipal /> },
+
+
+
     // Ruta de Inocuidad
     {
       path: `/Inocuidad`,
@@ -111,14 +109,12 @@ const router = createBrowserRouter([{
         { path: `LimpiezaDietaSiembra`, element: <PagesLimpiezaDietaSiembra /> },
         { path: `LimpiezaHornoMultilevel`, element: <PagesLimpiezaHornoMultilevel /> },
         { path: `LimpiezaBanosCasillerosPediluvios`, element: <PagesLimpiezaBanosCasillerosPediluvios /> },
-        {
-          path: 'LimpiezaOficinaReunionesComedor',
-          element: <PagesLimpiezaOficinaReunionesComedor />,
-        },
+        { path: 'LimpiezaOficinaReunionesComedor', element: <PagesLimpiezaOficinaReunionesComedor />, },
         { path: `ControlPlagasRoedores`, element: <PagesControlPlagasRoedores /> },
         { path: `LimpiezaTanqueAgua`, element: <PagesLimpiezaTanqueAgua /> },
       ],
     },
+
 
     // Grupo de rutas de Hatchery
     {

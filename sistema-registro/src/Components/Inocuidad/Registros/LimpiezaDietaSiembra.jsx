@@ -417,8 +417,8 @@ export default function LimpiezaDietaSiembra() {
                 <Column selectionMode="multiple" exportable={false} />
                 <Column field="fecha_registro" header="Fecha" sortable />
                 <Column field="hora_registro" header="Hora" />
-                <Column field="firma_encargado" header="Firma encargado" />
-                <Column field="verificacion_inocuidad" header="Verificación (Inocuidad)" />
+                <Column field="firma_encargado" header="Operario" />
+
                 <Column
                     field="fecha_correccion"
                     header="Fecha de Registro"
@@ -472,20 +472,20 @@ export default function LimpiezaDietaSiembra() {
                         />
                     </div>
                     <div className="field col-12 md:col-4">
-                        <label className="font-bold">Firma del encargado</label>
+                        <label className="font-bold">Operario*</label>
                         <InputText
                             value={form.firma_encargado}
                             onChange={(e) => onHeaderChange(e, "firma_encargado")}
                         />
                     </div>
 
-                    <div className="field col-12 md:col-6">
+                    {/*<div className="field col-12 md:col-6">
                         <label className="font-bold">Verificación (Coordinación de Inocuidad)</label>
                         <InputText
                             value={form.verificacion_inocuidad}
                             onChange={(e) => onHeaderChange(e, "verificacion_inocuidad")}
                         />
-                    </div>
+                    </div>*/}
 
                     {ITEMS.map((it) => {
                         const val = form.items[it.key] || { estado: "", comentario: "" };

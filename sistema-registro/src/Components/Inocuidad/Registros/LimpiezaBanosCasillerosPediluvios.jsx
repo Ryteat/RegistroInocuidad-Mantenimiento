@@ -316,7 +316,7 @@ export default function LimpiezaBanosCasillerosPediluvios() {
                     type="search"
                     value={globalFilter}
                     onInput={(e) => setGlobalFilter(e.target.value)}
-                    placeholder="Buscar por fecha..."
+                    placeholder="Buscar Registros"
                 />
             </span>
 
@@ -389,8 +389,8 @@ export default function LimpiezaBanosCasillerosPediluvios() {
                 <Column selectionMode="multiple" exportable={false} />
                 <Column field="fecha_registro" header="Fecha" sortable />
                 <Column field="hora_registro" header="Hora" />
-                <Column field="firma_encargado" header="Firma encargado" />
-                <Column field="verificacion_investigacion_desarrollo" header="Verificación I+D" />
+                <Column field="firma_encargado" header="Operario" />
+
                 <Column
                     field="fecha_correccion"
                     header="Fecha de Registro"
@@ -429,7 +429,7 @@ export default function LimpiezaBanosCasillerosPediluvios() {
                         <InputText type="time" value={form.hora_registro} onChange={(e) => onHeaderChange(e, "hora_registro")} />
                     </div>
                     <div className="field col-12 md:col-4">
-                        <label className="font-bold">Firma del encargado</label>
+                        <label className="font-bold">Operario*</label>
                         <InputText value={form.firma_encargado} onChange={(e) => onHeaderChange(e, "firma_encargado")} />
                     </div>
 
@@ -470,14 +470,6 @@ export default function LimpiezaBanosCasillerosPediluvios() {
                             </div>
                         </div>
                     ))}
-
-                    <div className="field col-12 md:col-6">
-                        <label className="font-bold">Verificación (Investigación y Desarrollo)</label>
-                        <InputText
-                            value={form.verificacion_investigacion_desarrollo}
-                            onChange={(e) => onHeaderChange(e, "verificacion_investigacion_desarrollo")}
-                        />
-                    </div>
 
                     <div className="field col-12 md:col-6">
                         <label className="font-bold">Fecha de Registro (auto)</label>
