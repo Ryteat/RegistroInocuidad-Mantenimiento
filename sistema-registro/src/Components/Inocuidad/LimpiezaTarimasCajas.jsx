@@ -17,6 +17,34 @@ import { InputText } from "primereact/inputtext";
 import { Dropdown } from "primereact/dropdown";
 import { Checkbox } from "primereact/checkbox";
 
+{/* Ver todos los registros JV
+    
+    SELECT
+  h.id,
+  h.fecha_registro,
+  h.hora_registro,
+  h.cant_tarimas_limpias,
+  h.cant_cajas_colores_limpias,
+  h.firma_encargado,
+  h.fecha_correccion,
+
+  
+  MAX(CASE WHEN i.item_key = 'lavado_cajas_1x1' THEN i.estado END)      AS lavado_cajas_1x1_estado,
+  MAX(CASE WHEN i.item_key = 'lavado_tarimas'  THEN i.estado END)       AS lavado_tarimas_estado,
+
+  
+  MAX(CASE WHEN i.item_key = 'lavado_cajas_1x1' THEN i.comentario END)  AS lavado_cajas_1x1_comentario,
+  MAX(CASE WHEN i.item_key = 'lavado_tarimas'  THEN i.comentario END)   AS lavado_tarimas_comentario
+
+FROM public.limpieza_tarimas_cajas AS h
+LEFT JOIN public.limpieza_tarimas_cajas_items AS i
+  ON i.id_registro = h.id
+GROUP BY
+  h.id, h.fecha_registro, h.hora_registro, h.cant_tarimas_limpias,
+  h.cant_cajas_colores_limpias, h.firma_encargado, h.fecha_correccion
+ORDER BY h.fecha_registro DESC, h.hora_registro DESC;
+
+*/}
 // ⬅️ Hook de permisos (ruta igual que en Cosecha/Hatchery/Oficinas)
 import useCanReview from "./Registros/Hooks/useCanReview.js";
 
@@ -43,7 +71,6 @@ const emptyForm = () => ({
     cant_tarimas_limpias: 0,
     cant_cajas_colores_limpias: 0,
     firma_encargado: "",
-    // solo visual en el modal; la columna real se llena en DB (default now())
     fecha_correccion_preview: new Date().toLocaleString(),
     items: ITEMS.reduce((acc, it) => {
         acc[it.key] = { estado: "", comentario: "" };

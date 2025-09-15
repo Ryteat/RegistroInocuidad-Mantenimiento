@@ -21,10 +21,10 @@ import useCanReview from "./Hooks/useCanReview.js";
 
 /* ---------- SOLO las 4 preguntas requeridas ---------- */
 const QUESTIONS = [
-    { key: "q3", label: "¿Verificó tuberías/válvulas/grietas/desgaste del tanque?" },
+    { key: "q3", label: "¿Verificó el estado detuberías/válvulas/grietas/desgaste del tanque?" },
     { key: "q4", label: "¿Removió residuos sólidos del fondo del tanque?" },
-    { key: "q13", label: "¿Instaló tapa correctamente (evitar contaminantes)?" },
-    { key: "q12", label: "¿Realizó varios lavados con agua potable (retiro de EPP)?" },
+    { key: "q13", label: "¿Se realizaron varios lavados con agua potable eliminando así los residuos de desinfectante?" },
+    { key: "q12", label: "¿Se instaló correctamente la tapa para evitar el ingreso de contaminantes?" },
 ];
 
 const YESNO = [
@@ -271,7 +271,7 @@ export default function LimpiezaTanqueAgua() {
                     type="search"
                     value={globalFilter}
                     onInput={(e) => setGlobalFilter(e.target.value)}
-                    placeholder="Buscar registros"
+                    placeholder="Buscar Registros"
                 />
             </span>
 
@@ -428,18 +428,24 @@ export default function LimpiezaTanqueAgua() {
                         />
                     </div>
                     <div className="field col-12 md:col-3">
-                        <label className="font-bold">Próximo lavado</label>
+                        <label className="font-bold">Selecciona la Fecha del Próximo lavado</label>
                         <InputText
                             type="date"
                             value={form.fecha_proximo_lavado}
                             onChange={(e) => onHeaderChange(e, "fecha_proximo_lavado")}
                         />
                     </div>
-                    <div className="field col-12 md:col-3">
-                        <label className="font-bold">Fecha de Registro (auto)</label>
-                        <InputText value={form.fecha_correccion_preview} disabled />
-                    </div>
 
+                    <div className="field col-12 md:col-6">
+                        <label className="font-bold">
+                            Operario* {submitted && !form.responsable_lavado && <small className="p-error"> Requerido</small>}
+                        </label>
+                        <InputText
+                            value={form.responsable_lavado}
+                            onChange={(e) => onHeaderChange(e, "responsable_lavado")}
+                            placeholder="Nombre del operario"
+                        />
+                    </div>
                     <div className="field col-12 md:col-6">
                         <label className="font-bold">
                             Ubicación del tanque* {submitted && !form.ubicacion_tanque && <small className="p-error"> Requerido</small>}
@@ -447,19 +453,10 @@ export default function LimpiezaTanqueAgua() {
                         <InputText
                             value={form.ubicacion_tanque}
                             onChange={(e) => onHeaderChange(e, "ubicacion_tanque")}
-                            placeholder="Ej: Tanque principal nave A"
+                            placeholder=""//Dejo este ph por aquello de que pidan agregarle algo. JV
                         />
                     </div>
-                    <div className="field col-12 md:col-6">
-                        <label className="font-bold">
-                            Responsable de lavado* {submitted && !form.responsable_lavado && <small className="p-error"> Requerido</small>}
-                        </label>
-                        <InputText
-                            value={form.responsable_lavado}
-                            onChange={(e) => onHeaderChange(e, "responsable_lavado")}
-                            placeholder="Nombre y/o firma"
-                        />
-                    </div>
+
 
                     {/* 4 preguntas */}
                     {QUESTIONS.map((q) => {
@@ -477,6 +474,11 @@ export default function LimpiezaTanqueAgua() {
                     <div className="field col-12">
                         <label className="font-bold">Observaciones</label>
                         <InputText value={form.observaciones} onChange={(e) => onHeaderChange(e, "observaciones")} />
+                    </div>
+
+                    <div className="field col-12 md:col-3">
+                        <label className="font-bold">Fecha de Registro (auto)</label>
+                        <InputText value={form.fecha_correccion_preview} disabled />
                     </div>
                 </div>
             </Dialog>

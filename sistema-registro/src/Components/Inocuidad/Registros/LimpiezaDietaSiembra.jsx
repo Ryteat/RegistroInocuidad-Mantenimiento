@@ -487,6 +487,22 @@ export default function LimpiezaDietaSiembra() {
                         />
                     </div>*/}
 
+                    {/* Copiar en Supabase para ver los registros y poder exportarlos
+            SELECT
+  h.id,
+  h.fecha_registro,
+  h.hora_registro,
+  h.firma_encargado,
+  h.verificacion_inocuidad,
+  h.fecha_correccion,
+  i.item_key,
+  i.estado,
+  i.comentario
+FROM public.limpieza_dieta_siembra AS h
+JOIN public.limpieza_dieta_siembra_items AS i
+  ON i.id_registro = h.id
+ORDER BY h.fecha_registro DESC, h.id, i.item_key;">*/}
+
                     {ITEMS.map((it) => {
                         const val = form.items[it.key] || { estado: "", comentario: "" };
                         const necesitaComentario = val.estado && val.estado !== "C";
@@ -527,5 +543,6 @@ export default function LimpiezaDietaSiembra() {
                 </div>
             </Dialog>
         </div>
+
     );
 }

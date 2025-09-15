@@ -16,12 +16,16 @@ import { InputText } from "primereact/inputtext";
 import { Dropdown } from "primereact/dropdown";
 import { Checkbox } from "primereact/checkbox";
 
+
+{/* SUPA BASE
+    SELECT * FROM public.limpieza_area_hatchery
+ORDER BY fecha_registro DESC, hora_registro DESC
+LIMIT 10; 
+*/}
 // Permisos (solo Mantenimiento01 / Produccion01)
 import useCanReview from "./Registros/Hooks/useCanReview.js";
-
-// -----------------------------
 // Catálogos / utilidades
-// -----------------------------
+
 const ESTADOS = [
     { label: "C (Cumple)", value: "C" },
     { label: "NC (No cumple)", value: "NC" },
