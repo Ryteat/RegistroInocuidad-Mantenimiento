@@ -559,13 +559,13 @@ export default function LimpiezaAreaHatchery() {
                     </div>
 
 
-                    {/*    <div className="field col-12">
+                    {<div className="field col-12">
                         <label className="font-bold">Observaciones</label>
                         <InputText
                             value={form.observaciones_generales}
                             onChange={(e) => onHeaderChange(e, "observaciones_generales")}
                         />
-                    </div>*/}
+                    </div>}
                 </div>
             </Dialog>
         </div>

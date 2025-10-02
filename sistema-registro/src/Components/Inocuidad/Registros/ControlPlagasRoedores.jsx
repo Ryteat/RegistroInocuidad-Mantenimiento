@@ -517,55 +517,72 @@ export default function ControlPlagasRoedores() {
 
                     {form.evidencia_roedores === true && (
                         <>
-                            {/* Aqui la evidencia de roedores con el "si o no". JV*/}
-                            <div className="field col-12 md:col-6">
-                                <label className="subarea-title" style={{ display: "block" }}>Roedores</label>
-                                <label className="font-bold">
-                                    Indicadores (uno o más)
-                                    {submitted && form.roedores_indicadores.length === 0 && <small className="p-error"> Requerido</small>}
-                                </label>
-                                <MultiSelect
-                                    value={form.roedores_indicadores}
-                                    options={ROEDORES_MS_OPTIONS}
-                                    onChange={(e) => onChange("roedores_indicadores", e.value)}
-                                    placeholder="Seleccione indicadores"
-                                    display="chip"
-                                    className="w-full"
-                                />
-                            </div>
+                            {/* Bloque ROEDORES */}
+                            <div className="field col-12">
+                                <div className="plaga-box">
+                                    <div className="subarea-title">Roedores</div>
 
-                            {/* Aqui evidencia de hormigas con el "si o no". JV*/}
-                            <div className="field col-12 md:col-6">
-                                <label className="subarea-title" style={{ display: "block" }}>Hormigas</label>
-                                <label className="font-bold">
-                                    Evidencia de Hormigas*{" "}
-                                    {submitted && form.plaga_hormigas === null && <small className="p-error"> Requerido</small>}
-                                </label>
-                                <Dropdown
-                                    value={form.plaga_hormigas}
-                                    options={opcionesSiNo}
-                                    onChange={(e) => onChange("plaga_hormigas", e.value)}
-                                    placeholder="Seleccione"
-                                />
-                            </div>
-
-                            {/* Si hay evidencia de hormigas -> marcamos las opciones. JV*/}
-                            {form.plaga_hormigas === true && (
-                                <div className="field col-12 md:col-6">
                                     <label className="font-bold">
-                                        Indicador de hormigas*
-                                        {submitted && !form.hormigas_indicador && <small className="p-error"> Requerido</small>}
+                                        Indicadores (uno o más)
+                                        {submitted && form.roedores_indicadores.length === 0 && (
+                                            <small className="p-error"> Requerido</small>
+                                        )}
                                     </label>
-                                    <Dropdown
-                                        value={form.hormigas_indicador}
-                                        options={HORMIGAS_OPTIONS}
-                                        onChange={(e) => onChange("hormigas_indicador", e.value)}
-                                        placeholder="Seleccione indicador"
+
+                                    <MultiSelect
+                                        value={form.roedores_indicadores}
+                                        options={ROEDORES_MS_OPTIONS}
+                                        onChange={(e) => onChange("roedores_indicadores", e.value)}
+                                        placeholder="Seleccione indicadores"
+                                        display="chip"
+                                        className="w-full"
                                     />
                                 </div>
-                            )}
+                            </div>
+
+                            {/* Bloque HORMIGAS */}
+                            <div className="field col-12">
+                                <div className="plaga-box">
+                                    <div className="subarea-title">Hormigas</div>
+
+                                    <div className="grid">
+                                        <div className="col-12 md:col-6">
+                                            <label className="font-bold">
+                                                Evidencia de Hormigas*
+                                                {submitted && form.plaga_hormigas === null && (
+                                                    <small className="p-error"> Requerido</small>
+                                                )}
+                                            </label>
+                                            <Dropdown
+                                                value={form.plaga_hormigas}
+                                                options={opcionesSiNo}
+                                                onChange={(e) => onChange("plaga_hormigas", e.value)}
+                                                placeholder="Seleccione"
+                                            />
+                                        </div>
+
+                                        {form.plaga_hormigas === true && (
+                                            <div className="col-12 md:col-6">
+                                                <label className="font-bold">
+                                                    Indicador de hormigas*
+                                                    {submitted && !form.hormigas_indicador && (
+                                                        <small className="p-error"> Requerido</small>
+                                                    )}
+                                                </label>
+                                                <Dropdown
+                                                    value={form.hormigas_indicador}
+                                                    options={HORMIGAS_OPTIONS}
+                                                    onChange={(e) => onChange("hormigas_indicador", e.value)}
+                                                    placeholder="Seleccione indicador"
+                                                />
+                                            </div>
+                                        )}
+                                    </div>
+                                </div>
+                            </div>
                         </>
                     )}
+
 
                     {/* Observación opcional */}
                     <div className="field col-12">

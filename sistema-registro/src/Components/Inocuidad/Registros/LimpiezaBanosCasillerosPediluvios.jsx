@@ -84,11 +84,44 @@ const emptyForm = () => ({
 });
 
 const packRow = (dbRow) => {
-    const itemsMap = ITEMS.reduce((acc, it) => {
-        const found = (dbRow.items || []).find((x) => x.item_key === it.key);
-        acc[it.key] = { estado: found?.estado || "", comentario: found?.comentario || "" };
-        return acc;
-    }, {});
+    const fromWide =
+        dbRow.estado_banos_sanitarios !== undefined ||
+        dbRow.estado_camerinos_pisos !== undefined ||
+        dbRow.estado_crecimiento_piso !== undefined ||
+        dbRow.estado_pediluvios_area_externa !== undefined;
+
+    const itemsMap = fromWide
+        ? {
+            // Baños
+            banos_sanitarios: { estado: dbRow.estado_banos_sanitarios || "", comentario: dbRow.comentario_banos_sanitarios || "" },
+            banos_pisos: { estado: dbRow.estado_banos_pisos || "", comentario: dbRow.comentario_banos_pisos || "" },
+            banos_lavamanos: { estado: dbRow.estado_banos_lavamanos || "", comentario: dbRow.comentario_banos_lavamanos || "" },
+            banos_orinales: { estado: dbRow.estado_banos_orinales || "", comentario: dbRow.comentario_banos_orinales || "" },
+            banos_recoleccion_basura: { estado: dbRow.estado_banos_recoleccion_basura || "", comentario: dbRow.comentario_banos_recoleccion_basura || "" },
+            banos_paredes: { estado: dbRow.estado_banos_paredes || "", comentario: dbRow.comentario_banos_paredes || "" },
+            banos_techos: { estado: dbRow.estado_banos_techos || "", comentario: dbRow.comentario_banos_techos || "" },
+            // Camerinos
+            camerinos_pisos: { estado: dbRow.estado_camerinos_pisos || "", comentario: dbRow.comentario_camerinos_pisos || "" },
+            camerinos_lavamanos: { estado: dbRow.estado_camerinos_lavamanos || "", comentario: dbRow.comentario_camerinos_lavamanos || "" },
+            camerinos_paredes: { estado: dbRow.estado_camerinos_paredes || "", comentario: dbRow.comentario_camerinos_paredes || "" },
+            camerinos_casilleros_exterior: { estado: dbRow.estado_camerinos_casilleros_exterior || "", comentario: dbRow.comentario_camerinos_casilleros_exterior || "" },
+            // Crecimiento
+            crecimiento_piso: { estado: dbRow.estado_crecimiento_piso || "", comentario: dbRow.comentario_crecimiento_piso || "" },
+            crecimiento_muebles: { estado: dbRow.estado_crecimiento_muebles || "", comentario: dbRow.comentario_crecimiento_muebles || "" },
+            crecimiento_paredes: { estado: dbRow.estado_crecimiento_paredes || "", comentario: dbRow.comentario_crecimiento_paredes || "" },
+            crecimiento_techo: { estado: dbRow.estado_crecimiento_techo || "", comentario: dbRow.comentario_crecimiento_techo || "" },
+            // Pediluvios
+            pediluvios_area_externa: { estado: dbRow.estado_pediluvios_area_externa || "", comentario: dbRow.comentario_pediluvios_area_externa || "" },
+            pediluvios_area_interna: { estado: dbRow.estado_pediluvios_area_interna || "", comentario: dbRow.comentario_pediluvios_area_interna || "" },
+            pediluvios_solucion: { estado: dbRow.estado_pediluvios_solucion || "", comentario: dbRow.comentario_pediluvios_solucion || "" },
+            pediluvios_techo: { estado: dbRow.estado_pediluvios_techo || "", comentario: dbRow.comentario_pediluvios_techo || "" },
+        }
+        : ITEMS.reduce((acc, it) => {
+            const found = (dbRow.items || []).find((x) => x.item_key === it.key);
+            acc[it.key] = { estado: found?.estado || "", comentario: found?.comentario || "" };
+            return acc;
+        }, {});
+
     return {
         id: dbRow.id,
         fecha_registro: dbRow.fecha_registro,
@@ -102,6 +135,7 @@ const packRow = (dbRow) => {
         items: itemsMap,
     };
 };
+
 
 export default function LimpiezaBanosCasillerosPediluvios() {
     const toast = useRef(null);
@@ -176,19 +210,39 @@ export default function LimpiezaBanosCasillerosPediluvios() {
             setLoading(true);
 
             let query = supabase
-                .from("limpieza_banos_casilleros_pediluvios")
+                .from("limpieza_banos_casilleros_pediluvios_1")
                 .select(`
-          id,
-          fecha_registro,
-          hora_registro,
-          firma_encargado,
-          verificacion_investigacion_desarrollo,
-          fecha_correccion,
-          revisado, revisado_por_username, revisado_fecha,
-          items:limpieza_banos_casilleros_pediluvios_items!limpieza_banos_casilleros_pediluvios_items_id_registro_fkey (
-            item_key, estado, comentario
-          )
-        `)
+        id,
+        fecha_registro,
+        hora_registro,
+        firma_encargado,
+        verificacion_investigacion_desarrollo,
+        fecha_correccion,
+        revisado, revisado_por_username, revisado_fecha,
+
+        estado_banos_sanitarios, comentario_banos_sanitarios,
+        estado_banos_pisos, comentario_banos_pisos,
+        estado_banos_lavamanos, comentario_banos_lavamanos,
+        estado_banos_orinales, comentario_banos_orinales,
+        estado_banos_recoleccion_basura, comentario_banos_recoleccion_basura,
+        estado_banos_paredes, comentario_banos_paredes,
+        estado_banos_techos, comentario_banos_techos,
+
+        estado_camerinos_pisos, comentario_camerinos_pisos,
+        estado_camerinos_lavamanos, comentario_camerinos_lavamanos,
+        estado_camerinos_paredes, comentario_camerinos_paredes,
+        estado_camerinos_casilleros_exterior, comentario_camerinos_casilleros_exterior,
+
+        estado_crecimiento_piso, comentario_crecimiento_piso,
+        estado_crecimiento_muebles, comentario_crecimiento_muebles,
+        estado_crecimiento_paredes, comentario_crecimiento_paredes,
+        estado_crecimiento_techo, comentario_crecimiento_techo,
+
+        estado_pediluvios_area_externa, comentario_pediluvios_area_externa,
+        estado_pediluvios_area_interna, comentario_pediluvios_area_interna,
+        estado_pediluvios_solucion, comentario_pediluvios_solucion,
+        estado_pediluvios_techo, comentario_pediluvios_techo
+      `)
                 .order("fecha_registro", { ascending: false });
 
             if (filtroRevisado === "checked") query = query.eq("revisado", true);
@@ -204,6 +258,7 @@ export default function LimpiezaBanosCasillerosPediluvios() {
             setLoading(false);
         }
     };
+
 
     useEffect(() => { fetchRows(); }, [filtroRevisado]);
 
@@ -230,33 +285,54 @@ export default function LimpiezaBanosCasillerosPediluvios() {
         setSubmitted(true);
         const errs = validate();
         if (errs.length) { showToast("error", "Validación", errs[0]); return; }
+
         try {
-            const { data: enc, error: errEnc } = await supabase
-                .from("limpieza_banos_casilleros_pediluvios")
-                .insert([{
-                    fecha_registro: form.fecha_registro,
-                    hora_registro: form.hora_registro,
-                    firma_encargado: form.firma_encargado || null,
-                    verificacion_investigacion_desarrollo: form.verificacion_investigacion_desarrollo || null,
-                }])
+            const p = (k) => ({
+                estado: form.items[k]?.estado || null,
+                comentario: form.items[k]?.comentario || null,
+            });
+
+            const payload = {
+                fecha_registro: form.fecha_registro,
+                hora_registro: form.hora_registro,
+                firma_encargado: form.firma_encargado || "",
+                verificacion_investigacion_desarrollo: form.verificacion_investigacion_desarrollo || null,
+
+                // Baños
+                estado_banos_sanitarios: p("banos_sanitarios").estado, comentario_banos_sanitarios: p("banos_sanitarios").comentario,
+                estado_banos_pisos: p("banos_pisos").estado, comentario_banos_pisos: p("banos_pisos").comentario,
+                estado_banos_lavamanos: p("banos_lavamanos").estado, comentario_banos_lavamanos: p("banos_lavamanos").comentario,
+                estado_banos_orinales: p("banos_orinales").estado, comentario_banos_orinales: p("banos_orinales").comentario,
+                estado_banos_recoleccion_basura: p("banos_recoleccion_basura").estado, comentario_banos_recoleccion_basura: p("banos_recoleccion_basura").comentario,
+                estado_banos_paredes: p("banos_paredes").estado, comentario_banos_paredes: p("banos_paredes").comentario,
+                estado_banos_techos: p("banos_techos").estado, comentario_banos_techos: p("banos_techos").comentario,
+
+                // Camerinos
+                estado_camerinos_pisos: p("camerinos_pisos").estado, comentario_camerinos_pisos: p("camerinos_pisos").comentario,
+                estado_camerinos_lavamanos: p("camerinos_lavamanos").estado, comentario_camerinos_lavamanos: p("camerinos_lavamanos").comentario,
+                estado_camerinos_paredes: p("camerinos_paredes").estado, comentario_camerinos_paredes: p("camerinos_paredes").comentario,
+                estado_camerinos_casilleros_exterior: p("camerinos_casilleros_exterior").estado, comentario_camerinos_casilleros_exterior: p("camerinos_casilleros_exterior").comentario,
+
+                // Crecimiento
+                estado_crecimiento_piso: p("crecimiento_piso").estado, comentario_crecimiento_piso: p("crecimiento_piso").comentario,
+                estado_crecimiento_muebles: p("crecimiento_muebles").estado, comentario_crecimiento_muebles: p("crecimiento_muebles").comentario,
+                estado_crecimiento_paredes: p("crecimiento_paredes").estado, comentario_crecimiento_paredes: p("crecimiento_paredes").comentario,
+                estado_crecimiento_techo: p("crecimiento_techo").estado, comentario_crecimiento_techo: p("crecimiento_techo").comentario,
+
+                // Pediluvios
+                estado_pediluvios_area_externa: p("pediluvios_area_externa").estado, comentario_pediluvios_area_externa: p("pediluvios_area_externa").comentario,
+                estado_pediluvios_area_interna: p("pediluvios_area_interna").estado, comentario_pediluvios_area_interna: p("pediluvios_area_interna").comentario,
+                estado_pediluvios_solucion: p("pediluvios_solucion").estado, comentario_pediluvios_solucion: p("pediluvios_solucion").comentario,
+                estado_pediluvios_techo: p("pediluvios_techo").estado, comentario_pediluvios_techo: p("pediluvios_techo").comentario,
+            };
+
+            const { error } = await supabase
+                .from("limpieza_banos_casilleros_pediluvios_1")
+                .insert([payload])
                 .select("id")
                 .single();
 
-            if (errEnc) throw errEnc;
-            const newId = enc.id;
-
-            const itemsInsert = ITEMS.map((it) => ({
-                id_registro: newId,
-                item_key: it.key,
-                estado: form.items[it.key]?.estado || "",
-                comentario: form.items[it.key]?.comentario || null,
-            }));
-
-            const { error: errDet } = await supabase
-                .from("limpieza_banos_casilleros_pediluvios_items")
-                .insert(itemsInsert);
-
-            if (errDet) throw errDet;
+            if (error) throw error;
 
             showToast("success", "Éxito", "Registro guardado correctamente");
             await fetchRows();
@@ -268,6 +344,7 @@ export default function LimpiezaBanosCasillerosPediluvios() {
             showToast("error", "Error", error.message || "No se pudo guardar el registro");
         }
     };
+
 
     const countBy = (row, val) => ITEMS.reduce((acc, it) => acc + (row.items?.[it.key]?.estado === val ? 1 : 0), 0);
 
@@ -282,13 +359,14 @@ export default function LimpiezaBanosCasillerosPediluvios() {
         const onToggle = async (next) => {
             if (!username) { showToast("warn", "Sesión", "No se detectó el usuario actual."); return; }
             const { error } = await supabase
-                .from("limpieza_banos_casilleros_pediluvios")
+                .from("limpieza_banos_casilleros_pediluvios_1")
                 .update({
                     revisado: next,
                     revisado_por_username: next ? username : null,
                     revisado_fecha: next ? new Date().toISOString() : null,
                 })
                 .eq("id", row.id);
+
 
             if (error) { showToast("error", "No se guardó", error.message); return; }
 

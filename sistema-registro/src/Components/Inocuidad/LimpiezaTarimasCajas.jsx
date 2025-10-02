@@ -79,12 +79,29 @@ const emptyForm = () => ({
 });
 
 // Mapea array de items -> objeto por clave para la tabla
+// Mapea array de items -> objeto por clave para la tabla (soporta ancho y viejo embed)
 const packRow = (dbRow) => {
-    const itemsMap = ITEMS.reduce((acc, it) => {
-        const found = (dbRow.items || []).find((x) => x.item_key === it.key);
-        acc[it.key] = { estado: found?.estado || "", comentario: found?.comentario || "" };
-        return acc;
-    }, {});
+    const fromWide =
+        dbRow.estado_lavado_cajas_1x1 !== undefined ||
+        dbRow.estado_lavado_tarimas !== undefined;
+
+    const itemsMap = fromWide
+        ? {
+            lavado_cajas_1x1: {
+                estado: dbRow.estado_lavado_cajas_1x1 || "",
+                comentario: dbRow.comentario_lavado_cajas_1x1 || ""
+            },
+            lavado_tarimas: {
+                estado: dbRow.estado_lavado_tarimas || "",
+                comentario: dbRow.comentario_lavado_tarimas || ""
+            },
+        }
+        : ITEMS.reduce((acc, it) => {
+            const found = (dbRow.items || []).find((x) => x.item_key === it.key);
+            acc[it.key] = { estado: found?.estado || "", comentario: found?.comentario || "" };
+            return acc;
+        }, {});
+
     return {
         id: dbRow.id,
         fecha_registro: dbRow.fecha_registro,
@@ -92,14 +109,15 @@ const packRow = (dbRow) => {
         cant_tarimas_limpias: dbRow.cant_tarimas_limpias,
         cant_cajas_colores_limpias: dbRow.cant_cajas_colores_limpias,
         firma_encargado: dbRow.firma_encargado,
-        fecha_correccion: dbRow.fecha_correccion, // usado como "Fecha de Registro" en pantalla
-        // campos de revisión
+        fecha_correccion: dbRow.fecha_correccion, // "Fecha de Registro" en pantalla
+
         revisado: dbRow.revisado ?? false,
         revisado_por_username: dbRow.revisado_por_username ?? null,
         revisado_fecha: dbRow.revisado_fecha ?? null,
         items: itemsMap,
     };
 };
+
 
 export default function LimpiezaTarimasCajas() {
     const toast = useRef(null);
@@ -151,22 +169,21 @@ export default function LimpiezaTarimasCajas() {
             setLoading(true);
 
             let query = supabase
-                .from("limpieza_tarimas_cajas")
+                .from("limpieza_tarimas_cajas_1")
                 .select(`
-          id,
-          fecha_registro,
-          hora_registro,
-          cant_tarimas_limpias,
-          cant_cajas_colores_limpias,
-          firma_encargado,
-          fecha_correccion,
-          revisado,
-          revisado_por_username,
-          revisado_fecha,
-          items:limpieza_tarimas_cajas_items!limpieza_tarimas_cajas_items_id_registro_fkey (
-            item_key, estado, comentario
-          )
-        `)
+        id,
+        fecha_registro,
+        hora_registro,
+        cant_tarimas_limpias,
+        cant_cajas_colores_limpias,
+        firma_encargado,
+        fecha_correccion,
+        revisado,
+        revisado_por_username,
+        revisado_fecha,
+        estado_lavado_cajas_1x1, comentario_lavado_cajas_1x1,
+        estado_lavado_tarimas,   comentario_lavado_tarimas
+      `)
                 .order("fecha_registro", { ascending: false });
 
             if (filtroRevisado === "checked") query = query.eq("revisado", true);
@@ -230,35 +247,27 @@ export default function LimpiezaTarimasCajas() {
             return;
         }
         try {
-            // 1) Encabezado
-            const { data: enc, error: errEnc } = await supabase
-                .from("limpieza_tarimas_cajas")
-                .insert([
-                    {
-                        fecha_registro: form.fecha_registro,
-                        hora_registro: form.hora_registro,
-                        cant_tarimas_limpias: Number(form.cant_tarimas_limpias) || 0,
-                        cant_cajas_colores_limpias: Number(form.cant_cajas_colores_limpias) || 0,
-                        firma_encargado: form.firma_encargado || null,
-                        // fecha_correccion la pone la DB: default now()
-                    },
-                ])
-                .select("id")
+            const payload = {
+                fecha_registro: form.fecha_registro,
+                hora_registro: form.hora_registro,
+                cant_tarimas_limpias: Number(form.cant_tarimas_limpias) || 0,
+                cant_cajas_colores_limpias: Number(form.cant_cajas_colores_limpias) || 0,
+                firma_encargado: form.firma_encargado || "",
+
+                estado_lavado_cajas_1x1: form.items.lavado_cajas_1x1?.estado,
+                comentario_lavado_cajas_1x1: form.items.lavado_cajas_1x1?.comentario || null,
+
+                estado_lavado_tarimas: form.items.lavado_tarimas?.estado,
+                comentario_lavado_tarimas: form.items.lavado_tarimas?.comentario || null,
+            };
+
+            const { error } = await supabase
+                .from("limpieza_tarimas_cajas_1")
+                .insert([payload])
+                .select("id, fecha_correccion")
                 .single();
 
-            if (errEnc) throw errEnc;
-            const newId = enc.id;
-
-            // 2) Detalle
-            const itemsInsert = ITEMS.map((it) => ({
-                id_registro: newId,
-                item_key: it.key,
-                estado: form.items[it.key]?.estado || "",
-                comentario: form.items[it.key]?.comentario || null,
-            }));
-
-            const { error: errDet } = await supabase.from("limpieza_tarimas_cajas_items").insert(itemsInsert);
-            if (errDet) throw errDet;
+            if (error) throw error;
 
             showToast("success", "Éxito", "Registro guardado correctamente");
             await fetchRegistros();
@@ -270,6 +279,7 @@ export default function LimpiezaTarimasCajas() {
             showToast("error", "Error", error.message || "No se pudo guardar el registro");
         }
     };
+
 
     const countBy = (row, val) => ITEMS.reduce((acc, it) => acc + (row.items?.[it.key]?.estado === val ? 1 : 0), 0);
 
@@ -288,13 +298,14 @@ export default function LimpiezaTarimasCajas() {
                 return;
             }
             const { error } = await supabase
-                .from("limpieza_tarimas_cajas")
+                .from("limpieza_tarimas_cajas_1")
                 .update({
                     revisado: next,
                     revisado_por_username: next ? username : null,
                     revisado_fecha: next ? new Date().toISOString() : null,
                 })
                 .eq("id", row.id);
+
 
             if (error) {
                 showToast("error", "No se guardó", error.message);

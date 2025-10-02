@@ -66,12 +66,32 @@ const emptyForm = () => ({
 });
 
 // DB -> UI
+// DB -> UI (soporta esquema viejo con items embed y el nuevo ancho)
 const packRow = (dbRow) => {
-    const itemsMap = ITEMS.reduce((acc, it) => {
-        const found = (dbRow.items || []).find((x) => x.item_key === it.key);
-        acc[it.key] = { estado: found?.estado || "", comentario: found?.comentario || "" };
-        return acc;
-    }, {});
+    const fromWide =
+        dbRow.estado_bandas_transportadoras !== undefined ||
+        dbRow.estado_dosificador_larva !== undefined;
+
+    const itemsMap = fromWide
+        ? {
+            bandas_transportadoras: { estado: dbRow.estado_bandas_transportadoras || "", comentario: dbRow.comentario_bandas_transportadoras || "" },
+            dosificador_larva: { estado: dbRow.estado_dosificador_larva || "", comentario: dbRow.comentario_dosificador_larva || "" },
+            banda_1: { estado: dbRow.estado_banda_1 || "", comentario: dbRow.comentario_banda_1 || "" },
+            banda_2: { estado: dbRow.estado_banda_2 || "", comentario: dbRow.comentario_banda_2 || "" },
+            banda_3: { estado: dbRow.estado_banda_3 || "", comentario: dbRow.comentario_banda_3 || "" },
+            banda_4: { estado: dbRow.estado_banda_4 || "", comentario: dbRow.comentario_banda_4 || "" },
+            banda_5: { estado: dbRow.estado_banda_5 || "", comentario: dbRow.comentario_banda_5 || "" },
+            compuertas_limpieza: { estado: dbRow.estado_compuertas_limpieza || "", comentario: dbRow.comentario_compuertas_limpieza || "" },
+            bandas_enfriamiento: { estado: dbRow.estado_bandas_enfriamiento || "", comentario: dbRow.comentario_bandas_enfriamiento || "" },
+            canguilones: { estado: dbRow.estado_canguilones || "", comentario: dbRow.comentario_canguilones || "" },
+            piso: { estado: dbRow.estado_piso || "", comentario: dbRow.comentario_piso || "" },
+        }
+        : ITEMS.reduce((acc, it) => {
+            const found = (dbRow.items || []).find((x) => x.item_key === it.key);
+            acc[it.key] = { estado: found?.estado || "", comentario: found?.comentario || "" };
+            return acc;
+        }, {});
+
     return {
         id: dbRow.id,
         fecha_registro: dbRow.fecha_registro,
@@ -79,14 +99,15 @@ const packRow = (dbRow) => {
         firma_encargado: dbRow.firma_encargado,
         verificacion_inocuidad: dbRow.verificacion_inocuidad,
         fecha_correccion: dbRow.fecha_correccion,
-        // nuevo: tipo limpieza + campos de revisión
         tipo_limpieza: dbRow.tipo_limpieza || "",
+
         revisado: dbRow.revisado ?? false,
         revisado_por_username: dbRow.revisado_por_username ?? null,
         revisado_fecha: dbRow.revisado_fecha ?? null,
         items: itemsMap,
     };
 };
+
 
 export default function LimpiezaHornoMultilevel() {
     const toast = useRef(null);
@@ -139,22 +160,30 @@ export default function LimpiezaHornoMultilevel() {
         try {
             setLoading(true);
             let query = supabase
-                .from("limpieza_horno_ml")
+                .from("limpieza_horno_ml_1")
                 .select(`
-          id,
-          fecha_registro,
-          hora_registro,
-          firma_encargado,
-          verificacion_inocuidad,
-          fecha_correccion,
-          tipo_limpieza,
-          revisado,
-          revisado_por_username,
-          revisado_fecha,
-          items:limpieza_horno_ml_items!limpieza_horno_ml_items_id_registro_fkey (
-            item_key, estado, comentario
-          )
-        `)
+        id,
+        fecha_registro,
+        hora_registro,
+        firma_encargado,
+        verificacion_inocuidad,
+        fecha_correccion,
+        tipo_limpieza,
+        revisado,
+        revisado_por_username,
+        revisado_fecha,
+        estado_bandas_transportadoras, comentario_bandas_transportadoras,
+        estado_dosificador_larva, comentario_dosificador_larva,
+        estado_banda_1, comentario_banda_1,
+        estado_banda_2, comentario_banda_2,
+        estado_banda_3, comentario_banda_3,
+        estado_banda_4, comentario_banda_4,
+        estado_banda_5, comentario_banda_5,
+        estado_compuertas_limpieza, comentario_compuertas_limpieza,
+        estado_bandas_enfriamiento, comentario_bandas_enfriamiento,
+        estado_canguilones, comentario_canguilones,
+        estado_piso, comentario_piso
+      `)
                 .order("fecha_registro", { ascending: false });
 
             if (filtroRevisado === "checked") query = query.eq("revisado", true);
@@ -170,6 +199,7 @@ export default function LimpiezaHornoMultilevel() {
             setLoading(false);
         }
     };
+
 
     useEffect(() => {
         fetchRegistros();
@@ -222,35 +252,38 @@ export default function LimpiezaHornoMultilevel() {
             return;
         }
         try {
-            // 1) Encabezado
-            const { data: enc, error: errEnc } = await supabase
-                .from("limpieza_horno_ml")
-                .insert([
-                    {
-                        fecha_registro: form.fecha_registro,
-                        hora_registro: form.hora_registro,
-                        firma_encargado: form.firma_encargado || null,
-                        verificacion_inocuidad: form.verificacion_inocuidad || null,
-                        tipo_limpieza: form.tipo_limpieza || null, // 👈 nuevo
-                        // fecha_correccion la pone la DB (DEFAULT now())
-                    },
-                ])
-                .select("id")
+            const p = (k) => ({
+                estado: form.items[k]?.estado,
+                comentario: form.items[k]?.comentario || null,
+            });
+
+            const payload = {
+                fecha_registro: form.fecha_registro,
+                hora_registro: form.hora_registro,
+                firma_encargado: form.firma_encargado || "",
+                verificacion_inocuidad: form.verificacion_inocuidad || null,
+                tipo_limpieza: form.tipo_limpieza, // obligatorio
+
+                estado_bandas_transportadoras: p("bandas_transportadoras").estado, comentario_bandas_transportadoras: p("bandas_transportadoras").comentario,
+                estado_dosificador_larva: p("dosificador_larva").estado, comentario_dosificador_larva: p("dosificador_larva").comentario,
+                estado_banda_1: p("banda_1").estado, comentario_banda_1: p("banda_1").comentario,
+                estado_banda_2: p("banda_2").estado, comentario_banda_2: p("banda_2").comentario,
+                estado_banda_3: p("banda_3").estado, comentario_banda_3: p("banda_3").comentario,
+                estado_banda_4: p("banda_4").estado, comentario_banda_4: p("banda_4").comentario,
+                estado_banda_5: p("banda_5").estado, comentario_banda_5: p("banda_5").comentario,
+                estado_compuertas_limpieza: p("compuertas_limpieza").estado, comentario_compuertas_limpieza: p("compuertas_limpieza").comentario,
+                estado_bandas_enfriamiento: p("bandas_enfriamiento").estado, comentario_bandas_enfriamiento: p("bandas_enfriamiento").comentario,
+                estado_canguilones: p("canguilones").estado, comentario_canguilones: p("canguilones").comentario,
+                estado_piso: p("piso").estado, comentario_piso: p("piso").comentario,
+            };
+
+            const { error } = await supabase
+                .from("limpieza_horno_ml_1")
+                .insert([payload])
+                .select("id, fecha_correccion")
                 .single();
 
-            if (errEnc) throw errEnc;
-            const newId = enc.id;
-
-            // 2) Detalle
-            const itemsInsert = ITEMS.map((it) => ({
-                id_registro: newId,
-                item_key: it.key,
-                estado: form.items[it.key]?.estado || "",
-                comentario: form.items[it.key]?.comentario || null,
-            }));
-
-            const { error: errDet } = await supabase.from("limpieza_horno_ml_items").insert(itemsInsert);
-            if (errDet) throw errDet;
+            if (error) throw error;
 
             showToast("success", "Éxito", "Registro guardado correctamente");
             await fetchRegistros();
@@ -262,6 +295,7 @@ export default function LimpiezaHornoMultilevel() {
             showToast("error", "Error", error.message || "No se pudo guardar el registro");
         }
     };
+
 
     const countBy = (row, val) =>
         ITEMS.reduce((acc, it) => acc + (row.items?.[it.key]?.estado === val ? 1 : 0), 0);
@@ -281,13 +315,14 @@ export default function LimpiezaHornoMultilevel() {
                 return;
             }
             const { error } = await supabase
-                .from("limpieza_horno_ml")
+                .from("limpieza_horno_ml_1")
                 .update({
                     revisado: next,
                     revisado_por_username: next ? username : null,
                     revisado_fecha: next ? new Date().toISOString() : null,
                 })
                 .eq("id", row.id);
+
 
             if (error) {
                 showToast("error", "No se guardó", error.message);

@@ -75,12 +75,48 @@ const emptyForm = () => ({
 });
 
 // DB -> UI
+// Reemplaza tu packRow por este:
 const packRow = (dbRow) => {
-    const map = ITEMS.reduce((acc, it) => {
-        const f = (dbRow.items || []).find((x) => x.item_key === it.key);
-        acc[it.key] = { estado: f?.estado || "", comentario: f?.comentario || "" };
-        return acc;
-    }, {});
+    const isWide =
+        dbRow.estado_of_pisos !== undefined ||
+        dbRow.estado_sr_pisos !== undefined ||
+        dbRow.estado_com_pisos !== undefined;
+
+    const items = isWide
+        ? {
+            // Oficinas
+            of_pisos: { estado: dbRow.estado_of_pisos || "", comentario: dbRow.comentario_of_pisos || "" },
+            of_muebles: { estado: dbRow.estado_of_muebles || "", comentario: dbRow.comentario_of_muebles || "" },
+            of_sillas_escritorios: { estado: dbRow.estado_of_sillas_escritorios || "", comentario: dbRow.comentario_of_sillas_escritorios || "" },
+            of_puerta: { estado: dbRow.estado_of_puerta || "", comentario: dbRow.comentario_of_puerta || "" },
+            of_recoleccion_basura: { estado: dbRow.estado_of_recoleccion_basura || "", comentario: dbRow.comentario_of_recoleccion_basura || "" },
+            of_ventanas: { estado: dbRow.estado_of_ventanas || "", comentario: dbRow.comentario_of_ventanas || "" },
+            of_cielos_falsos: { estado: dbRow.estado_of_cielos_falsos || "", comentario: dbRow.comentario_of_cielos_falsos || "" },
+
+            // Sala de Reuniones
+            sr_pisos: { estado: dbRow.estado_sr_pisos || "", comentario: dbRow.comentario_sr_pisos || "" },
+            sr_muebles: { estado: dbRow.estado_sr_muebles || "", comentario: dbRow.comentario_sr_muebles || "" },
+            sr_ventanas: { estado: dbRow.estado_sr_ventanas || "", comentario: dbRow.comentario_sr_ventanas || "" },
+            sr_cielos_falsos: { estado: dbRow.estado_sr_cielos_falsos || "", comentario: dbRow.comentario_sr_cielos_falsos || "" },
+
+            // Comedor
+            com_sillas_mesas: { estado: dbRow.estado_com_sillas_mesas || "", comentario: dbRow.comentario_com_sillas_mesas || "" },
+            com_recoleccion_basura: { estado: dbRow.estado_com_recoleccion_basura || "", comentario: dbRow.comentario_com_recoleccion_basura || "" },
+            com_dispensadores_agua: { estado: dbRow.estado_com_dispensadores_agua || "", comentario: dbRow.comentario_com_dispensadores_agua || "" },
+            com_pisos: { estado: dbRow.estado_com_pisos || "", comentario: dbRow.comentario_com_pisos || "" },
+            com_puerta_entrada: { estado: dbRow.estado_com_puerta_entrada || "", comentario: dbRow.comentario_com_puerta_entrada || "" },
+            com_microondas: { estado: dbRow.estado_com_microondas || "", comentario: dbRow.comentario_com_microondas || "" },
+            com_refrigeradoras: { estado: dbRow.estado_com_refrigeradoras || "", comentario: dbRow.comentario_com_refrigeradoras || "" },
+            com_techo: { estado: dbRow.estado_com_techo || "", comentario: dbRow.comentario_com_techo || "" },
+            com_persianas: { estado: dbRow.estado_com_persianas || "", comentario: dbRow.comentario_com_persianas || "" },
+            com_paredes: { estado: dbRow.estado_com_paredes || "", comentario: dbRow.comentario_com_paredes || "" },
+        }
+        : ITEMS.reduce((acc, it) => {
+            const f = (dbRow.items || []).find((x) => x.item_key === it.key);
+            acc[it.key] = { estado: f?.estado || "", comentario: f?.comentario || "" };
+            return acc;
+        }, {});
+
     return {
         id: dbRow.id,
         fecha_registro: dbRow.fecha_registro,
@@ -88,13 +124,13 @@ const packRow = (dbRow) => {
         firma_encargado: dbRow.firma_encargado,
         verificacion_inocuidad: dbRow.verificacion_inocuidad,
         fecha_correccion: dbRow.fecha_correccion,
-        // campos revisión
         revisado: dbRow.revisado ?? false,
         revisado_por_username: dbRow.revisado_por_username ?? null,
         revisado_fecha: dbRow.revisado_fecha ?? null,
-        items: map,
+        items,
     };
 };
+
 
 export default function LimpiezaOficinaReunionesComedor() {
     const toast = useRef(null);
@@ -123,25 +159,41 @@ export default function LimpiezaOficinaReunionesComedor() {
     const showToast = (severity, summary, detail, life = 3000) =>
         toast.current?.show({ severity, summary, detail, life });
 
+    // Reemplaza tu fetchRegistros por este:
     const fetchRegistros = async () => {
         try {
             setLoading(true);
+
             let query = supabase
-                .from("limpieza_oficina_reuniones_comedor")
+                .from("limpieza_oficina_reuniones_comedor_1")
                 .select(`
-          id,
-          fecha_registro,
-          hora_registro,
-          firma_encargado,
-          verificacion_inocuidad,
-          fecha_correccion,
-          revisado,
-          revisado_por_username,
-          revisado_fecha,
-          items:limpieza_oficina_reuniones_comedor_items!limpieza_oficina_reuniones_comedor_items_id_registro_fkey (
-            item_key, estado, comentario
-          )
-        `)
+        id, fecha_registro, hora_registro, firma_encargado, verificacion_inocuidad,
+        fecha_correccion, revisado, revisado_por_username, revisado_fecha,
+
+        estado_of_pisos, comentario_of_pisos,
+        estado_of_muebles, comentario_of_muebles,
+        estado_of_sillas_escritorios, comentario_of_sillas_escritorios,
+        estado_of_puerta, comentario_of_puerta,
+        estado_of_recoleccion_basura, comentario_of_recoleccion_basura,
+        estado_of_ventanas, comentario_of_ventanas,
+        estado_of_cielos_falsos, comentario_of_cielos_falsos,
+
+        estado_sr_pisos, comentario_sr_pisos,
+        estado_sr_muebles, comentario_sr_muebles,
+        estado_sr_ventanas, comentario_sr_ventanas,
+        estado_sr_cielos_falsos, comentario_sr_cielos_falsos,
+
+        estado_com_sillas_mesas, comentario_com_sillas_mesas,
+        estado_com_recoleccion_basura, comentario_com_recoleccion_basura,
+        estado_com_dispensadores_agua, comentario_com_dispensadores_agua,
+        estado_com_pisos, comentario_com_pisos,
+        estado_com_puerta_entrada, comentario_com_puerta_entrada,
+        estado_com_microondas, comentario_com_microondas,
+        estado_com_refrigeradoras, comentario_com_refrigeradoras,
+        estado_com_techo, comentario_com_techo,
+        estado_com_persianas, comentario_com_persianas,
+        estado_com_paredes, comentario_com_paredes
+      `)
                 .order("fecha_registro", { ascending: false });
 
             if (filtroRevisado === "checked") query = query.eq("revisado", true);
@@ -157,6 +209,7 @@ export default function LimpiezaOficinaReunionesComedor() {
             setLoading(false);
         }
     };
+
 
     useEffect(() => {
         fetchRegistros();
@@ -187,45 +240,59 @@ export default function LimpiezaOficinaReunionesComedor() {
         return errors;
     };
 
+    // Reemplaza tu save por este:
     const save = async () => {
         setSubmitted(true);
         const errs = validate();
-        if (errs.length) {
-            showToast("warn", "Validación", errs[0]);
-            return;
-        }
+        if (errs.length) { showToast("warn", "Validación", errs[0]); return; }
 
         try {
-            // 1) Encabezado
-            const { data: enc, error: errEnc } = await supabase
-                .from("limpieza_oficina_reuniones_comedor")
-                .insert([
-                    {
-                        fecha_registro: form.fecha_registro,
-                        hora_registro: form.hora_registro,
-                        firma_encargado: form.firma_encargado || null,
-                        verificacion_inocuidad: form.verificacion_inocuidad || null,
-                    },
-                ])
+            const p = (k) => ({
+                estado: form.items[k]?.estado || null,
+                comentario: form.items[k]?.comentario || null,
+            });
+
+            const payload = {
+                fecha_registro: form.fecha_registro,
+                hora_registro: form.hora_registro,
+                firma_encargado: form.firma_encargado || "",
+                verificacion_inocuidad: form.verificacion_inocuidad || null,
+
+                // Oficinas
+                estado_of_pisos: p("of_pisos").estado, comentario_of_pisos: p("of_pisos").comentario,
+                estado_of_muebles: p("of_muebles").estado, comentario_of_muebles: p("of_muebles").comentario,
+                estado_of_sillas_escritorios: p("of_sillas_escritorios").estado, comentario_of_sillas_escritorios: p("of_sillas_escritorios").comentario,
+                estado_of_puerta: p("of_puerta").estado, comentario_of_puerta: p("of_puerta").comentario,
+                estado_of_recoleccion_basura: p("of_recoleccion_basura").estado, comentario_of_recoleccion_basura: p("of_recoleccion_basura").comentario,
+                estado_of_ventanas: p("of_ventanas").estado, comentario_of_ventanas: p("of_ventanas").comentario,
+                estado_of_cielos_falsos: p("of_cielos_falsos").estado, comentario_of_cielos_falsos: p("of_cielos_falsos").comentario,
+
+
+                estado_sr_pisos: p("sr_pisos").estado, comentario_sr_pisos: p("sr_pisos").comentario,
+                estado_sr_muebles: p("sr_muebles").estado, comentario_sr_muebles: p("sr_muebles").comentario,
+                estado_sr_ventanas: p("sr_ventanas").estado, comentario_sr_ventanas: p("sr_ventanas").comentario,
+                estado_sr_cielos_falsos: p("sr_cielos_falsos").estado, comentario_sr_cielos_falsos: p("sr_cielos_falsos").comentario,
+
+                // Comedor
+                estado_com_sillas_mesas: p("com_sillas_mesas").estado, comentario_com_sillas_mesas: p("com_sillas_mesas").comentario,
+                estado_com_recoleccion_basura: p("com_recoleccion_basura").estado, comentario_com_recoleccion_basura: p("com_recoleccion_basura").comentario,
+                estado_com_dispensadores_agua: p("com_dispensadores_agua").estado, comentario_com_dispensadores_agua: p("com_dispensadores_agua").comentario,
+                estado_com_pisos: p("com_pisos").estado, comentario_com_pisos: p("com_pisos").comentario,
+                estado_com_puerta_entrada: p("com_puerta_entrada").estado, comentario_com_puerta_entrada: p("com_puerta_entrada").comentario,
+                estado_com_microondas: p("com_microondas").estado, comentario_com_microondas: p("com_microondas").comentario,
+                estado_com_refrigeradoras: p("com_refrigeradoras").estado, comentario_com_refrigeradoras: p("com_refrigeradoras").comentario,
+                estado_com_techo: p("com_techo").estado, comentario_com_techo: p("com_techo").comentario,
+                estado_com_persianas: p("com_persianas").estado, comentario_com_persianas: p("com_persianas").comentario,
+                estado_com_paredes: p("com_paredes").estado, comentario_com_paredes: p("com_paredes").comentario,
+            };
+
+            const { error } = await supabase
+                .from("limpieza_oficina_reuniones_comedor_1")
+                .insert([payload])
                 .select("id")
                 .single();
 
-            if (errEnc) throw errEnc;
-            const idReg = enc.id;
-
-            // 2) Detalle
-            const detalle = ITEMS.map((it) => ({
-                id_registro: idReg,
-                item_key: it.key,
-                estado: form.items[it.key]?.estado || "",
-                comentario: form.items[it.key]?.comentario || null,
-            }));
-
-            const { error: errDet } = await supabase
-                .from("limpieza_oficina_reuniones_comedor_items")
-                .insert(detalle);
-
-            if (errDet) throw errDet;
+            if (error) throw error;
 
             showToast("success", "Éxito", "Registro guardado correctamente");
             setDialogOpen(false);
@@ -237,6 +304,7 @@ export default function LimpiezaOficinaReunionesComedor() {
             showToast("error", "Error", e.message || "No se pudo guardar");
         }
     };
+
 
     const countBy = (row, val) => ITEMS.reduce((acc, it) => acc + (row.items?.[it.key]?.estado === val ? 1 : 0), 0);
 
@@ -250,13 +318,14 @@ export default function LimpiezaOficinaReunionesComedor() {
                 return;
             }
             const { error } = await supabase
-                .from("limpieza_oficina_reuniones_comedor")
+                .from("limpieza_oficina_reuniones_comedor_1")
                 .update({
                     revisado: next,
                     revisado_por_username: next ? username : null,
                     revisado_fecha: next ? new Date().toISOString() : null,
                 })
                 .eq("id", row.id);
+
 
             if (error) {
                 showToast("error", "No se guardó", error.message);

@@ -46,3 +46,19 @@
     align-items: center;
     margin-bottom: 16px;
 }
+
+/* Caja visual para separar Roedores / Hormigas */
+.plaga-box {
+    border: 2px solid #000;
+    /* si prefieres más suave, usa #cfd4d1 */
+    border-radius: 10px;
+    padding: 0.75rem 1rem 1rem;
+    margin: 0.75rem 0;
+    background: #fff;
+    /* respeta el tema */
+}
+
+/* Ya usas .subarea-title en otros módulos, aquí solo aseguramos separación */
+.plaga-box .subarea-title {
+    margin-bottom: 0.5rem;
+}

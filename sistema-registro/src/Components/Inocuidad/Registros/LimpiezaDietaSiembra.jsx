@@ -71,12 +71,41 @@ const emptyForm = () => ({
     }, {}),
 });
 
+// Convierte DB row -> modelo de la grilla (soporta esquema viejo y nuevo ancho)
 const packRow = (dbRow) => {
-    const itemsMap = ITEMS.reduce((acc, it) => {
-        const found = (dbRow.items || []).find((x) => x.item_key === it.key);
-        acc[it.key] = { estado: found?.estado || "", comentario: found?.comentario || "" };
-        return acc;
-    }, {});
+    const fromWide =
+        dbRow.estado_pisos !== undefined ||
+        dbRow.estado_maquina_mezcladora_1 !== undefined;
+
+    const itemsMap = fromWide
+        ? {
+            pisos: { estado: dbRow.estado_pisos || "", comentario: dbRow.comentario_pisos || "" },
+            maquina_mezcladora_1: { estado: dbRow.estado_maquina_mezcladora_1 || "", comentario: dbRow.comentario_maquina_mezcladora_1 || "" },
+            maquina_mezcladora_2: { estado: dbRow.estado_maquina_mezcladora_2 || "", comentario: dbRow.comentario_maquina_mezcladora_2 || "" },
+            pila: { estado: dbRow.estado_pila || "", comentario: dbRow.comentario_pila || "" },
+            herramientas_limpieza: { estado: dbRow.estado_herramientas_limpieza || "", comentario: dbRow.comentario_herramientas_limpieza || "" },
+            mesanine: { estado: dbRow.estado_mesanine || "", comentario: dbRow.comentario_mesanine || "" },
+            romana: { estado: dbRow.estado_romana || "", comentario: dbRow.comentario_romana || "" },
+            baldes_melaza: { estado: dbRow.estado_baldes_melaza || "", comentario: dbRow.comentario_baldes_melaza || "" },
+            recoleccion_basura: { estado: dbRow.estado_recoleccion_basura || "", comentario: dbRow.comentario_recoleccion_basura || "" },
+            carcamo_bombeo: { estado: dbRow.estado_carcamo_bombeo || "", comentario: dbRow.comentario_carcamo_bombeo || "" },
+            tornillo_sin_fin: { estado: dbRow.estado_tornillo_sin_fin || "", comentario: dbRow.comentario_tornillo_sin_fin || "" },
+            banda_plana: { estado: dbRow.estado_banda_plana || "", comentario: dbRow.comentario_banda_plana || "" },
+            banda_inclinada: { estado: dbRow.estado_banda_inclinada || "", comentario: dbRow.comentario_banda_inclinada || "" },
+            triturador: { estado: dbRow.estado_triturador || "", comentario: dbRow.comentario_triturador || "" },
+            tolva_cascara_1: { estado: dbRow.estado_tolva_cascara_1 || "", comentario: dbRow.comentario_tolva_cascara_1 || "" },
+            tolva_cascara_2: { estado: dbRow.estado_tolva_cascara_2 || "", comentario: dbRow.comentario_tolva_cascara_2 || "" },
+            tolva_cascara_3: { estado: dbRow.estado_tolva_cascara_3 || "", comentario: dbRow.comentario_tolva_cascara_3 || "" },
+            cano: { estado: dbRow.estado_cano || "", comentario: dbRow.comentario_cano || "" },
+            rampa_pila: { estado: dbRow.estado_rampa_pila || "", comentario: dbRow.comentario_rampa_pila || "" },
+            pila_cascara: { estado: dbRow.estado_pila_cascara || "", comentario: dbRow.comentario_pila_cascara || "" },
+        }
+        : ITEMS.reduce((acc, it) => {
+            const found = (dbRow.items || []).find((x) => x.item_key === it.key);
+            acc[it.key] = { estado: found?.estado || "", comentario: found?.comentario || "" };
+            return acc;
+        }, {});
+
     return {
         id: dbRow.id,
         fecha_registro: dbRow.fecha_registro,
@@ -84,13 +113,13 @@ const packRow = (dbRow) => {
         firma_encargado: dbRow.firma_encargado,
         verificacion_inocuidad: dbRow.verificacion_inocuidad,
         fecha_correccion: dbRow.fecha_correccion,
-        // campos de revisión
         revisado: dbRow.revisado ?? false,
         revisado_por_username: dbRow.revisado_por_username ?? null,
         revisado_fecha: dbRow.revisado_fecha ?? null,
         items: itemsMap,
     };
 };
+
 
 export default function LimpiezaDietaSiembra() {
     const toast = useRef(null);
@@ -142,21 +171,38 @@ export default function LimpiezaDietaSiembra() {
         try {
             setLoading(true);
             let query = supabase
-                .from("limpieza_dieta_siembra")
+                .from("limpieza_dieta_siembra_1")
                 .select(`
-          id,
-          fecha_registro,
-          hora_registro,
-          firma_encargado,
-          verificacion_inocuidad,
-          fecha_correccion,
-          revisado,
-          revisado_por_username,
-          revisado_fecha,
-          items:limpieza_dieta_siembra_items!limpieza_dieta_siembra_items_id_registro_fkey (
-            item_key, estado, comentario
-          )
-        `)
+        id,
+        fecha_registro,
+        hora_registro,
+        firma_encargado,
+        verificacion_inocuidad,
+        fecha_correccion,
+        revisado,
+        revisado_por_username,
+        revisado_fecha,
+        estado_pisos, comentario_pisos,
+        estado_maquina_mezcladora_1, comentario_maquina_mezcladora_1,
+        estado_maquina_mezcladora_2, comentario_maquina_mezcladora_2,
+        estado_pila, comentario_pila,
+        estado_herramientas_limpieza, comentario_herramientas_limpieza,
+        estado_mesanine, comentario_mesanine,
+        estado_romana, comentario_romana,
+        estado_baldes_melaza, comentario_baldes_melaza,
+        estado_recoleccion_basura, comentario_recoleccion_basura,
+        estado_carcamo_bombeo, comentario_carcamo_bombeo,
+        estado_tornillo_sin_fin, comentario_tornillo_sin_fin,
+        estado_banda_plana, comentario_banda_plana,
+        estado_banda_inclinada, comentario_banda_inclinada,
+        estado_triturador, comentario_triturador,
+        estado_tolva_cascara_1, comentario_tolva_cascara_1,
+        estado_tolva_cascara_2, comentario_tolva_cascara_2,
+        estado_tolva_cascara_3, comentario_tolva_cascara_3,
+        estado_cano, comentario_cano,
+        estado_rampa_pila, comentario_rampa_pila,
+        estado_pila_cascara, comentario_pila_cascara
+      `)
                 .order("fecha_registro", { ascending: false });
 
             if (filtroRevisado === "checked") query = query.eq("revisado", true);
@@ -172,6 +218,7 @@ export default function LimpiezaDietaSiembra() {
             setLoading(false);
         }
     };
+
 
     useEffect(() => {
         fetchRegistros();
@@ -215,37 +262,47 @@ export default function LimpiezaDietaSiembra() {
         }
         try {
             setSaving(true);
-            // 1) header
-            const { data: enc, error: errEnc } = await supabase
-                .from("limpieza_dieta_siembra")
-                .insert([
-                    {
-                        fecha_registro: form.fecha_registro,
-                        hora_registro: form.hora_registro,
-                        firma_encargado: form.firma_encargado || null,
-                        verificacion_inocuidad: form.verificacion_inocuidad || null,
-                        // fecha_correccion -> DB default now()
-                    },
-                ])
-                .select("id")
+
+            const p = (k) => ({
+                estado: form.items[k]?.estado,
+                comentario: form.items[k]?.comentario || null,
+            });
+
+            const payload = {
+                fecha_registro: form.fecha_registro,
+                hora_registro: form.hora_registro,
+                firma_encargado: form.firma_encargado || "",
+                verificacion_inocuidad: form.verificacion_inocuidad || null,
+
+                estado_pisos: p("pisos").estado, comentario_pisos: p("pisos").comentario,
+                estado_maquina_mezcladora_1: p("maquina_mezcladora_1").estado, comentario_maquina_mezcladora_1: p("maquina_mezcladora_1").comentario,
+                estado_maquina_mezcladora_2: p("maquina_mezcladora_2").estado, comentario_maquina_mezcladora_2: p("maquina_mezcladora_2").comentario,
+                estado_pila: p("pila").estado, comentario_pila: p("pila").comentario,
+                estado_herramientas_limpieza: p("herramientas_limpieza").estado, comentario_herramientas_limpieza: p("herramientas_limpieza").comentario,
+                estado_mesanine: p("mesanine").estado, comentario_mesanine: p("mesanine").comentario,
+                estado_romana: p("romana").estado, comentario_romana: p("romana").comentario,
+                estado_baldes_melaza: p("baldes_melaza").estado, comentario_baldes_melaza: p("baldes_melaza").comentario,
+                estado_recoleccion_basura: p("recoleccion_basura").estado, comentario_recoleccion_basura: p("recoleccion_basura").comentario,
+                estado_carcamo_bombeo: p("carcamo_bombeo").estado, comentario_carcamo_bombeo: p("carcamo_bombeo").comentario,
+                estado_tornillo_sin_fin: p("tornillo_sin_fin").estado, comentario_tornillo_sin_fin: p("tornillo_sin_fin").comentario,
+                estado_banda_plana: p("banda_plana").estado, comentario_banda_plana: p("banda_plana").comentario,
+                estado_banda_inclinada: p("banda_inclinada").estado, comentario_banda_inclinada: p("banda_inclinada").comentario,
+                estado_triturador: p("triturador").estado, comentario_triturador: p("triturador").comentario,
+                estado_tolva_cascara_1: p("tolva_cascara_1").estado, comentario_tolva_cascara_1: p("tolva_cascara_1").comentario,
+                estado_tolva_cascara_2: p("tolva_cascara_2").estado, comentario_tolva_cascara_2: p("tolva_cascara_2").comentario,
+                estado_tolva_cascara_3: p("tolva_cascara_3").estado, comentario_tolva_cascara_3: p("tolva_cascara_3").comentario,
+                estado_cano: p("cano").estado, comentario_cano: p("cano").comentario,
+                estado_rampa_pila: p("rampa_pila").estado, comentario_rampa_pila: p("rampa_pila").comentario,
+                estado_pila_cascara: p("pila_cascara").estado, comentario_pila_cascara: p("pila_cascara").comentario,
+            };
+
+            const { error } = await supabase
+                .from("limpieza_dieta_siembra_1")
+                .insert([payload])
+                .select("id, fecha_correccion")
                 .single();
 
-            if (errEnc) throw errEnc;
-            const newId = enc.id;
-
-            // 2) items
-            const itemsInsert = ITEMS.map((it) => ({
-                id_registro: newId,
-                item_key: it.key,
-                estado: form.items[it.key]?.estado || "",
-                comentario: form.items[it.key]?.comentario || null,
-            }));
-
-            const { error: errDet } = await supabase
-                .from("limpieza_dieta_siembra_items")
-                .insert(itemsInsert);
-
-            if (errDet) throw errDet;
+            if (error) throw error;
 
             showToast("success", "Éxito", "Registro guardado correctamente");
             await fetchRegistros();
@@ -259,6 +316,7 @@ export default function LimpiezaDietaSiembra() {
             setSaving(false);
         }
     };
+
 
     const countBy = (row, val) =>
         ITEMS.reduce((acc, it) => acc + (row.items?.[it.key]?.estado === val ? 1 : 0), 0);
@@ -278,13 +336,14 @@ export default function LimpiezaDietaSiembra() {
                 return;
             }
             const { error } = await supabase
-                .from("limpieza_dieta_siembra")
+                .from("limpieza_dieta_siembra_1")
                 .update({
                     revisado: next,
                     revisado_por_username: next ? username : null,
                     revisado_fecha: next ? new Date().toISOString() : null,
                 })
                 .eq("id", row.id);
+
 
             if (error) {
                 showToast("error", "No se guardó", error.message);
@@ -488,20 +547,20 @@ export default function LimpiezaDietaSiembra() {
                     </div>*/}
 
                     {/* Copiar en Supabase para ver los registros y poder exportarlos
-            SELECT
-  h.id,
-  h.fecha_registro,
-  h.hora_registro,
-  h.firma_encargado,
-  h.verificacion_inocuidad,
-  h.fecha_correccion,
-  i.item_key,
-  i.estado,
-  i.comentario
-FROM public.limpieza_dieta_siembra AS h
-JOIN public.limpieza_dieta_siembra_items AS i
-  ON i.id_registro = h.id
-ORDER BY h.fecha_registro DESC, h.id, i.item_key;">*/}
+                            SELECT
+                             h.id,
+                          h.fecha_registro,
+                          h.hora_registro,
+                        h.firma_encargado,
+                        h.verificacion_inocuidad,
+                      h.fecha_correccion,
+                      i.item_key,
+                      i.estado,
+                      i.comentario
+                    FROM public.limpieza_dieta_siembra AS h
+                    JOIN public.limpieza_dieta_siembra_items AS i
+                    ON i.id_registro = h.id
+                    ORDER BY h.fecha_registro DESC, h.id, i.item_key;">*/}
 
                     {ITEMS.map((it) => {
                         const val = form.items[it.key] || { estado: "", comentario: "" };

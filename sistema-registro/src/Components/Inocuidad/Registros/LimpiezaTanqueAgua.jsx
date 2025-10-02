@@ -56,11 +56,14 @@ const emptyForm = () => ({
 });
 
 const packRow = (dbRow) => {
-    const itemsMap = QUESTIONS.reduce((acc, q) => {
-        const found = (dbRow.items || []).find((x) => x.item_key === q.key);
-        acc[q.key] = { respuesta: found?.respuesta || "" };
-        return acc;
-    }, {});
+    // reconstruir el objeto items desde columnas anchas
+    const itemsMap = {
+        q3: { respuesta: dbRow.respuesta_q3 || "" },
+        q4: { respuesta: dbRow.respuesta_q4 || "" },
+        q13: { respuesta: dbRow.respuesta_q13 || "" },
+        q12: { respuesta: dbRow.respuesta_q12 || "" },
+    };
+
     return {
         id: dbRow.id,
         fecha_registro: dbRow.fecha_registro,
@@ -68,7 +71,7 @@ const packRow = (dbRow) => {
         ubicacion_tanque: dbRow.ubicacion_tanque,
         responsable_lavado: dbRow.responsable_lavado,
         fecha_proximo_lavado: dbRow.fecha_proximo_lavado,
-        fecha_correccion: dbRow.fecha_correccion, // ← “Fecha de Registro” del sistema
+        fecha_correccion: dbRow.fecha_correccion, // “Fecha de Registro” del sistema
         observaciones: dbRow.observaciones,
         // revisión
         revisado: dbRow.revisado ?? false,
@@ -77,6 +80,7 @@ const packRow = (dbRow) => {
         items: itemsMap,
     };
 };
+
 
 export default function LimpiezaTanqueAgua() {
     const toast = useRef(null);
@@ -103,13 +107,13 @@ export default function LimpiezaTanqueAgua() {
         try {
             setLoading(true);
             let query = supabase
-                .from("limpieza_tanque_agua")
+                .from("limpieza_tanque_agua_1")
                 .select(`
-          id, fecha_registro, hora_registro, ubicacion_tanque, responsable_lavado,
-          fecha_proximo_lavado, fecha_correccion, observaciones,
-          revisado, revisado_por_username, revisado_fecha,
-          items:limpieza_tanque_agua_items!limpieza_tanque_agua_items_id_registro_fkey ( item_key, respuesta )
-        `)
+        id, fecha_registro, hora_registro, ubicacion_tanque, responsable_lavado,
+        fecha_proximo_lavado, fecha_correccion, observaciones,
+        revisado, revisado_por_username, revisado_fecha,
+        respuesta_q3, respuesta_q4, respuesta_q13, respuesta_q12
+      `)
                 .order("fecha_registro", { ascending: false })
                 .order("created_at", { ascending: false });
 
@@ -126,6 +130,7 @@ export default function LimpiezaTanqueAgua() {
             setLoading(false);
         }
     };
+
 
     useEffect(() => {
         fetchRows();
@@ -164,32 +169,28 @@ export default function LimpiezaTanqueAgua() {
         }
 
         try {
-            // 1) encabezado
-            const { data: enc, error: errEnc } = await supabase
-                .from("limpieza_tanque_agua")
-                .insert([
-                    {
-                        fecha_registro: form.fecha_registro,
-                        hora_registro: form.hora_registro,
-                        ubicacion_tanque: form.ubicacion_tanque,
-                        responsable_lavado: form.responsable_lavado,
-                        fecha_proximo_lavado: form.fecha_proximo_lavado || null,
-                        observaciones: form.observaciones || null,
-                        // fecha_correccion -> la pone la DB (default now())
-                    },
-                ])
+            const payload = {
+                fecha_registro: form.fecha_registro,
+                hora_registro: form.hora_registro,
+                ubicacion_tanque: form.ubicacion_tanque,
+                responsable_lavado: form.responsable_lavado,
+                fecha_proximo_lavado: form.fecha_proximo_lavado || null,
+                observaciones: form.observaciones || null,
+
+                // 4 respuestas SI/NO
+                respuesta_q3: form.items.q3?.respuesta || null,
+                respuesta_q4: form.items.q4?.respuesta || null,
+                respuesta_q13: form.items.q13?.respuesta || null,
+                respuesta_q12: form.items.q12?.respuesta || null,
+            };
+
+            const { error } = await supabase
+                .from("limpieza_tanque_agua_1")
+                .insert([payload])
                 .select("id")
                 .single();
-            if (errEnc) throw errEnc;
 
-            // 2) detalle (solo 4 preguntas)
-            const detalle = QUESTIONS.map((q) => ({
-                id_registro: enc.id,
-                item_key: q.key,
-                respuesta: form.items[q.key]?.respuesta || "NO",
-            }));
-            const { error: errDet } = await supabase.from("limpieza_tanque_agua_items").insert(detalle);
-            if (errDet) throw errDet;
+            if (error) throw error;
 
             showToast("success", "Éxito", "Registro guardado");
             setDialogOpen(false);
@@ -201,6 +202,7 @@ export default function LimpiezaTanqueAgua() {
             showToast("error", "Error", e.message || "No se pudo guardar");
         }
     };
+
 
     const countBy = (row, val) =>
         QUESTIONS.reduce((acc, q) => acc + (row.items?.[q.key]?.respuesta === val ? 1 : 0), 0);
@@ -220,13 +222,14 @@ export default function LimpiezaTanqueAgua() {
                 return;
             }
             const { error } = await supabase
-                .from("limpieza_tanque_agua")
+                .from("limpieza_tanque_agua_1")
                 .update({
                     revisado: next,
                     revisado_por_username: next ? username : null,
                     revisado_fecha: next ? new Date().toISOString() : null,
                 })
                 .eq("id", row.id);
+
 
             if (error) {
                 showToast("error", "No se guardó", error.message);

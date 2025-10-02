@@ -66,13 +66,30 @@ const emptyForm = () => ({
   }, {}),
 });
 
-// Convierte el array de items (embed) a objeto por clave para la grilla
+// Convierte DB row -> modelo de la grilla (soporta esquema viejo y el nuevo "ancho")
 const packRow = (dbRow) => {
-  const itemsMap = LIMPIEZA_ITEMS.reduce((acc, it) => {
-    const found = (dbRow.items || []).find((x) => x.item_key === it.key);
-    acc[it.key] = { estado: found?.estado || "", comentario: found?.comentario || "" };
-    return acc;
-  }, {});
+  const fromWide =
+    dbRow.estado_romanas !== undefined ||
+    dbRow.estado_maquina_tamizadora !== undefined;
+
+  const itemsMap = fromWide
+    ? {
+      romanas: { estado: dbRow.estado_romanas || "", comentario: dbRow.comentario_romanas || "" },
+      maquina_tamizadora: { estado: dbRow.estado_maquina_tamizadora || "", comentario: dbRow.comentario_maquina_tamizadora || "" },
+      recipientes_plasticos: { estado: dbRow.estado_recipientes_plasticos || "", comentario: dbRow.comentario_recipientes_plasticos || "" },
+      pisos: { estado: dbRow.estado_pisos || "", comentario: dbRow.comentario_pisos || "" },
+      zarandas: { estado: dbRow.estado_zarandas || "", comentario: dbRow.comentario_zarandas || "" },
+      bines: { estado: dbRow.estado_bines || "", comentario: dbRow.comentario_bines || "" },
+      cano: { estado: dbRow.estado_cano || "", comentario: dbRow.comentario_cano || "" },
+      techos: { estado: dbRow.estado_techos || "", comentario: dbRow.comentario_techos || "" },
+      paredes: { estado: dbRow.estado_paredes || "", comentario: dbRow.comentario_paredes || "" },
+    }
+    : LIMPIEZA_ITEMS.reduce((acc, it) => {
+      const found = (dbRow.items || []).find((x) => x.item_key === it.key);
+      acc[it.key] = { estado: found?.estado || "", comentario: found?.comentario || "" };
+      return acc;
+    }, {});
+
   return {
     id: dbRow.id,
     fecha_registro: dbRow.fecha_registro,
@@ -81,18 +98,15 @@ const packRow = (dbRow) => {
     verificador_inocuidad: dbRow.verificador_inocuidad,
     firma_encargado: dbRow.firma_encargado,
     observaciones_generales: dbRow.observaciones_generales,
-
-    // 🟢 La BD guarda el timestamp en 'fecha_correccion' (default now()).
-    //     Lo exponemos como 'fecha_registro_sistema' para el front.
+    // la BD lo guarda como fecha_correccion (auto now())
     fecha_registro_sistema: dbRow.fecha_correccion,
-
-    // campos de revisión
     revisado: dbRow.revisado ?? false,
     revisado_por_username: dbRow.revisado_por_username ?? null,
     revisado_fecha: dbRow.revisado_fecha ?? null,
     items: itemsMap,
   };
 };
+
 
 function LimpiezaAreaCosecha() {
   const navigate = useNavigate();
@@ -125,23 +139,29 @@ function LimpiezaAreaCosecha() {
     setLoading(true);
     try {
       let query = supabase
-        .from("limpieza_cosecha")
+        .from("limpieza_cosecha_1")
         .select(`
-          id,
-          fecha_registro,
-          hora_registro,
-          responsable,
-          verificador_inocuidad,
-          firma_encargado,
-          observaciones_generales,
-          fecha_correccion,
-          revisado,
-          revisado_por_username,
-          revisado_fecha,
-          items:limpieza_cosecha_items!limpieza_cosecha_items_id_registro_fkey (
-            item_key, estado, comentario
-          )
-        `)
+        id,
+        fecha_registro,
+        hora_registro,
+        responsable,
+        verificador_inocuidad,
+        firma_encargado,
+        observaciones_generales,
+        fecha_correccion,
+        revisado,
+        revisado_por_username,
+        revisado_fecha,
+        estado_romanas, comentario_romanas,
+        estado_maquina_tamizadora, comentario_maquina_tamizadora,
+        estado_recipientes_plasticos, comentario_recipientes_plasticos,
+        estado_pisos, comentario_pisos,
+        estado_zarandas, comentario_zarandas,
+        estado_bines, comentario_bines,
+        estado_cano, comentario_cano,
+        estado_techos, comentario_techos,
+        estado_paredes, comentario_paredes
+      `)
         .order("fecha_registro", { ascending: false });
 
       if (filtroRevisado === "checked") query = query.eq("revisado", true);
@@ -157,6 +177,7 @@ function LimpiezaAreaCosecha() {
       setLoading(false);
     }
   };
+
 
   useEffect(() => {
     fetchRows();
@@ -199,35 +220,49 @@ function LimpiezaAreaCosecha() {
     }
 
     try {
-      // 1) Inserta encabezado (BD generará 'fecha_correccion' = now())
-      const { data: enc, error: errEnc } = await supabase
-        .from("limpieza_cosecha")
-        .insert([
-          {
-            fecha_registro: form.fecha_registro,
-            hora_registro: form.hora_registro,
-            responsable: form.responsable,
-            verificador_inocuidad: form.verificador_inocuidad || null,
-            firma_encargado: form.firma_encargado || null,
-            observaciones_generales: form.observaciones_generales || null,
-          },
-        ])
-        .select("id, fecha_correccion") // leemos el timestamp real generado por la BD
+      const payload = {
+        fecha_registro: form.fecha_registro,
+        hora_registro: form.hora_registro,
+        responsable: form.responsable,
+        verificador_inocuidad: form.verificador_inocuidad || null,
+        firma_encargado: form.firma_encargado || null,
+        observaciones_generales: form.observaciones_generales || null,
+
+        estado_romanas: form.items.romanas?.estado,
+        comentario_romanas: form.items.romanas?.comentario || null,
+
+        estado_maquina_tamizadora: form.items.maquina_tamizadora?.estado,
+        comentario_maquina_tamizadora: form.items.maquina_tamizadora?.comentario || null,
+
+        estado_recipientes_plasticos: form.items.recipientes_plasticos?.estado,
+        comentario_recipientes_plasticos: form.items.recipientes_plasticos?.comentario || null,
+
+        estado_pisos: form.items.pisos?.estado,
+        comentario_pisos: form.items.pisos?.comentario || null,
+
+        estado_zarandas: form.items.zarandas?.estado,
+        comentario_zarandas: form.items.zarandas?.comentario || null,
+
+        estado_bines: form.items.bines?.estado,
+        comentario_bines: form.items.bines?.comentario || null,
+
+        estado_cano: form.items.cano?.estado,
+        comentario_cano: form.items.cano?.comentario || null,
+
+        estado_techos: form.items.techos?.estado,
+        comentario_techos: form.items.techos?.comentario || null,
+
+        estado_paredes: form.items.paredes?.estado,
+        comentario_paredes: form.items.paredes?.comentario || null,
+      };
+
+      const { error } = await supabase
+        .from("limpieza_cosecha_1")
+        .insert([payload])
+        .select("id, fecha_correccion")
         .single();
 
-      if (errEnc) throw errEnc;
-      const id_registro = enc.id;
-
-      // 2) Inserta detalle
-      const itemsInsert = LIMPIEZA_ITEMS.map((it) => ({
-        id_registro,
-        item_key: it.key,
-        estado: form.items[it.key]?.estado || "",
-        comentario: form.items[it.key]?.comentario || null,
-      }));
-
-      const { error: errDet } = await supabase.from("limpieza_cosecha_items").insert(itemsInsert);
-      if (errDet) throw errDet;
+      if (error) throw error;
 
       showToast("success", "Guardado", "Registro creado");
       setDialogOpen(false);
@@ -239,6 +274,7 @@ function LimpiezaAreaCosecha() {
       showToast("error", "Error", e.message || "No se pudo guardar");
     }
   };
+
 
   const flattenForExport = (r) => {
     const flat = {
@@ -298,13 +334,14 @@ function LimpiezaAreaCosecha() {
         return;
       }
       const { error } = await supabase
-        .from("limpieza_cosecha")
+        .from("limpieza_cosecha_1")
         .update({
           revisado: next,
           revisado_por_username: next ? username : null,
           revisado_fecha: next ? new Date().toISOString() : null,
         })
         .eq("id", row.id);
+
 
       if (error) {
         showToast("error", "No se guardó", error.message);
