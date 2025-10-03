@@ -16,10 +16,10 @@ import { Dropdown } from "primereact/dropdown";
 import { Checkbox } from "primereact/checkbox";
 import * as XLSX from "xlsx";
 
-// ✅ Permisos (ajusta la ruta si difiere)
+// Permisos (ajusta la ruta si difiere)
 import useCanReview from "./Hooks/useCanReview.js";
 
-/* ---------- SOLO las 4 preguntas requeridas ---------- */
+/* ---------- SOLO las 4 preguntas requeidas ---------- */
 const QUESTIONS = [
     { key: "q3", label: "¿Verificó el estado detuberías/válvulas/grietas/desgaste del tanque?" },
     { key: "q4", label: "¿Removió residuos sólidos del fondo del tanque?" },
