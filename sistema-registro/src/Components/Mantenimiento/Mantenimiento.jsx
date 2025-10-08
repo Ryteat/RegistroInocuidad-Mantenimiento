@@ -47,11 +47,11 @@ export default function Mantenimiento() {
         <>
           <h1>
             <img src={logo2} alt="mosca" className="logo2" />
-            Registros de Mantenimiento
+            Registros de Transporte
           </h1>
 
           <div className="welcome-message">
-            <p>Esta es la página de registros de mantenimiento.</p>
+            <p>Esta es la página de registros de Transporte.</p>
           </div>
 
           <div className="grid-botones">

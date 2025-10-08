@@ -38,6 +38,10 @@ import PagesLimpiezaOficinaReunionesComedor from './pages/Inocuidad/Registros/Pa
 import PagesControlPlagasRoedores from './pages/Inocuidad/Registros/PagesControlPlagasRoedores.jsx';
 import PagesLimpiezaTanqueAgua from "./pages/Inocuidad/Registros/PagesLimpiezaTanqueAgua.jsx";
 
+//imports de paginas de MantenimientoAlertas
+import PagesMantenimientoAlertas from './pages/MantenimientoAlertas/PagesMantenimientoAlertas.jsx';
+
+
 //control de tiempos imports
 import ControlTiempos from './pages/ControlTiempos/PagesControlTiempos.jsx';
 

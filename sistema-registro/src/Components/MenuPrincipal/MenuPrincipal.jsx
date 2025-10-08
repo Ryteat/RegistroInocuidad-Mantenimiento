@@ -68,7 +68,7 @@ function MenuPrincipal() {
       cols: 1
     },
     {
-      texto: 'Registros Mantenimiento',
+      texto: 'Registros Transporte',
       ruta: '/Mantenimiento',
       departamentos: ['Mantenimiento'],
       cols: 1
@@ -77,6 +77,12 @@ function MenuPrincipal() {
       texto: 'Registros Inocuidad',
       ruta: '/Inocuidad',
       departamentos: ['Inocuidad'],
+      cols: 1
+    },
+    {
+      texto: 'Alertas de Mantenimiento',
+      ruta: '/MantenimientoAlertas',
+      departamentos: ['MantenimientoAlertas'],
       cols: 1
     },
     {
@@ -90,7 +96,8 @@ function MenuPrincipal() {
       ruta: '/Visualizar',
       departamentos: ['Visualizar'],
       cols: 2  // Este ocupará dos columnas
-    }
+    },
+
   ];
 
   return (
