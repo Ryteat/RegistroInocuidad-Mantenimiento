@@ -1,4 +1,5 @@
-import React, { useEffect, useRef, useState, useMemo } from "react";
+// Components/Inocuidad/Registros/ControlPlagasRoedores.jsx
+import React, { useEffect, useRef, useState, useMemo, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import supabase from "../../../supabaseClient";
 import logo2 from "../../../assets/mosca.png";
@@ -17,21 +18,12 @@ import { Checkbox } from "primereact/checkbox";
 import { MultiSelect } from "primereact/multiselect";
 import * as XLSX from "xlsx";
 
-
-{/* PARA VERIFICAR EN SUPA BASE
-     SELECT *
-FROM public.control_plagas_roedores
-ORDER BY fecha_registro DESC, hora_registro DESC
-LIMIT 10;
-*/}
-// permiso de revisión (igual que en otros módulos)
 import useCanReview from "./Hooks/useCanReview.js";
 
 const todayISO = () => new Date().toISOString().slice(0, 10);
 const nowHM = () =>
     new Date().toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit", hour12: false });
 
-/** Áreas y estaciones (según tu Excel) */
 const AREAS = [
     { label: "Dieta", value: "DIETA" },
     { label: "Engorde", value: "ENGORDE" },
@@ -66,7 +58,6 @@ const opcionesSiNo = [
     { label: "No", value: false },
 ];
 
-// Indicadores de roedores (MultiSelect)
 const ROEDORES_INDICADORES = [
     { key: "E", label: "E (Excremento)" },
     { key: "CM", label: "CM (Cebo mordido)" },
@@ -77,28 +68,28 @@ const ROEDORES_INDICADORES = [
 ];
 const ROEDORES_MS_OPTIONS = ROEDORES_INDICADORES.map((o) => ({ label: o.label, value: o.key }));
 
-// Indicador de hormigas (Dropdown de una sola opción IV)
 const HORMIGAS_OPTIONS = [{ label: "IV (Individuos vivos)", value: "IV" }];
 
 const emptyForm = () => ({
     fecha_registro: todayISO(),
     hora_registro: nowHM(),
+    firma_encargado: "",
     area: "",
     ubicacion_estacion: "",
     numero_estacion: null,
 
-    evidencia_roedores: null,
+    // ✅ ahora son independientes
+    evidencia_roedores: null,   // Sí/No
+    roedores_indicadores: [],   // si evidencia_roedores === true → requerido
+
     cambio_agente_control: null,
 
-    // Sección dinámica
-    roedores_indicadores: [], // MultiSelect -> array de códigos
-    plaga_hormigas: false, // “Evidencia de Hormigas” (Sí/No)
-    hormigas_indicador: "", // "IV" cuando aplica
+    plaga_hormigas: null,       // Sí/No independiente
+    hormigas_indicador: "",     // si plaga_hormigas === true → requerido
 
-    tiene_observacion: false,
     observaciones: "",
-
     revisado: false,
+
     fecha_correccion_preview: new Date().toLocaleString(),
 });
 
@@ -115,13 +106,12 @@ export default function ControlPlagasRoedores() {
     const [submitted, setSubmitted] = useState(false);
     const [form, setForm] = useState(emptyForm());
 
-    const [filtroRevisado, setFiltroRevisado] = useState("all"); // 'all' | 'checked' | 'unchecked'
+    const [filtroRevisado, setFiltroRevisado] = useState("all");
     const { canReview, username } = useCanReview();
 
     const showToast = (severity, summary, detail, life = 3000) =>
         toast.current?.show({ severity, summary, detail, life });
 
-    // Fetch con filtro revisado
     const fetchRows = async () => {
         try {
             setLoading(true);
@@ -171,18 +161,16 @@ export default function ControlPlagasRoedores() {
             return setForm((p) => ({ ...p, ubicacion_estacion: value, numero_estacion: null }));
 
         if (field === "evidencia_roedores") {
-            // Si NO hay evidencia, limpiar todo lo dependiente
+            // si NO hay evidencias de roedores, limpia indicadores
             return setForm((p) => ({
                 ...p,
                 evidencia_roedores: value,
                 roedores_indicadores: value ? p.roedores_indicadores : [],
-                plaga_hormigas: value ? p.plaga_hormigas : false,
-                hormigas_indicador: value ? p.hormigas_indicador : "",
             }));
         }
 
         if (field === "plaga_hormigas" && !value) {
-            // Si el usuario marca "No" en Evidencia de Hormigas, limpia el indicador
+            // si NO hay hormigas, limpia indicador
             return setForm((p) => ({ ...p, plaga_hormigas: false, hormigas_indicador: "" }));
         }
 
@@ -191,27 +179,26 @@ export default function ControlPlagasRoedores() {
 
     const validate = () => {
         const errs = [];
+        if (!form.firma_encargado?.trim()) errs.push("Ingrese el Operario.");
         if (!form.area) errs.push("Seleccione el área.");
         if (!form.ubicacion_estacion) errs.push("Seleccione la ubicación de la estación.");
         if (form.numero_estacion === null) errs.push("Seleccione el número de estación.");
-        if (form.evidencia_roedores === null) errs.push("Indique si hay evidencia de roedores.");
         if (form.cambio_agente_control === null) errs.push("Indique si hubo cambio de agente de control.");
 
-        if (form.evidencia_roedores === true) {
-            if (form.roedores_indicadores.length === 0) {
-                errs.push("Seleccione al menos un indicador de roedores (E, CM, P, MC, IV o IM).");
-            }
-            if (form.plaga_hormigas === null) {
-                errs.push("Indique si hay evidencia de hormigas.");
-            }
-            if (form.plaga_hormigas === true && !form.hormigas_indicador) {
-                errs.push("Seleccione el indicador de hormigas (IV).");
-            }
+        // ✅ Roedores con SI/NO primero, y luego indicadores requeridos solo si es Sí
+        if (form.evidencia_roedores === null) {
+            errs.push("Indique si hay evidencia de roedores.");
+        } else if (form.evidencia_roedores === true && form.roedores_indicadores.length === 0) {
+            errs.push("Seleccione al menos un indicador de roedores (E, CM, P, MC, IV o IM).");
         }
 
-        if (form.tiene_observacion && !form.observaciones.trim()) {
-            errs.push("Ingrese la observación/comentario.");
+        // ✅ Hormigas independiente
+        if (form.plaga_hormigas === null) {
+            errs.push("Indique si hay evidencia de hormigas.");
+        } else if (form.plaga_hormigas === true && !form.hormigas_indicador) {
+            errs.push("Seleccione el indicador de hormigas (IV).");
         }
+
         return errs;
     };
 
@@ -226,24 +213,26 @@ export default function ControlPlagasRoedores() {
             const payload = {
                 fecha_registro: form.fecha_registro,
                 hora_registro: form.hora_registro,
+                firma_encargado: form.firma_encargado || "",
                 area: form.area,
                 ubicacion_estacion: form.ubicacion_estacion,
                 numero_estacion: form.numero_estacion,
 
-                evidencia_roedores: !!form.evidencia_roedores,
                 cambio_agente_control: !!form.cambio_agente_control,
 
-                // Guardado:
-                plaga_roedores: !!form.evidencia_roedores, // si hay evidencia de roedores -> true
+                // Roedores
+                evidencia_roedores: !!form.evidencia_roedores,
+                plaga_roedores: !!form.evidencia_roedores,
                 roedores_indicadores:
                     form.evidencia_roedores && form.roedores_indicadores.length
                         ? form.roedores_indicadores.join(",")
                         : null,
 
-                plaga_hormigas: form.evidencia_roedores ? !!form.plaga_hormigas : false,
-                hormigas_iv: form.evidencia_roedores && form.plaga_hormigas ? form.hormigas_indicador === "IV" : false,
+                // Hormigas (independiente)
+                plaga_hormigas: !!form.plaga_hormigas,
+                hormigas_iv: form.plaga_hormigas ? form.hormigas_indicador === "IV" : false,
 
-                observaciones: form.tiene_observacion ? form.observaciones.trim() : null,
+                observaciones: form.observaciones?.trim() ? form.observaciones.trim() : null,
             };
 
             const { error } = await supabase.from("control_plagas_roedores").insert([payload]);
@@ -259,113 +248,142 @@ export default function ControlPlagasRoedores() {
     };
 
     const exportXlsx = () => {
-        if (selected.length === 0) {
-            showToast("warn", "Advertencia", "Seleccione registros");
+        const dataset = selected.length ? selected : rows;
+        if (!dataset.length) {
+            showToast("warn", "Advertencia", "No hay registros para exportar");
             return;
         }
         const toFlat = (r) => ({
             fecha: r.fecha_registro,
             hora: r.hora_registro,
+            operario: r.firma_encargado || "",
             area: r.area || "",
             ubicacion_estacion: r.ubicacion_estacion || "",
             numero_estacion: r.numero_estacion ?? "",
             evidencia_roedores: r.evidencia_roedores ? "Sí" : "No",
-            cambio_agente_control: r.cambio_agente_control ? "Sí" : "No",
-            plaga_roedores: r.plaga_roedores ? "Sí" : "No",
             roedores_indicadores: r.roedores_indicadores || "",
             plaga_hormigas: r.plaga_hormigas ? "Sí" : "No",
             hormigas_iv: r.hormigas_iv ? "Sí" : "No",
-            revisado: r.revisado ? "Sí" : "No",
+            cambio_agente_control: r.cambio_agente_control ? "Sí" : "No",
             observaciones: r.observaciones || "",
-            fecha_correccion: r.fecha_correccion ? new Date(r.fecha_correccion).toLocaleString() : "",
+            revisado: r.revisado ? "Sí" : "No",
+            fecha_registro_sistema: r.fecha_correccion ? new Date(r.fecha_correccion).toLocaleString() : "",
         });
-        const ws = XLSX.utils.json_to_sheet(selected.map(toFlat));
+        const ws = XLSX.utils.json_to_sheet(dataset.map(toFlat));
         const wb = XLSX.utils.book_new();
         XLSX.utils.book_append_sheet(wb, ws, "Control Plagas - Roedores");
         XLSX.writeFile(wb, `Control_Plagas_Roedores_${new Date().toISOString().slice(0, 10)}.xlsx`);
     };
 
-    const { canReview: _canReview } = useCanReview();
-
-    const revisadoTemplate = (row) => {
-        if (!_canReview) return <span>{row.revisado ? "Sí" : "No"}</span>;
-
-        const onToggle = async (next) => {
-            if (!username) {
-                showToast("warn", "Sesión", "No se detectó el usuario actual.");
-                return;
-            }
-            const { error } = await supabase
-                .from("control_plagas_roedores")
-                .update({
-                    revisado: next,
-                    revisado_por_username: next ? username : null,
-                    revisado_fecha: next ? new Date().toISOString() : null,
-                })
-                .eq("id", row.id);
-
-            if (error) {
-                showToast("error", "No se guardó", error.message);
-                return;
-            }
-            setRows((prev) =>
-                prev.map((r) =>
-                    r.id === row.id
-                        ? {
-                            ...r,
-                            revisado: next,
-                            revisado_por_username: next ? username : null,
-                            revisado_fecha: next ? new Date().toISOString() : null,
-                        }
-                        : r
-                )
-            );
-            showToast("success", "OK", next ? "Marcado revisado" : "Marcado no revisado");
-        };
-
-        return (
-            <div className="flex align-items-center justify-content-center gap-2">
-                <Checkbox inputId={`chk-rev-plg-${row.id}`} checked={!!row.revisado} onChange={(e) => onToggle(e.checked)} />
-                <label htmlFor={`chk-rev-plg-${row.id}`} className="text-sm">
-                    Revisado
-                </label>
-            </div>
-        );
-    };
-
-    const plagaResumen = (r) => {
+    const plagaResumen = useCallback((r) => {
         const parts = [];
         if (r.plaga_roedores) parts.push(`Roedores [${r.roedores_indicadores || "-"}]`);
         if (r.plaga_hormigas) parts.push(`Hormigas [${r.hormigas_iv ? "IV" : "-"}]`);
         return parts.length ? parts.join(" | ") : "—";
-    };
+    }, []);
 
-    const header = (
-        <div className="flex flex-wrap gap-2 align-items-center justify-content-between">
-            <span className="p-input-icon-left">
-                <i className="pi pi-search" />
-                <InputText
-                    type="search"
-                    value={globalFilter}
-                    onInput={(e) => setGlobalFilter(e.target.value)}
-                    placeholder="Buscar Registros"
-                />
-            </span>
+    const { canReview: _canReview } = useCanReview();
+    const revisadoTemplate = useCallback(
+        (row) => {
+            if (!_canReview) return <span>{row.revisado ? "Sí" : "No"}</span>;
 
-            <div className="flex align-items-center gap-2">
-                <span className="text-sm font-medium">Filtro:</span>
-                <Dropdown
-                    value={filtroRevisado}
-                    onChange={(e) => setFiltroRevisado(e.value)}
-                    options={[
-                        { label: "Todos", value: "all" },
-                        { label: "Revisado", value: "checked" },
-                        { label: "Sin revisar", value: "unchecked" },
-                    ]}
-                    style={{ minWidth: 160 }}
-                />
+            const onToggle = async (next) => {
+                if (!username) {
+                    showToast("warn", "Sesión", "No se detectó el usuario actual.");
+                    return;
+                }
+                const { error } = await supabase
+                    .from("control_plagas_roedores")
+                    .update({
+                        revisado: next,
+                        revisado_por_username: next ? username : null,
+                        revisado_fecha: next ? new Date().toISOString() : null,
+                    })
+                    .eq("id", row.id);
+
+                if (error) {
+                    showToast("error", "No se guardó", error.message);
+                    return;
+                }
+                setRows((prev) =>
+                    prev.map((r) =>
+                        r.id === row.id
+                            ? {
+                                ...r,
+                                revisado: next,
+                                revisado_por_username: next ? username : null,
+                                revisado_fecha: next ? new Date().toISOString() : null,
+                            }
+                            : r
+                    )
+                );
+                showToast("success", "OK", next ? "Marcado revisado" : "Marcado no revisado");
+            };
+
+            return (
+                <div className="flex align-items-center justify-content-center gap-2">
+                    <Checkbox inputId={`chk-rev-plg-${row.id}`} checked={!!row.revisado} onChange={(e) => onToggle(e.checked)} />
+                    <label htmlFor={`chk-rev-plg-${row.id}`} className="text-sm">Revisado</label>
+                </div>
+            );
+        },
+        [_canReview, username]
+    );
+
+    const header = useMemo(
+        () => (
+            <div className="flex flex-wrap gap-2 align-items-center justify-content-between">
+                <span className="p-input-icon-left">
+                    <i className="pi pi-search" />
+                    <InputText
+                        type="search"
+                        value={globalFilter}
+                        onInput={(e) => setGlobalFilter(e.target.value)}
+                        placeholder="Buscar Registros"
+                    />
+                </span>
+
+                <div className="flex align-items-center gap-2">
+                    <span className="text-sm font-medium">Filtro:</span>
+                    <Dropdown
+                        value={filtroRevisado}
+                        onChange={(e) => setFiltroRevisado(e.value)}
+                        options={[
+                            { label: "Todos", value: "all" },
+                            { label: "Revisado", value: "checked" },
+                            { label: "Sin revisar", value: "unchecked" },
+                        ]}
+                        style={{ minWidth: 160 }}
+                    />
+                </div>
             </div>
-        </div>
+        ),
+        [globalFilter, filtroRevisado]
+    );
+
+    const columns = useMemo(
+        () => [
+            <Column key="sel" selectionMode="multiple" exportable={false} />,
+            <Column key="fec" field="fecha_registro" header="Fecha" sortable />,
+            <Column key="hor" field="hora_registro" header="Hora" />,
+            <Column key="ope" field="firma_encargado" header="Operario" />,
+            <Column key="are" field="area" header="Área" sortable />,
+            <Column key="ubi" field="ubicacion_estacion" header="Ubicación" sortable />,
+            <Column key="num" field="numero_estacion" header="Nº Estación" sortable />,
+            <Column key="evr" header="Evidencia de roedores" body={(r) => (r.evidencia_roedores ? "Sí" : "No")} sortable />,
+            <Column key="cac" header="Cambio agente de control" body={(r) => (r.cambio_agente_control ? "Sí" : "No")} sortable />,
+            <Column key="plg" header="Plaga detectada" body={plagaResumen} />,
+            <Column key="obs" field="observaciones" header="Observaciones" body={(r) => r.observaciones || "—"} />,
+            <Column
+                key="fcr"
+                field="fecha_correccion"
+                header="Fecha de Registro"
+                body={(r) => (r.fecha_correccion ? new Date(r.fecha_correccion).toLocaleString() : "—")}
+                sortable
+            />,
+            <Column key="rev" header="Revisado" body={revisadoTemplate} style={{ width: "10rem", textAlign: "center" }} />,
+        ],
+        [plagaResumen, revisadoTemplate]
     );
 
     return (
@@ -377,23 +395,18 @@ export default function ControlPlagasRoedores() {
             </h1>
 
             <div className="welcome-message">
-                <p>
-                    <b>Hoja de chequeo de estaciones de Control de Plagas y Roedores:</b>
-                </p>
+                <p><b>Hoja de chequeo de estaciones de Control de Plagas y Roedores:</b></p>
             </div>
 
-
             <div className="buttons-container">
-                <button onClick={() => navigate(-1)} className="return-button">Volver</button>
-                <button onClick={() => navigate(-2)} className="menu-button">Menú principal</button>
+                <button type="button" onClick={() => navigate(-1)} className="return-button">Volver</button>
+                <button type="button" onClick={() => navigate(-2)} className="menu-button">Menú principal</button>
             </div>
 
             <Toolbar
                 className="mb-4"
                 left={() => <Button label="Nuevo" icon="pi pi-plus" severity="success" onClick={openNew} />}
-                right={() => (
-                    <Button label="Exportar a Excel" icon="pi pi-upload" className="p-button-help" onClick={exportXlsx} />
-                )}
+                right={() => <Button label="Exportar a Excel" icon="pi pi-upload" className="p-button-help" onClick={exportXlsx} />}
             />
 
             <DataTable
@@ -412,29 +425,13 @@ export default function ControlPlagasRoedores() {
                 dataKey="id"
                 showGridlines
             >
-                <Column selectionMode="multiple" exportable={false} />
-                <Column field="fecha_registro" header="Fecha" sortable />
-                <Column field="hora_registro" header="Hora" />
-                <Column field="area" header="Área" sortable />
-                <Column field="ubicacion_estacion" header="Ubicación" sortable />
-                <Column field="numero_estacion" header="Nº Estación" sortable />
-                <Column header="Evidencia de roedores" body={(r) => (r.evidencia_roedores ? "Sí" : "No")} sortable />
-                <Column header="Cambio agente de control" body={(r) => (r.cambio_agente_control ? "Sí" : "No")} sortable />
-                <Column header="Plaga detectada" body={plagaResumen} />
-                <Column field="observaciones" header="Observaciones" body={(r) => r.observaciones || "—"} />
-                <Column
-                    field="fecha_correccion"
-                    header="Fecha de Registro"
-                    body={(r) => (r.fecha_correccion ? new Date(r.fecha_correccion).toLocaleString() : "—")}
-                    sortable
-                />
-                <Column header="Revisado" body={revisadoTemplate} style={{ width: "10rem", textAlign: "center" }} />
+                {columns}
             </DataTable>
 
             {/* Dialog */}
             <Dialog
                 visible={dialogOpen}
-                style={{ width: "58vw", maxWidth: 980 }}
+                style={{ width: "60vw", maxWidth: 1000 }}
                 header="Nuevo registro de control de plagas"
                 modal
                 onHide={hideDialog}
@@ -455,11 +452,20 @@ export default function ControlPlagasRoedores() {
                         <InputText type="time" value={form.hora_registro} onChange={(e) => onChange("hora_registro", e.target.value)} />
                     </div>
                     <div className="field col-12 md:col-4">
-                        <label className="font-bold">Área* {submitted && !form.area && <small className="p-error"> Requerido</small>}</label>
+                        <label className="font-bold">
+                            Operario* {submitted && !form.firma_encargado?.trim() && <small className="p-error"> Requerido</small>}
+                        </label>
+                        <InputText value={form.firma_encargado} onChange={(e) => onChange("firma_encargado", e.target.value)} />
+                    </div>
+
+                    <div className="field col-12 md:col-4">
+                        <label className="font-bold">
+                            Área* {submitted && !form.area && <small className="p-error"> Requerido</small>}
+                        </label>
                         <Dropdown value={form.area} options={AREAS} onChange={(e) => onChange("area", e.value)} placeholder="Seleccione" />
                     </div>
 
-                    <div className="field col-12 md:col-6">
+                    <div className="field col-12 md:col-4">
                         <label className="font-bold">
                             Ubicación de estación* {submitted && !form.ubicacion_estacion && <small className="p-error"> Requerido</small>}
                         </label>
@@ -472,7 +478,7 @@ export default function ControlPlagasRoedores() {
                         />
                     </div>
 
-                    <div className="field col-12 md:col-6">
+                    <div className="field col-12 md:col-4">
                         <label className="font-bold">
                             Nº de estación* {submitted && form.numero_estacion === null && <small className="p-error"> Requerido</small>}
                         </label>
@@ -484,13 +490,10 @@ export default function ControlPlagasRoedores() {
                             disabled={!form.area || !form.ubicacion_estacion}
                         />
                     </div>
-                    {/* Cambio de agente de control (Sí/No) */}
+
                     <div className="field col-12 md:col-6">
                         <label className="font-bold">
-                            Cambio de agente de control*
-                            {submitted && form.cambio_agente_control === null && (
-                                <small className="p-error"> Requerido</small>
-                            )}
+                            Cambio de agente de control* {submitted && form.cambio_agente_control === null && <small className="p-error"> Requerido</small>}
                         </label>
                         <Dropdown
                             value={form.cambio_agente_control}
@@ -500,11 +503,10 @@ export default function ControlPlagasRoedores() {
                         />
                     </div>
 
-                    {/* Evidencia de roedores -> despliegue de indicadores (MultiSelect) */}
+                    {/* ✅ Evidencia de Roedores (SI/NO) */}
                     <div className="field col-12 md:col-6">
                         <label className="font-bold">
-                            Evidencia de Roedores u Hormigas*{" "}
-                            {submitted && form.evidencia_roedores === null && <small className="p-error"> Requerido</small>}
+                            Evidencia de Roedores* {submitted && form.evidencia_roedores === null && <small className="p-error"> Requerido</small>}
                         </label>
                         <Dropdown
                             value={form.evidencia_roedores}
@@ -514,99 +516,73 @@ export default function ControlPlagasRoedores() {
                         />
                     </div>
 
-
+                    {/* Indicadores ROEDORES si evidencia_roedores === true */}
                     {form.evidencia_roedores === true && (
-                        <>
-                            {/* Bloque ROEDORES */}
-                            <div className="field col-12">
-                                <div className="plaga-box">
-                                    <div className="subarea-title">Roedores</div>
+                        <div className="field col-12">
+                            <div className="plaga-box">
+                                <div className="subarea-title">Roedores</div>
 
-                                    <label className="font-bold">
-                                        Indicadores (uno o más)
-                                        {submitted && form.roedores_indicadores.length === 0 && (
-                                            <small className="p-error"> Requerido</small>
-                                        )}
-                                    </label>
-
-                                    <MultiSelect
-                                        value={form.roedores_indicadores}
-                                        options={ROEDORES_MS_OPTIONS}
-                                        onChange={(e) => onChange("roedores_indicadores", e.value)}
-                                        placeholder="Seleccione indicadores"
-                                        display="chip"
-                                        className="w-full"
-                                    />
-                                </div>
+                                <label className="font-bold">
+                                    Indicadores (uno o más)
+                                    {submitted && form.roedores_indicadores.length === 0 && <small className="p-error"> Requerido</small>}
+                                </label>
+                                <MultiSelect
+                                    value={form.roedores_indicadores}
+                                    options={ROEDORES_MS_OPTIONS}
+                                    onChange={(e) => onChange("roedores_indicadores", e.value)}
+                                    placeholder="Seleccione indicadores"
+                                    display="chip"
+                                    className="w-full"
+                                />
                             </div>
+                        </div>
+                    )}
 
-                            {/* Bloque HORMIGAS */}
-                            <div className="field col-12">
-                                <div className="plaga-box">
-                                    <div className="subarea-title">Hormigas</div>
+                    {/* ✅ Evidencia de Hormigas (SI/NO) – independiente */}
+                    <div className="field col-12 md:col-6">
+                        <label className="font-bold">
+                            Evidencia de Hormigas* {submitted && form.plaga_hormigas === null && <small className="p-error"> Requerido</small>}
+                        </label>
+                        <Dropdown
+                            value={form.plaga_hormigas}
+                            options={opcionesSiNo}
+                            onChange={(e) => onChange("plaga_hormigas", e.value)}
+                            placeholder="Seleccione"
+                        />
+                    </div>
 
-                                    <div className="grid">
-                                        <div className="col-12 md:col-6">
-                                            <label className="font-bold">
-                                                Evidencia de Hormigas*
-                                                {submitted && form.plaga_hormigas === null && (
-                                                    <small className="p-error"> Requerido</small>
-                                                )}
-                                            </label>
-                                            <Dropdown
-                                                value={form.plaga_hormigas}
-                                                options={opcionesSiNo}
-                                                onChange={(e) => onChange("plaga_hormigas", e.value)}
-                                                placeholder="Seleccione"
-                                            />
-                                        </div>
+                    {/* ✅ Caja con borde igual a Roedores cuando es "Sí" */}
+                    {form.plaga_hormigas === true && (
+                        <div className="field col-12">
+                            <div className="plaga-box">
+                                <div className="subarea-title">Hormigas</div>
 
-                                        {form.plaga_hormigas === true && (
-                                            <div className="col-12 md:col-6">
-                                                <label className="font-bold">
-                                                    Indicador de hormigas*
-                                                    {submitted && !form.hormigas_indicador && (
-                                                        <small className="p-error"> Requerido</small>
-                                                    )}
-                                                </label>
-                                                <Dropdown
-                                                    value={form.hormigas_indicador}
-                                                    options={HORMIGAS_OPTIONS}
-                                                    onChange={(e) => onChange("hormigas_indicador", e.value)}
-                                                    placeholder="Seleccione indicador"
-                                                />
-                                            </div>
-                                        )}
+                                <div className="grid">
+                                    <div className="col-12 md:col-6">
+                                        <label className="font-bold">
+                                            Indicador de hormigas* {submitted && !form.hormigas_indicador && <small className="p-error"> Requerido</small>}
+                                        </label>
+                                        <Dropdown
+                                            value={form.hormigas_indicador}
+                                            options={HORMIGAS_OPTIONS}
+                                            onChange={(e) => onChange("hormigas_indicador", e.value)}
+                                            placeholder="Seleccione indicador"
+                                        />
                                     </div>
                                 </div>
                             </div>
-                        </>
+                        </div>
                     )}
 
 
-                    {/* Observación opcional */}
+                    {/* Observaciones (opcional) */}
                     <div className="field col-12">
-                        <div className="flex align-items-center gap-2">
-                            <Checkbox
-                                inputId="chkObs"
-                                checked={form.tiene_observacion}
-                                onChange={(e) => onChange("tiene_observacion", e.checked)}
-                            />
-                            <label htmlFor="chkObs" className="font-bold" style={{ cursor: "pointer" }}>
-                                Agregar observación (daños/reemplazo/ausencia/presencia de insectos)
-                            </label>
-                        </div>
-                        {form.tiene_observacion && (
-                            <>
-                                <InputText
-                                    className="mt-2"
-                                    value={form.observaciones}
-                                    onChange={(e) => onChange("observaciones", e.target.value)}
-                                    placeholder="Detalle la observación"
-                                />
-                                {submitted && !form.observaciones.trim() && <small className="p-error"> Campo requerido</small>}
-                            </>
-                        )}
+                        <label className="font-bold">Observaciones</label>
+                        <InputText
+                            value={form.observaciones}
+                            onChange={(e) => onChange("observaciones", e.target.value)}
+                            placeholder="Comentarios adicionales (opcional)"
+                        />
                     </div>
 
                     <div className="field col-12">

@@ -1,11 +1,12 @@
 // Components/Inocuidad/LimpiezaTarimasCajas.jsx
-import React, { useEffect, useRef, useState } from "react";
+import React, { useEffect, useRef, useState, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
-import supabase from "../../supabaseClient";
-import logo2 from "../../assets/mosca.png";
+import supabase from "../../../supabaseClient.js";
+import logo2 from "../../../assets/mosca.png";
 
 import "primereact/resources/themes/lara-light-indigo/theme.css";
 import "primeicons/primeicons.css";
+import "../Inocuidad.css";
 import { Toast } from "primereact/toast";
 import { Toolbar } from "primereact/toolbar";
 import * as XLSX from "xlsx";
@@ -17,36 +18,7 @@ import { InputText } from "primereact/inputtext";
 import { Dropdown } from "primereact/dropdown";
 import { Checkbox } from "primereact/checkbox";
 
-{/* Ver todos los registros JV
-    
-    SELECT
-  h.id,
-  h.fecha_registro,
-  h.hora_registro,
-  h.cant_tarimas_limpias,
-  h.cant_cajas_colores_limpias,
-  h.firma_encargado,
-  h.fecha_correccion,
-
-  
-  MAX(CASE WHEN i.item_key = 'lavado_cajas_1x1' THEN i.estado END)      AS lavado_cajas_1x1_estado,
-  MAX(CASE WHEN i.item_key = 'lavado_tarimas'  THEN i.estado END)       AS lavado_tarimas_estado,
-
-  
-  MAX(CASE WHEN i.item_key = 'lavado_cajas_1x1' THEN i.comentario END)  AS lavado_cajas_1x1_comentario,
-  MAX(CASE WHEN i.item_key = 'lavado_tarimas'  THEN i.comentario END)   AS lavado_tarimas_comentario
-
-FROM public.limpieza_tarimas_cajas AS h
-LEFT JOIN public.limpieza_tarimas_cajas_items AS i
-  ON i.id_registro = h.id
-GROUP BY
-  h.id, h.fecha_registro, h.hora_registro, h.cant_tarimas_limpias,
-  h.cant_cajas_colores_limpias, h.firma_encargado, h.fecha_correccion
-ORDER BY h.fecha_registro DESC, h.hora_registro DESC;
-
-*/}
-// ⬅️ Hook de permisos (ruta igual que en Cosecha/Hatchery/Oficinas)
-import useCanReview from "./Registros/Hooks/useCanReview.js";
+import useCanReview from "./Hooks/useCanReview.js";
 
 const ESTADOS = [
     { label: "C (Cumple)", value: "C" },
@@ -71,36 +43,19 @@ const emptyForm = () => ({
     cant_tarimas_limpias: 0,
     cant_cajas_colores_limpias: 0,
     firma_encargado: "",
-    fecha_correccion_preview: new Date().toLocaleString(),
+    observaciones: "",
     items: ITEMS.reduce((acc, it) => {
-        acc[it.key] = { estado: "", comentario: "" };
+        acc[it.key] = { estado: "" }; // ← solo estado (sin comentario)
         return acc;
     }, {}),
 });
 
-// Mapea array de items -> objeto por clave para la tabla
-// Mapea array de items -> objeto por clave para la tabla (soporta ancho y viejo embed)
+// Row mapper (sin comentarios)
 const packRow = (dbRow) => {
-    const fromWide =
-        dbRow.estado_lavado_cajas_1x1 !== undefined ||
-        dbRow.estado_lavado_tarimas !== undefined;
-
-    const itemsMap = fromWide
-        ? {
-            lavado_cajas_1x1: {
-                estado: dbRow.estado_lavado_cajas_1x1 || "",
-                comentario: dbRow.comentario_lavado_cajas_1x1 || ""
-            },
-            lavado_tarimas: {
-                estado: dbRow.estado_lavado_tarimas || "",
-                comentario: dbRow.comentario_lavado_tarimas || ""
-            },
-        }
-        : ITEMS.reduce((acc, it) => {
-            const found = (dbRow.items || []).find((x) => x.item_key === it.key);
-            acc[it.key] = { estado: found?.estado || "", comentario: found?.comentario || "" };
-            return acc;
-        }, {});
+    const itemsMap = {
+        lavado_cajas_1x1: { estado: dbRow.estado_lavado_cajas_1x1 || "" },
+        lavado_tarimas: { estado: dbRow.estado_lavado_tarimas || "" },
+    };
 
     return {
         id: dbRow.id,
@@ -109,15 +64,14 @@ const packRow = (dbRow) => {
         cant_tarimas_limpias: dbRow.cant_tarimas_limpias,
         cant_cajas_colores_limpias: dbRow.cant_cajas_colores_limpias,
         firma_encargado: dbRow.firma_encargado,
-        fecha_correccion: dbRow.fecha_correccion, // "Fecha de Registro" en pantalla
-
+        fecha_registro_sistema: dbRow.created_at ?? dbRow.fecha_correccion ?? null,
         revisado: dbRow.revisado ?? false,
         revisado_por_username: dbRow.revisado_por_username ?? null,
         revisado_fecha: dbRow.revisado_fecha ?? null,
         items: itemsMap,
+        observaciones: dbRow.observaciones || "",
     };
 };
-
 
 export default function LimpiezaTarimasCajas() {
     const toast = useRef(null);
@@ -132,12 +86,10 @@ export default function LimpiezaTarimasCajas() {
     const [submitted, setSubmitted] = useState(false);
     const [form, setForm] = useState(emptyForm());
 
-    // Filtro por revisado
-    const [filtroRevisado, setFiltroRevisado] = useState("all"); // 'all' | 'checked' | 'unchecked'
-    // Permisos
+    const [filtroRevisado, setFiltroRevisado] = useState("all");
     const { canReview, username } = useCanReview();
 
-    // Exportar a Excel
+    // Exportar a Excel (sin comentarios)
     const exportXlsx = () => {
         const rowsToExport = (Array.isArray(rows) ? rows : []).map((row) => {
             const base = {
@@ -146,12 +98,12 @@ export default function LimpiezaTarimasCajas() {
                 cant_tarimas_limpias: row.cant_tarimas_limpias,
                 cant_cajas_colores_limpias: row.cant_cajas_colores_limpias,
                 firma_encargado: row.firma_encargado,
-                fecha_registro_sistema: row.fecha_correccion ? new Date(row.fecha_correccion).toLocaleString() : "",
+                "fecha registro (sistema)": row.fecha_registro_sistema ? new Date(row.fecha_registro_sistema).toLocaleString() : "",
                 revisado: row.revisado ? "Sí" : "No",
+                observaciones: row.observaciones || "",
             };
             Object.keys(row.items).forEach((key) => {
                 base[`${key}_estado`] = row.items[key]?.estado || "";
-                base[`${key}_comentario`] = row.items[key]?.comentario || "";
             });
             return base;
         });
@@ -167,23 +119,24 @@ export default function LimpiezaTarimasCajas() {
     const fetchRegistros = async () => {
         try {
             setLoading(true);
-
             let query = supabase
                 .from("limpieza_tarimas_cajas_1")
                 .select(`
-        id,
-        fecha_registro,
-        hora_registro,
-        cant_tarimas_limpias,
-        cant_cajas_colores_limpias,
-        firma_encargado,
-        fecha_correccion,
-        revisado,
-        revisado_por_username,
-        revisado_fecha,
-        estado_lavado_cajas_1x1, comentario_lavado_cajas_1x1,
-        estado_lavado_tarimas,   comentario_lavado_tarimas
-      `)
+          id,
+          fecha_registro,
+          hora_registro,
+          cant_tarimas_limpias,
+          cant_cajas_colores_limpias,
+          firma_encargado,
+          created_at,
+          fecha_correccion,
+          revisado,
+          revisado_por_username,
+          revisado_fecha,
+          observaciones,
+          estado_lavado_cajas_1x1,
+          estado_lavado_tarimas
+        `)
                 .order("fecha_registro", { ascending: false });
 
             if (filtroRevisado === "checked") query = query.eq("revisado", true);
@@ -215,10 +168,10 @@ export default function LimpiezaTarimasCajas() {
     };
 
     const onHeaderChange = (e, field) => setForm((p) => ({ ...p, [field]: e.target.value }));
-    const onItemChange = (key, field, value) =>
+    const onItemChange = (key, value) =>
         setForm((p) => ({
             ...p,
-            items: { ...p.items, [key]: { ...(p.items[key] || {}), [field]: value } },
+            items: { ...p.items, [key]: { estado: value } },
         }));
 
     const validate = () => {
@@ -226,9 +179,6 @@ export default function LimpiezaTarimasCajas() {
         ITEMS.forEach((it) => {
             const v = form.items[it.key]?.estado;
             if (!v) errs.push(`Seleccione estado para: ${it.label}`);
-            if (v && v !== "C" && !form.items[it.key]?.comentario?.trim()) {
-                errs.push(`Comentario requerido en ${it.label} (NC/NA).`);
-            }
         });
 
         const n1 = Number(form.cant_tarimas_limpias);
@@ -253,23 +203,24 @@ export default function LimpiezaTarimasCajas() {
                 cant_tarimas_limpias: Number(form.cant_tarimas_limpias) || 0,
                 cant_cajas_colores_limpias: Number(form.cant_cajas_colores_limpias) || 0,
                 firma_encargado: form.firma_encargado || "",
-
                 estado_lavado_cajas_1x1: form.items.lavado_cajas_1x1?.estado,
-                comentario_lavado_cajas_1x1: form.items.lavado_cajas_1x1?.comentario || null,
-
                 estado_lavado_tarimas: form.items.lavado_tarimas?.estado,
-                comentario_lavado_tarimas: form.items.lavado_tarimas?.comentario || null,
+                observaciones: form.observaciones?.trim() ? form.observaciones : null,
             };
 
-            const { error } = await supabase
+            const { data, error } = await supabase
                 .from("limpieza_tarimas_cajas_1")
                 .insert([payload])
-                .select("id, fecha_correccion")
+                .select("id, created_at")
                 .single();
 
             if (error) throw error;
 
-            showToast("success", "Éxito", "Registro guardado correctamente");
+            showToast(
+                "success",
+                "Éxito",
+                `Registro guardado. Fecha de Registro (auto): ${new Date(data.created_at).toLocaleString()}`
+            );
             await fetchRegistros();
             setDialogOpen(false);
             setForm(emptyForm());
@@ -280,15 +231,16 @@ export default function LimpiezaTarimasCajas() {
         }
     };
 
-
     const countBy = (row, val) => ITEMS.reduce((acc, it) => acc + (row.items?.[it.key]?.estado === val ? 1 : 0), 0);
 
-    const dynamicColumns = ITEMS.map((it) => ({
-        header: it.label,
-        body: (row) => row.items?.[it.key]?.estado || "",
-    }));
+    const dynamicCols = useMemo(
+        () =>
+            ITEMS.map((it) => (
+                <Column key={it.key} header={it.label} body={(row) => row.items?.[it.key]?.estado || ""} />
+            )),
+        []
+    );
 
-    // plantilla de checkbox revisado
     const revisadoTemplate = (row) => {
         if (!canReview) return <span>{row.revisado ? "Sí" : "No"}</span>;
 
@@ -305,7 +257,6 @@ export default function LimpiezaTarimasCajas() {
                     revisado_fecha: next ? new Date().toISOString() : null,
                 })
                 .eq("id", row.id);
-
 
             if (error) {
                 showToast("error", "No se guardó", error.message);
@@ -337,7 +288,6 @@ export default function LimpiezaTarimasCajas() {
         );
     };
 
-    // header con búsqueda + filtro
     const header = (
         <div className="flex flex-wrap gap-2 align-items-center justify-content-between">
             <span className="p-input-icon-left">
@@ -377,17 +327,10 @@ export default function LimpiezaTarimasCajas() {
             <div className="welcome-message">
                 <p>
                     <span>
-                        <b className="bold-space">Seleciona:</b>
-                        <b className="bold-space">C</b> (Cumple),
+                        <b className="bold-space">Selecciona:</b> <b className="bold-space">C</b> (Cumple),
                         <b className="bold-space">NC</b> (No cumple),
                         <b className="bold-space">NA</b> (No aplica).
                     </span>
-                    <br />
-                    <span>
-                        Para <b className="bold-space">NC/NA</b> el comentario es obligatorio.
-                    </span>
-                    <br />
-
                 </p>
             </div>
 
@@ -429,19 +372,22 @@ export default function LimpiezaTarimasCajas() {
                 <Column field="cant_tarimas_limpias" header="Tarimas limpias" sortable />
                 <Column field="cant_cajas_colores_limpias" header="Cajas colores limpias" sortable />
 
+                {/* Fecha de Registro (auto) real */}
                 <Column
-                    field="fecha_correccion"
-                    header="Fecha de Registro"
-                    body={(r) => (r.fecha_correccion ? new Date(r.fecha_correccion).toLocaleString() : "")}
+                    field="fecha_registro_sistema"
+                    header="Fecha de Registro (auto)"
+                    body={(r) => (r.fecha_registro_sistema ? new Date(r.fecha_registro_sistema).toLocaleString() : "")}
                     sortable
                 />
+
                 <Column header="#C" body={(r) => countBy(r, "C")} />
                 <Column header="#NC" body={(r) => countBy(r, "NC")} />
                 <Column header="#NA" body={(r) => countBy(r, "NA")} />
-                {dynamicColumns.map((c, i) => (
-                    <Column key={i} header={c.header} body={c.body} />
-                ))}
-                {/* última columna: checkbox revisado */}
+
+                {dynamicCols}
+
+                <Column field="observaciones" header="Observaciones" body={(r) => r.observaciones || "—"} />
+
                 <Column header="Revisado" body={revisadoTemplate} style={{ width: "10rem", textAlign: "center" }} />
             </DataTable>
 
@@ -473,8 +419,7 @@ export default function LimpiezaTarimasCajas() {
                     </div>
 
                     {ITEMS.map((it) => {
-                        const val = form.items[it.key] || { estado: "", comentario: "" };
-                        const necesitaComentario = val.estado && val.estado !== "C";
+                        const val = form.items[it.key] || { estado: "" };
                         return (
                             <div className="field col-12 md:col-6" key={it.key}>
                                 <label className="font-bold">
@@ -483,21 +428,10 @@ export default function LimpiezaTarimasCajas() {
                                 <Dropdown
                                     value={val.estado}
                                     options={ESTADOS}
-                                    onChange={(e) => onItemChange(it.key, "estado", e.value)}
+                                    onChange={(e) => onItemChange(it.key, e.value)}
                                     placeholder="Seleccione"
                                     className="mb-2"
                                 />
-                                {necesitaComentario && (
-                                    <>
-                                        <small className="campo-note">Comentario obligatorio para NC o NA</small>
-                                        <InputText
-                                            value={val.comentario}
-                                            onChange={(e) => onItemChange(it.key, "comentario", e.target.value)}
-                                            placeholder="Explique la causa/acción correctiva"
-                                        />
-                                        {submitted && !val.comentario?.trim() && <small className="p-error"> Requerido</small>}
-                                    </>
-                                )}
                             </div>
                         );
                     })}
@@ -509,10 +443,9 @@ export default function LimpiezaTarimasCajas() {
                             value={form.cant_tarimas_limpias}
                             onChange={(e) => onHeaderChange(e, "cant_tarimas_limpias")}
                         />
-                        {submitted &&
-                            (!Number.isInteger(Number(form.cant_tarimas_limpias)) || Number(form.cant_tarimas_limpias) < 0) && (
-                                <small className="p-error"> Debe ser entero ≥ 0</small>
-                            )}
+                        {submitted && (!Number.isInteger(Number(form.cant_tarimas_limpias)) || Number(form.cant_tarimas_limpias) < 0) && (
+                            <small className="p-error"> Debe ser entero ≥ 0</small>
+                        )}
                     </div>
 
                     <div className="field col-12 md:col-6">
@@ -523,13 +456,18 @@ export default function LimpiezaTarimasCajas() {
                             onChange={(e) => onHeaderChange(e, "cant_cajas_colores_limpias")}
                         />
                         {submitted &&
-                            (!Number.isInteger(Number(form.cant_cajas_colores_limpias)) ||
-                                Number(form.cant_cajas_colores_limpias) < 0) && <small className="p-error"> Debe ser entero ≥ 0</small>}
+                            (!Number.isInteger(Number(form.cant_cajas_colores_limpias)) || Number(form.cant_cajas_colores_limpias) < 0) && (
+                                <small className="p-error"> Debe ser entero ≥ 0</small>
+                            )}
                     </div>
 
                     <div className="field col-12">
-                        <label className="font-bold">Fecha de Registro (auto)</label>
-                        <InputText value={form.fecha_correccion_preview} disabled />
+                        <label className="font-bold">Observaciones</label>
+                        <InputText
+                            value={form.observaciones}
+                            onChange={(e) => onHeaderChange(e, "observaciones")}
+                            placeholder="Comentarios adicionales (opcional)"
+                        />
                     </div>
                 </div>
             </Dialog>

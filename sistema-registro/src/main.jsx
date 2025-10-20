@@ -28,9 +28,9 @@ import GestionUsuarios from './pages/Gerencia/Registros/PagesGestionUsuarios.jsx
 
 // import de Inocuidad
 import PagesInocuidad from './pages/Inocuidad/PagesInocuidad.jsx';
-import LimpiezaAreaHatchery from './Components/Inocuidad/LimpiezaAreaHatchery.jsx';
-import LimpiezaAreaCosecha from './Components/Inocuidad/LimpiezaAreaCosecha.jsx';
-import LimpiezaTarimasCajas from './Components/Inocuidad/LimpiezaTarimasCajas.jsx';
+import LimpiezaAreaHatchery from "./Components/Inocuidad/Registros/LimpiezaAreaHatchery.jsx";
+import LimpiezaAreaCosecha from "./Components/Inocuidad/Registros/LimpiezaAreaCosecha.jsx";
+import LimpiezaTarimasCajas from "./Components/Inocuidad/Registros/LimpiezaTarimasCajas.jsx";
 import PagesLimpiezaDietaSiembra from './pages/Inocuidad/Registros/PagesLimpiezaDietaSiembra.jsx';
 import PagesLimpiezaHornoMultilevel from './pages/Inocuidad/Registros/PagesLimpiezaHornoMultilevel.jsx';
 import PagesLimpiezaBanosCasillerosPediluvios from './pages/Inocuidad/Registros/PagesLimpiezaBanosCasillerosPediluvios.jsx';

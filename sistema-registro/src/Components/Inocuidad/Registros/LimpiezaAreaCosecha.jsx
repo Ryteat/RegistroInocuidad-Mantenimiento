@@ -1,11 +1,12 @@
 // Components/Inocuidad/LimpiezaAreaCosecha.jsx
 import React, { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import supabase from "../../supabaseClient";
-import logo2 from "../../assets/mosca.png";
+import supabase from "../../../supabaseClient.js";
+import logo2 from "../../../assets/mosca.png";
 
 import "primereact/resources/themes/lara-light-indigo/theme.css";
 import "primeicons/primeicons.css";
+import "../Inocuidad.css";
 import { Toast } from "primereact/toast";
 import { Toolbar } from "primereact/toolbar";
 import { Button } from "primereact/button";
@@ -19,8 +20,7 @@ import * as XLSX from "xlsx";
 import jsPDF from "jspdf";
 import "jspdf-autotable";
 
-// ✅ Hook de permisos
-import useCanReview from "./Registros/Hooks/useCanReview.js";
+import useCanReview from "./Hooks/useCanReview.js";
 
 /** Ítems + frecuencia (solo informativa para agrupar en el modal) */
 const LIMPIEZA_ITEMS = [
@@ -58,37 +58,25 @@ const emptyForm = () => ({
   verificador_inocuidad: "",
   firma_encargado: "",
   observaciones_generales: "",
-  // 🔸Texto informativo mientras se crea (la BD pondrá el definitivo al guardar)
-  fecha_registro_preview: new Date().toLocaleString(),
   items: LIMPIEZA_ITEMS.reduce((acc, it) => {
-    acc[it.key] = { estado: "", comentario: "" };
+    acc[it.key] = { estado: "" }; // ← solo estado (sin comentario)
     return acc;
   }, {}),
 });
 
-// Convierte DB row -> modelo de la grilla (soporta esquema viejo y el nuevo "ancho")
+// Convierte DB row -> modelo de la grilla (sin comentarios)
 const packRow = (dbRow) => {
-  const fromWide =
-    dbRow.estado_romanas !== undefined ||
-    dbRow.estado_maquina_tamizadora !== undefined;
-
-  const itemsMap = fromWide
-    ? {
-      romanas: { estado: dbRow.estado_romanas || "", comentario: dbRow.comentario_romanas || "" },
-      maquina_tamizadora: { estado: dbRow.estado_maquina_tamizadora || "", comentario: dbRow.comentario_maquina_tamizadora || "" },
-      recipientes_plasticos: { estado: dbRow.estado_recipientes_plasticos || "", comentario: dbRow.comentario_recipientes_plasticos || "" },
-      pisos: { estado: dbRow.estado_pisos || "", comentario: dbRow.comentario_pisos || "" },
-      zarandas: { estado: dbRow.estado_zarandas || "", comentario: dbRow.comentario_zarandas || "" },
-      bines: { estado: dbRow.estado_bines || "", comentario: dbRow.comentario_bines || "" },
-      cano: { estado: dbRow.estado_cano || "", comentario: dbRow.comentario_cano || "" },
-      techos: { estado: dbRow.estado_techos || "", comentario: dbRow.comentario_techos || "" },
-      paredes: { estado: dbRow.estado_paredes || "", comentario: dbRow.comentario_paredes || "" },
-    }
-    : LIMPIEZA_ITEMS.reduce((acc, it) => {
-      const found = (dbRow.items || []).find((x) => x.item_key === it.key);
-      acc[it.key] = { estado: found?.estado || "", comentario: found?.comentario || "" };
-      return acc;
-    }, {});
+  const itemsMap = {
+    romanas: { estado: dbRow.estado_romanas || "" },
+    maquina_tamizadora: { estado: dbRow.estado_maquina_tamizadora || "" },
+    recipientes_plasticos: { estado: dbRow.estado_recipientes_plasticos || "" },
+    pisos: { estado: dbRow.estado_pisos || "" },
+    zarandas: { estado: dbRow.estado_zarandas || "" },
+    bines: { estado: dbRow.estado_bines || "" },
+    cano: { estado: dbRow.estado_cano || "" },
+    techos: { estado: dbRow.estado_techos || "" },
+    paredes: { estado: dbRow.estado_paredes || "" },
+  };
 
   return {
     id: dbRow.id,
@@ -97,16 +85,16 @@ const packRow = (dbRow) => {
     responsable: dbRow.responsable,
     verificador_inocuidad: dbRow.verificador_inocuidad,
     firma_encargado: dbRow.firma_encargado,
-    observaciones_generales: dbRow.observaciones_generales,
-    // la BD lo guarda como fecha_correccion (auto now())
-    fecha_registro_sistema: dbRow.fecha_correccion,
+    observaciones_generales: dbRow.observaciones_generales || "",
+    // Mostramos la fecha REAL del sistema (created_at). Si no existe, cae a fecha_correccion (legacy)
+    fecha_registro_sistema: dbRow.created_at ?? dbRow.fecha_correccion ?? null,
+
     revisado: dbRow.revisado ?? false,
     revisado_por_username: dbRow.revisado_por_username ?? null,
     revisado_fecha: dbRow.revisado_fecha ?? null,
     items: itemsMap,
   };
 };
-
 
 function LimpiezaAreaCosecha() {
   const navigate = useNavigate();
@@ -117,10 +105,7 @@ function LimpiezaAreaCosecha() {
   const [selected, setSelected] = useState([]);
   const [globalFilter, setGlobalFilter] = useState("");
 
-  // Filtro por revisado
   const [filtroRevisado, setFiltroRevisado] = useState("all"); // 'all' | 'checked' | 'unchecked'
-
-  // Permisos (solo Mantenimiento01 / Produccion01 pueden ver/marcar)
   const { canReview, username } = useCanReview();
 
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -141,27 +126,28 @@ function LimpiezaAreaCosecha() {
       let query = supabase
         .from("limpieza_cosecha_1")
         .select(`
-        id,
-        fecha_registro,
-        hora_registro,
-        responsable,
-        verificador_inocuidad,
-        firma_encargado,
-        observaciones_generales,
-        fecha_correccion,
-        revisado,
-        revisado_por_username,
-        revisado_fecha,
-        estado_romanas, comentario_romanas,
-        estado_maquina_tamizadora, comentario_maquina_tamizadora,
-        estado_recipientes_plasticos, comentario_recipientes_plasticos,
-        estado_pisos, comentario_pisos,
-        estado_zarandas, comentario_zarandas,
-        estado_bines, comentario_bines,
-        estado_cano, comentario_cano,
-        estado_techos, comentario_techos,
-        estado_paredes, comentario_paredes
-      `)
+          id,
+          fecha_registro,
+          hora_registro,
+          responsable,
+          verificador_inocuidad,
+          firma_encargado,
+          observaciones_generales,
+          created_at,
+          fecha_correccion,
+          revisado,
+          revisado_por_username,
+          revisado_fecha,
+          estado_romanas,
+          estado_maquina_tamizadora,
+          estado_recipientes_plasticos,
+          estado_pisos,
+          estado_zarandas,
+          estado_bines,
+          estado_cano,
+          estado_techos,
+          estado_paredes
+        `)
         .order("fecha_registro", { ascending: false });
 
       if (filtroRevisado === "checked") query = query.eq("revisado", true);
@@ -178,7 +164,6 @@ function LimpiezaAreaCosecha() {
     }
   };
 
-
   useEffect(() => {
     fetchRows();
   }, [filtroRevisado]);
@@ -190,24 +175,19 @@ function LimpiezaAreaCosecha() {
   };
 
   const onHeaderChange = (e, field) => setForm((prev) => ({ ...prev, [field]: e.target.value }));
-  const onItemChange = (key, field, value) =>
+  const onItemChange = (key, value) =>
     setForm((prev) => ({
       ...prev,
-      items: { ...prev.items, [key]: { ...(prev.items[key] || { estado: "", comentario: "" }), [field]: value } },
+      items: { ...prev.items, [key]: { estado: value } },
     }));
 
   const validate = () => {
     const errs = [];
     if (!form.responsable?.trim()) errs.push("Responsable es requerido");
-
     LIMPIEZA_ITEMS.forEach((it) => {
       const v = form.items[it.key];
       if (!v?.estado) errs.push(`Selecciona estado en "${it.label}"`);
-      if (v?.estado && v.estado !== "C" && !v?.comentario?.trim()) {
-        errs.push(`Comentario requerido en "${it.label}" cuando es NC/NA`);
-      }
     });
-
     return errs;
   };
 
@@ -229,42 +209,29 @@ function LimpiezaAreaCosecha() {
         observaciones_generales: form.observaciones_generales || null,
 
         estado_romanas: form.items.romanas?.estado,
-        comentario_romanas: form.items.romanas?.comentario || null,
-
         estado_maquina_tamizadora: form.items.maquina_tamizadora?.estado,
-        comentario_maquina_tamizadora: form.items.maquina_tamizadora?.comentario || null,
-
         estado_recipientes_plasticos: form.items.recipientes_plasticos?.estado,
-        comentario_recipientes_plasticos: form.items.recipientes_plasticos?.comentario || null,
-
         estado_pisos: form.items.pisos?.estado,
-        comentario_pisos: form.items.pisos?.comentario || null,
-
         estado_zarandas: form.items.zarandas?.estado,
-        comentario_zarandas: form.items.zarandas?.comentario || null,
-
         estado_bines: form.items.bines?.estado,
-        comentario_bines: form.items.bines?.comentario || null,
-
         estado_cano: form.items.cano?.estado,
-        comentario_cano: form.items.cano?.comentario || null,
-
         estado_techos: form.items.techos?.estado,
-        comentario_techos: form.items.techos?.comentario || null,
-
         estado_paredes: form.items.paredes?.estado,
-        comentario_paredes: form.items.paredes?.comentario || null,
       };
 
-      const { error } = await supabase
+      const { data, error } = await supabase
         .from("limpieza_cosecha_1")
         .insert([payload])
-        .select("id, fecha_correccion")
+        .select("id, created_at")
         .single();
 
       if (error) throw error;
 
-      showToast("success", "Guardado", "Registro creado");
+      showToast(
+        "success",
+        "Guardado",
+        `Registro creado. Fecha de Registro (auto): ${new Date(data.created_at).toLocaleString()}`
+      );
       setDialogOpen(false);
       setForm(emptyForm());
       setSubmitted(false);
@@ -274,7 +241,6 @@ function LimpiezaAreaCosecha() {
       showToast("error", "Error", e.message || "No se pudo guardar");
     }
   };
-
 
   const flattenForExport = (r) => {
     const flat = {
@@ -290,7 +256,6 @@ function LimpiezaAreaCosecha() {
     LIMPIEZA_ITEMS.forEach((it) => {
       const v = r.items?.[it.key] || {};
       flat[it.label] = v.estado || "";
-      flat[`${it.label} - comentario`] = v.comentario || "";
     });
     return flat;
   };
@@ -324,7 +289,6 @@ function LimpiezaAreaCosecha() {
   const countBy = (row, val) =>
     LIMPIEZA_ITEMS.reduce((acc, it) => acc + (row.items?.[it.key]?.estado === val ? 1 : 0), 0);
 
-  // Columna final: checkbox de Revisado (solo si canReview)
   const revisadoTemplate = (row) => {
     if (!canReview) return <span>{row.revisado ? "Sí" : "No"}</span>;
 
@@ -341,7 +305,6 @@ function LimpiezaAreaCosecha() {
           revisado_fecha: next ? new Date().toISOString() : null,
         })
         .eq("id", row.id);
-
 
       if (error) {
         showToast("error", "No se guardó", error.message);
@@ -373,7 +336,6 @@ function LimpiezaAreaCosecha() {
     );
   };
 
-  // Header con búsqueda + filtro de revisado
   const header = (
     <div className="flex flex-wrap gap-2 align-items-center justify-content-between">
       <span className="p-input-icon-left">
@@ -402,19 +364,6 @@ function LimpiezaAreaCosecha() {
     </div>
   );
 
-  const leftToolbarTemplate = () => (
-    <div className="flex gap-2">
-      <Button label="Nuevo" icon="pi pi-plus" severity="success" onClick={openNew} />
-    </div>
-  );
-
-  const rightToolbarTemplate = () => (
-    <div className="exportar-container flex flex-wrap gap-2">
-      <Button label="Exportar a Excel" icon="pi pi-upload" className="p-button-help" onClick={exportXlsx} />
-      <Button label="Exportar a PDF" icon="pi pi-file-pdf" className="p-button-danger" onClick={exportPdf} />
-    </div>
-  );
-
   return (
     <div className="controlrendcosechayfrass-container">
       <Toast ref={toast} />
@@ -425,15 +374,9 @@ function LimpiezaAreaCosecha() {
 
       <div className="welcome-message">
         <p>
-          <span>
-            Selecciona <b className="bold-space">C</b> (Cumple),
-            <b className="bold-space">NC</b> (No cumple),
-            <b className="bold-space">NA</b> (No aplica).
-          </span>
-          <br />
-          <span>
-            Si es <b className="bold-space">NC</b> o <b className="bold-space">NA</b>, el comentario es obligatorio.
-          </span>
+          Selecciona <b className="bold-space">C</b> (Cumple),
+          <b className="bold-space">NC</b> (No cumple),
+          <b className="bold-space">NA</b> (No aplica).
         </p>
       </div>
 
@@ -446,7 +389,16 @@ function LimpiezaAreaCosecha() {
         </button>
       </div>
 
-      <Toolbar className="mb-4" left={leftToolbarTemplate} right={rightToolbarTemplate} />
+      <Toolbar
+        className="mb-4"
+        left={() => <Button label="Nuevo" icon="pi pi-plus" severity="success" onClick={openNew} />}
+        right={() => (
+          <div className="exportar-container flex flex-wrap gap-2">
+            <Button label="Exportar a Excel" icon="pi pi-upload" className="p-button-help" onClick={exportXlsx} />
+            <Button label="Exportar a PDF" icon="pi pi-file-pdf" className="p-button-danger" onClick={exportPdf} />
+          </div>
+        )}
+      />
 
       <DataTable
         value={rows}
@@ -469,10 +421,10 @@ function LimpiezaAreaCosecha() {
         <Column field="hora_registro" header="Hora" />
         <Column field="responsable" header="Operario" sortable />
 
-        {/* ⬇️ NUEVA COLUMNA visible en pantalla */}
+        {/* 👇 Fecha de Registro (auto) real de la BD */}
         <Column
           field="fecha_registro_sistema"
-          header="Fecha de Registro"
+          header="Fecha de Registro (auto)"
           body={(r) => (r.fecha_registro_sistema ? new Date(r.fecha_registro_sistema).toLocaleString() : "")}
           sortable
         />
@@ -480,10 +432,15 @@ function LimpiezaAreaCosecha() {
         <Column header="#C" body={(r) => countBy(r, "C")} />
         <Column header="#NC" body={(r) => countBy(r, "NC")} />
         <Column header="#NA" body={(r) => countBy(r, "NA")} />
+
         {dynamicColumns.map((c, i) => (
           <Column key={i} header={c.header} body={c.body} />
         ))}
-        {/* Última columna: checkbox de revisado */}
+
+        {/* Observaciones visibles en la grilla */}
+        <Column field="observaciones_generales" header="Observaciones" body={(r) => r.observaciones_generales || "—"} />
+
+        {/* Última columna: checkbox revisado */}
         <Column header="Revisado" body={revisadoTemplate} style={{ width: "10rem", textAlign: "center" }} />
       </DataTable>
 
@@ -523,8 +480,7 @@ function LimpiezaAreaCosecha() {
               <div className="font-bold text-lg mb-2">{freq}</div>
               <div className="grid">
                 {groups[freq].map((it) => {
-                  const val = form.items[it.key] || { estado: "", comentario: "" };
-                  const necesitaComentario = val.estado && val.estado !== "C";
+                  const val = form.items[it.key] || { estado: "" };
                   return (
                     <div className="field col-12 md:col-6" key={it.key}>
                       <label className="font-bold">
@@ -533,21 +489,9 @@ function LimpiezaAreaCosecha() {
                       <Dropdown
                         value={val.estado}
                         options={ESTADOS}
-                        onChange={(e) => onItemChange(it.key, "estado", e.value)}
+                        onChange={(e) => onItemChange(it.key, e.value)}
                         placeholder="Seleccione"
-                        className="mb-2"
                       />
-                      {necesitaComentario && (
-                        <>
-                          <small className="campo-note">Comentario obligatorio para NC o NA</small>
-                          <InputText
-                            value={val.comentario}
-                            onChange={(e) => onItemChange(it.key, "comentario", e.target.value)}
-                            placeholder="Describa causa/acción"
-                          />
-                          {submitted && !val.comentario?.trim() && <small className="p-error"> Requerido</small>}
-                        </>
-                      )}
                     </div>
                   );
                 })}
@@ -555,33 +499,12 @@ function LimpiezaAreaCosecha() {
             </div>
           ))}
 
-          {/* <div className="field col-12 md:col-6">
-            <label className="font-bold">Verificación (Inocuidad)</label>
-            <InputText
-              value={form.verificador_inocuidad}
-              onChange={(e) => onHeaderChange(e, "verificador_inocuidad")}
-            />
-          </div> 
-          </div>
-          <div className="field col-12 md:col-6">
-            <label className="font-bold">Firma del encargado</label>
-            <InputText value={form.firma_encargado} onChange={(e) => onHeaderChange(e, "firma_encargado")} />
-          </div>*/}
-
-          {/* Solo lectura; se genera al guardar */}
-          <div className="field col-12">
-            <label className="font-bold">Fecha de Registro (auto)</label>
-            <InputText value={form.fecha_registro_preview} disabled />
-            <small className="text-color-secondary">
-              Se genera automáticamente al guardar (en la tabla verás el valor real del sistema).
-            </small>
-          </div>
-
           <div className="field col-12">
             <label className="font-bold">Observaciones</label>
             <InputText
               value={form.observaciones_generales}
               onChange={(e) => onHeaderChange(e, "observaciones_generales")}
+              placeholder="Comentarios adicionales (opcional)"
             />
           </div>
         </div>

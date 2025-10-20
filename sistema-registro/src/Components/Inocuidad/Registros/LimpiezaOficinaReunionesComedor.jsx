@@ -1,9 +1,9 @@
+// Components/Inocuidad/Oficinas/LimpiezaOficinaReunionesComedor.jsx
 import React, { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import supabase from "../../../supabaseClient";
 import logo2 from "../../../assets/mosca.png";
 import "./LimpiezaOficinaReunionesComedor.css";
-
 
 import "primereact/resources/themes/lara-light-indigo/theme.css";
 import "primeicons/primeicons.css";
@@ -18,7 +18,6 @@ import { Dropdown } from "primereact/dropdown";
 import { Checkbox } from "primereact/checkbox";
 import * as XLSX from "xlsx";
 
-// Hook de permisos (ajusta la ruta si tu árbol difiere)
 import useCanReview from "../Registros/Hooks/useCanReview.js";
 
 const ESTADOS = [
@@ -60,62 +59,52 @@ const todayISO = () => {
     const d = new Date();
     return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 };
-const nowHM = () => new Date().toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit", hour12: false });
+const nowHM = () =>
+    new Date().toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit", hour12: false });
 
 const emptyForm = () => ({
     fecha_registro: todayISO(),
     hora_registro: nowHM(),
     firma_encargado: "",
     verificacion_inocuidad: "",
-    fecha_correccion_preview: new Date().toLocaleString(), // solo visual
+    observaciones: "", // ← nuevo
+    fecha_registro_preview: new Date().toLocaleString(), // solo visual
     items: ITEMS.reduce((acc, it) => {
-        acc[it.key] = { estado: "", comentario: "" };
+        acc[it.key] = { estado: "" }; // ← sin comentario
         return acc;
     }, {}),
 });
 
-// DB -> UI
-// Reemplaza tu packRow por este:
+// DB -> UI (solo estados)
 const packRow = (dbRow) => {
-    const isWide =
-        dbRow.estado_of_pisos !== undefined ||
-        dbRow.estado_sr_pisos !== undefined ||
-        dbRow.estado_com_pisos !== undefined;
+    const items = {
+        // Oficinas
+        of_pisos: { estado: dbRow.estado_of_pisos || "" },
+        of_muebles: { estado: dbRow.estado_of_muebles || "" },
+        of_sillas_escritorios: { estado: dbRow.estado_of_sillas_escritorios || "" },
+        of_puerta: { estado: dbRow.estado_of_puerta || "" },
+        of_recoleccion_basura: { estado: dbRow.estado_of_recoleccion_basura || "" },
+        of_ventanas: { estado: dbRow.estado_of_ventanas || "" },
+        of_cielos_falsos: { estado: dbRow.estado_of_cielos_falsos || "" },
 
-    const items = isWide
-        ? {
-            // Oficinas
-            of_pisos: { estado: dbRow.estado_of_pisos || "", comentario: dbRow.comentario_of_pisos || "" },
-            of_muebles: { estado: dbRow.estado_of_muebles || "", comentario: dbRow.comentario_of_muebles || "" },
-            of_sillas_escritorios: { estado: dbRow.estado_of_sillas_escritorios || "", comentario: dbRow.comentario_of_sillas_escritorios || "" },
-            of_puerta: { estado: dbRow.estado_of_puerta || "", comentario: dbRow.comentario_of_puerta || "" },
-            of_recoleccion_basura: { estado: dbRow.estado_of_recoleccion_basura || "", comentario: dbRow.comentario_of_recoleccion_basura || "" },
-            of_ventanas: { estado: dbRow.estado_of_ventanas || "", comentario: dbRow.comentario_of_ventanas || "" },
-            of_cielos_falsos: { estado: dbRow.estado_of_cielos_falsos || "", comentario: dbRow.comentario_of_cielos_falsos || "" },
+        // Sala de Reuniones
+        sr_pisos: { estado: dbRow.estado_sr_pisos || "" },
+        sr_muebles: { estado: dbRow.estado_sr_muebles || "" },
+        sr_ventanas: { estado: dbRow.estado_sr_ventanas || "" },
+        sr_cielos_falsos: { estado: dbRow.estado_sr_cielos_falsos || "" },
 
-            // Sala de Reuniones
-            sr_pisos: { estado: dbRow.estado_sr_pisos || "", comentario: dbRow.comentario_sr_pisos || "" },
-            sr_muebles: { estado: dbRow.estado_sr_muebles || "", comentario: dbRow.comentario_sr_muebles || "" },
-            sr_ventanas: { estado: dbRow.estado_sr_ventanas || "", comentario: dbRow.comentario_sr_ventanas || "" },
-            sr_cielos_falsos: { estado: dbRow.estado_sr_cielos_falsos || "", comentario: dbRow.comentario_sr_cielos_falsos || "" },
-
-            // Comedor
-            com_sillas_mesas: { estado: dbRow.estado_com_sillas_mesas || "", comentario: dbRow.comentario_com_sillas_mesas || "" },
-            com_recoleccion_basura: { estado: dbRow.estado_com_recoleccion_basura || "", comentario: dbRow.comentario_com_recoleccion_basura || "" },
-            com_dispensadores_agua: { estado: dbRow.estado_com_dispensadores_agua || "", comentario: dbRow.comentario_com_dispensadores_agua || "" },
-            com_pisos: { estado: dbRow.estado_com_pisos || "", comentario: dbRow.comentario_com_pisos || "" },
-            com_puerta_entrada: { estado: dbRow.estado_com_puerta_entrada || "", comentario: dbRow.comentario_com_puerta_entrada || "" },
-            com_microondas: { estado: dbRow.estado_com_microondas || "", comentario: dbRow.comentario_com_microondas || "" },
-            com_refrigeradoras: { estado: dbRow.estado_com_refrigeradoras || "", comentario: dbRow.comentario_com_refrigeradoras || "" },
-            com_techo: { estado: dbRow.estado_com_techo || "", comentario: dbRow.comentario_com_techo || "" },
-            com_persianas: { estado: dbRow.estado_com_persianas || "", comentario: dbRow.comentario_com_persianas || "" },
-            com_paredes: { estado: dbRow.estado_com_paredes || "", comentario: dbRow.comentario_com_paredes || "" },
-        }
-        : ITEMS.reduce((acc, it) => {
-            const f = (dbRow.items || []).find((x) => x.item_key === it.key);
-            acc[it.key] = { estado: f?.estado || "", comentario: f?.comentario || "" };
-            return acc;
-        }, {});
+        // Comedor
+        com_sillas_mesas: { estado: dbRow.estado_com_sillas_mesas || "" },
+        com_recoleccion_basura: { estado: dbRow.estado_com_recoleccion_basura || "" },
+        com_dispensadores_agua: { estado: dbRow.estado_com_dispensadores_agua || "" },
+        com_pisos: { estado: dbRow.estado_com_pisos || "" },
+        com_puerta_entrada: { estado: dbRow.estado_com_puerta_entrada || "" },
+        com_microondas: { estado: dbRow.estado_com_microondas || "" },
+        com_refrigeradoras: { estado: dbRow.estado_com_refrigeradoras || "" },
+        com_techo: { estado: dbRow.estado_com_techo || "" },
+        com_persianas: { estado: dbRow.estado_com_persianas || "" },
+        com_paredes: { estado: dbRow.estado_com_paredes || "" },
+    };
 
     return {
         id: dbRow.id,
@@ -123,14 +112,14 @@ const packRow = (dbRow) => {
         hora_registro: dbRow.hora_registro,
         firma_encargado: dbRow.firma_encargado,
         verificacion_inocuidad: dbRow.verificacion_inocuidad,
-        fecha_correccion: dbRow.fecha_correccion,
+        fecha_registro_sistema: dbRow.created_at ?? dbRow.fecha_correccion ?? null, // preferimos created_at
         revisado: dbRow.revisado ?? false,
         revisado_por_username: dbRow.revisado_por_username ?? null,
         revisado_fecha: dbRow.revisado_fecha ?? null,
+        observaciones: dbRow.observaciones || "",
         items,
     };
 };
-
 
 export default function LimpiezaOficinaReunionesComedor() {
     const toast = useRef(null);
@@ -145,9 +134,7 @@ export default function LimpiezaOficinaReunionesComedor() {
     const [submitted, setSubmitted] = useState(false);
     const [form, setForm] = useState(emptyForm());
 
-    // filtro revisado
     const [filtroRevisado, setFiltroRevisado] = useState("all"); // 'all' | 'checked' | 'unchecked'
-    // permisos
     const { canReview, username } = useCanReview();
 
     const grupos = {
@@ -159,7 +146,6 @@ export default function LimpiezaOficinaReunionesComedor() {
     const showToast = (severity, summary, detail, life = 3000) =>
         toast.current?.show({ severity, summary, detail, life });
 
-    // Reemplaza tu fetchRegistros por este:
     const fetchRegistros = async () => {
         try {
             setLoading(true);
@@ -167,33 +153,35 @@ export default function LimpiezaOficinaReunionesComedor() {
             let query = supabase
                 .from("limpieza_oficina_reuniones_comedor_1")
                 .select(`
-        id, fecha_registro, hora_registro, firma_encargado, verificacion_inocuidad,
-        fecha_correccion, revisado, revisado_por_username, revisado_fecha,
+          id, fecha_registro, hora_registro, firma_encargado, verificacion_inocuidad,
+          created_at, fecha_correccion,
+          revisado, revisado_por_username, revisado_fecha,
+          observaciones,
 
-        estado_of_pisos, comentario_of_pisos,
-        estado_of_muebles, comentario_of_muebles,
-        estado_of_sillas_escritorios, comentario_of_sillas_escritorios,
-        estado_of_puerta, comentario_of_puerta,
-        estado_of_recoleccion_basura, comentario_of_recoleccion_basura,
-        estado_of_ventanas, comentario_of_ventanas,
-        estado_of_cielos_falsos, comentario_of_cielos_falsos,
+          estado_of_pisos,
+          estado_of_muebles,
+          estado_of_sillas_escritorios,
+          estado_of_puerta,
+          estado_of_recoleccion_basura,
+          estado_of_ventanas,
+          estado_of_cielos_falsos,
 
-        estado_sr_pisos, comentario_sr_pisos,
-        estado_sr_muebles, comentario_sr_muebles,
-        estado_sr_ventanas, comentario_sr_ventanas,
-        estado_sr_cielos_falsos, comentario_sr_cielos_falsos,
+          estado_sr_pisos,
+          estado_sr_muebles,
+          estado_sr_ventanas,
+          estado_sr_cielos_falsos,
 
-        estado_com_sillas_mesas, comentario_com_sillas_mesas,
-        estado_com_recoleccion_basura, comentario_com_recoleccion_basura,
-        estado_com_dispensadores_agua, comentario_com_dispensadores_agua,
-        estado_com_pisos, comentario_com_pisos,
-        estado_com_puerta_entrada, comentario_com_puerta_entrada,
-        estado_com_microondas, comentario_com_microondas,
-        estado_com_refrigeradoras, comentario_com_refrigeradoras,
-        estado_com_techo, comentario_com_techo,
-        estado_com_persianas, comentario_com_persianas,
-        estado_com_paredes, comentario_com_paredes
-      `)
+          estado_com_sillas_mesas,
+          estado_com_recoleccion_basura,
+          estado_com_dispensadores_agua,
+          estado_com_pisos,
+          estado_com_puerta_entrada,
+          estado_com_microondas,
+          estado_com_refrigeradoras,
+          estado_com_techo,
+          estado_com_persianas,
+          estado_com_paredes
+        `)
                 .order("fecha_registro", { ascending: false });
 
             if (filtroRevisado === "checked") query = query.eq("revisado", true);
@@ -210,91 +198,74 @@ export default function LimpiezaOficinaReunionesComedor() {
         }
     };
 
+    useEffect(() => { fetchRegistros(); }, [filtroRevisado]);
 
-    useEffect(() => {
-        fetchRegistros();
-    }, [filtroRevisado]);
-
-    const openNew = () => {
-        setForm(emptyForm());
-        setSubmitted(false);
-        setDialogOpen(true);
-    };
-    const hideDialog = () => {
-        setDialogOpen(false);
-        setSubmitted(false);
-    };
+    const openNew = () => { setForm(emptyForm()); setSubmitted(false); setDialogOpen(true); };
+    const hideDialog = () => { setDialogOpen(false); setSubmitted(false); };
 
     const onHeaderChange = (e, field) => setForm((p) => ({ ...p, [field]: e.target.value }));
-    const onItemChange = (key, field, value) =>
-        setForm((p) => ({ ...p, items: { ...p.items, [key]: { ...(p.items[key] || {}), [field]: value } } }));
+    const onItemChange = (key, value) =>
+        setForm((p) => ({ ...p, items: { ...p.items, [key]: { estado: value } } }));
 
     const validate = () => {
         const errors = [];
         ITEMS.forEach((it) => {
             const v = form.items[it.key]?.estado;
             if (!v) errors.push(`Seleccione estado para: ${it.label}`);
-            if (v && v !== "C" && !form.items[it.key]?.comentario?.trim())
-                errors.push(`Comentario requerido en ${it.label} (NC/NA).`);
         });
         return errors;
     };
 
-    // Reemplaza tu save por este:
     const save = async () => {
         setSubmitted(true);
         const errs = validate();
         if (errs.length) { showToast("warn", "Validación", errs[0]); return; }
 
         try {
-            const p = (k) => ({
-                estado: form.items[k]?.estado || null,
-                comentario: form.items[k]?.comentario || null,
-            });
-
             const payload = {
                 fecha_registro: form.fecha_registro,
                 hora_registro: form.hora_registro,
                 firma_encargado: form.firma_encargado || "",
                 verificacion_inocuidad: form.verificacion_inocuidad || null,
+                observaciones: form.observaciones?.trim() ? form.observaciones : null,
 
                 // Oficinas
-                estado_of_pisos: p("of_pisos").estado, comentario_of_pisos: p("of_pisos").comentario,
-                estado_of_muebles: p("of_muebles").estado, comentario_of_muebles: p("of_muebles").comentario,
-                estado_of_sillas_escritorios: p("of_sillas_escritorios").estado, comentario_of_sillas_escritorios: p("of_sillas_escritorios").comentario,
-                estado_of_puerta: p("of_puerta").estado, comentario_of_puerta: p("of_puerta").comentario,
-                estado_of_recoleccion_basura: p("of_recoleccion_basura").estado, comentario_of_recoleccion_basura: p("of_recoleccion_basura").comentario,
-                estado_of_ventanas: p("of_ventanas").estado, comentario_of_ventanas: p("of_ventanas").comentario,
-                estado_of_cielos_falsos: p("of_cielos_falsos").estado, comentario_of_cielos_falsos: p("of_cielos_falsos").comentario,
+                estado_of_pisos: form.items.of_pisos?.estado,
+                estado_of_muebles: form.items.of_muebles?.estado,
+                estado_of_sillas_escritorios: form.items.of_sillas_escritorios?.estado,
+                estado_of_puerta: form.items.of_puerta?.estado,
+                estado_of_recoleccion_basura: form.items.of_recoleccion_basura?.estado,
+                estado_of_ventanas: form.items.of_ventanas?.estado,
+                estado_of_cielos_falsos: form.items.of_cielos_falsos?.estado,
 
-
-                estado_sr_pisos: p("sr_pisos").estado, comentario_sr_pisos: p("sr_pisos").comentario,
-                estado_sr_muebles: p("sr_muebles").estado, comentario_sr_muebles: p("sr_muebles").comentario,
-                estado_sr_ventanas: p("sr_ventanas").estado, comentario_sr_ventanas: p("sr_ventanas").comentario,
-                estado_sr_cielos_falsos: p("sr_cielos_falsos").estado, comentario_sr_cielos_falsos: p("sr_cielos_falsos").comentario,
+                // Sala de Reuniones
+                estado_sr_pisos: form.items.sr_pisos?.estado,
+                estado_sr_muebles: form.items.sr_muebles?.estado,
+                estado_sr_ventanas: form.items.sr_ventanas?.estado,
+                estado_sr_cielos_falsos: form.items.sr_cielos_falsos?.estado,
 
                 // Comedor
-                estado_com_sillas_mesas: p("com_sillas_mesas").estado, comentario_com_sillas_mesas: p("com_sillas_mesas").comentario,
-                estado_com_recoleccion_basura: p("com_recoleccion_basura").estado, comentario_com_recoleccion_basura: p("com_recoleccion_basura").comentario,
-                estado_com_dispensadores_agua: p("com_dispensadores_agua").estado, comentario_com_dispensadores_agua: p("com_dispensadores_agua").comentario,
-                estado_com_pisos: p("com_pisos").estado, comentario_com_pisos: p("com_pisos").comentario,
-                estado_com_puerta_entrada: p("com_puerta_entrada").estado, comentario_com_puerta_entrada: p("com_puerta_entrada").comentario,
-                estado_com_microondas: p("com_microondas").estado, comentario_com_microondas: p("com_microondas").comentario,
-                estado_com_refrigeradoras: p("com_refrigeradoras").estado, comentario_com_refrigeradoras: p("com_refrigeradoras").comentario,
-                estado_com_techo: p("com_techo").estado, comentario_com_techo: p("com_techo").comentario,
-                estado_com_persianas: p("com_persianas").estado, comentario_com_persianas: p("com_persianas").comentario,
-                estado_com_paredes: p("com_paredes").estado, comentario_com_paredes: p("com_paredes").comentario,
+                estado_com_sillas_mesas: form.items.com_sillas_mesas?.estado,
+                estado_com_recoleccion_basura: form.items.com_recoleccion_basura?.estado,
+                estado_com_dispensadores_agua: form.items.com_dispensadores_agua?.estado,
+                estado_com_pisos: form.items.com_pisos?.estado,
+                estado_com_puerta_entrada: form.items.com_puerta_entrada?.estado,
+                estado_com_microondas: form.items.com_microondas?.estado,
+                estado_com_refrigeradoras: form.items.com_refrigeradoras?.estado,
+                estado_com_techo: form.items.com_techo?.estado,
+                estado_com_persianas: form.items.com_persianas?.estado,
+                estado_com_paredes: form.items.com_paredes?.estado,
             };
 
-            const { error } = await supabase
+            const { data, error } = await supabase
                 .from("limpieza_oficina_reuniones_comedor_1")
                 .insert([payload])
-                .select("id")
+                .select("id, created_at")
                 .single();
 
             if (error) throw error;
 
-            showToast("success", "Éxito", "Registro guardado correctamente");
+            showToast("success", "Éxito", `Registro guardado. Fecha de Registro (auto): ${new Date(data.created_at).toLocaleString()}`);
             setDialogOpen(false);
             setForm(emptyForm());
             setSubmitted(false);
@@ -305,18 +276,13 @@ export default function LimpiezaOficinaReunionesComedor() {
         }
     };
 
-
     const countBy = (row, val) => ITEMS.reduce((acc, it) => acc + (row.items?.[it.key]?.estado === val ? 1 : 0), 0);
 
-    // plantilla de checkbox revisado
     const revisadoTemplate = (row) => {
         if (!canReview) return <span>{row.revisado ? "Sí" : "No"}</span>;
 
         const onToggle = async (next) => {
-            if (!username) {
-                showToast("warn", "Sesión", "No se detectó el usuario actual.");
-                return;
-            }
+            if (!username) { showToast("warn", "Sesión", "No se detectó el usuario actual."); return; }
             const { error } = await supabase
                 .from("limpieza_oficina_reuniones_comedor_1")
                 .update({
@@ -326,21 +292,12 @@ export default function LimpiezaOficinaReunionesComedor() {
                 })
                 .eq("id", row.id);
 
-
-            if (error) {
-                showToast("error", "No se guardó", error.message);
-                return;
-            }
+            if (error) { showToast("error", "No se guardó", error.message); return; }
 
             setRows((prev) =>
                 prev.map((r) =>
                     r.id === row.id
-                        ? {
-                            ...r,
-                            revisado: next,
-                            revisado_por_username: next ? username : null,
-                            revisado_fecha: next ? new Date().toISOString() : null,
-                        }
+                        ? { ...r, revisado: next, revisado_por_username: next ? username : null, revisado_fecha: next ? new Date().toISOString() : null }
                         : r
                 )
             );
@@ -349,14 +306,8 @@ export default function LimpiezaOficinaReunionesComedor() {
 
         return (
             <div className="flex align-items-center justify-content-center gap-2">
-                <Checkbox
-                    inputId={`chk-rev-ofi-${row.id}`}
-                    checked={!!row.revisado}
-                    onChange={(e) => onToggle(e.checked)}
-                />
-                <label htmlFor={`chk-rev-ofi-${row.id}`} className="text-sm">
-                    Revisado
-                </label>
+                <Checkbox inputId={`chk-rev-ofi-${row.id}`} checked={!!row.revisado} onChange={(e) => onToggle(e.checked)} />
+                <label htmlFor={`chk-rev-ofi-${row.id}`} className="text-sm">Revisado</label>
             </div>
         );
     };
@@ -368,12 +319,12 @@ export default function LimpiezaOficinaReunionesComedor() {
                 hora_registro: r.hora_registro,
                 firma_encargado: r.firma_encargado,
                 verificacion_inocuidad: r.verificacion_inocuidad,
-                fecha_correccion: r.fecha_correccion ? new Date(r.fecha_correccion).toLocaleString() : "",
+                "fecha registro (sistema)": r.fecha_registro_sistema ? new Date(r.fecha_registro_sistema).toLocaleString() : "",
                 revisado: r.revisado ? "Sí" : "No",
+                observaciones: r.observaciones || "",
             };
             ITEMS.forEach((it) => {
                 base[`${it.grupo} - ${it.label}`] = r.items?.[it.key]?.estado || "";
-                base[`${it.grupo} - ${it.label} (comentario)`] = r.items?.[it.key]?.comentario || "";
             });
             return base;
         });
@@ -383,7 +334,6 @@ export default function LimpiezaOficinaReunionesComedor() {
         XLSX.writeFile(wb, `Limpieza_Oficina_Reuniones_Comedor_${new Date().toISOString().slice(0, 10)}.xlsx`);
     };
 
-    // header con búsqueda + filtro
     const header = (
         <div className="flex flex-wrap gap-2 align-items-center justify-content-between">
             <span className="p-input-icon-left">
@@ -428,22 +378,12 @@ export default function LimpiezaOficinaReunionesComedor() {
                         <b className="bold-space">NC</b> (No cumple),
                         <b className="bold-space">NA</b> (No aplica).
                     </span>
-                    <br />
-                    <span>
-                        Para <b className="bold-space">NC/NA</b> el comentario es obligatorio.
-                    </span>
-                    <br />
-
                 </p>
             </div>
 
             <div className="buttons-container">
-                <button onClick={() => navigate(-1)} className="return-button">
-                    Volver
-                </button>
-                <button onClick={() => navigate(-2)} className="menu-button">
-                    Menú principal
-                </button>
+                <button onClick={() => navigate(-1)} className="return-button">Volver</button>
+                <button onClick={() => navigate(-2)} className="menu-button">Menú principal</button>
             </div>
 
             <Toolbar
@@ -474,18 +414,25 @@ export default function LimpiezaOficinaReunionesComedor() {
                 <Column field="firma_encargado" header="Operario" />
 
                 <Column
-                    field="fecha_correccion"
+                    field="fecha_registro_sistema"
                     header="Fecha de Registro"
-                    body={(r) => (r.fecha_correccion ? new Date(r.fecha_correccion).toLocaleString() : "")}
+                    body={(r) => (r.fecha_registro_sistema ? new Date(r.fecha_registro_sistema).toLocaleString() : "")}
                     sortable
                 />
                 <Column header="#C" body={(r) => countBy(r, "C")} />
                 <Column header="#NC" body={(r) => countBy(r, "NC")} />
                 <Column header="#NA" body={(r) => countBy(r, "NA")} />
+
                 {ITEMS.map((it) => (
-                    <Column key={it.key} header={`${it.grupo} - ${it.label}`} body={(row) => row.items?.[it.key]?.estado || ""} />
+                    <Column
+                        key={it.key}
+                        header={`${it.grupo} - ${it.label}`}
+                        body={(row) => row.items?.[it.key]?.estado || ""}
+                    />
                 ))}
-                {/* última columna: checkbox revisado */}
+
+                <Column field="observaciones" header="Observaciones" body={(r) => r.observaciones || "—"} />
+
                 <Column header="Revisado" body={revisadoTemplate} style={{ width: "10rem", textAlign: "center" }} />
             </DataTable>
 
@@ -516,24 +463,17 @@ export default function LimpiezaOficinaReunionesComedor() {
                         <InputText value={form.firma_encargado} onChange={(e) => onHeaderChange(e, "firma_encargado")} />
                     </div>
 
-                    {/* Títulos MÁS GRANDES para diferenciar secciones en el modal */}
                     {["Oficinas", "Sala de Reuniones", "Comedor"].map((g) => (
                         <div key={g} className="col-12">
                             <div
                                 className="mb-3"
-                                style={{
-                                    fontSize: "1.6rem",
-                                    fontWeight: 800,
-                                    padding: "6px 0",
-                                    borderBottom: "2px solid #e9ecef",
-                                }}
+                                style={{ fontSize: "1.6rem", fontWeight: 800, padding: "6px 0", borderBottom: "2px solid #e9ecef" }}
                             >
                                 {g}
                             </div>
                             <div className="grid">
                                 {grupos[g].map((it) => {
-                                    const val = form.items[it.key] || { estado: "", comentario: "" };
-                                    const necesitaComentario = val.estado && val.estado !== "C";
+                                    const val = form.items[it.key] || { estado: "" };
                                     return (
                                         <div className="field col-12 md:col-6" key={it.key}>
                                             <label className="font-bold">
@@ -542,21 +482,10 @@ export default function LimpiezaOficinaReunionesComedor() {
                                             <Dropdown
                                                 value={val.estado}
                                                 options={ESTADOS}
-                                                onChange={(e) => onItemChange(it.key, "estado", e.value)}
+                                                onChange={(e) => onItemChange(it.key, e.value)}
                                                 placeholder="Seleccione"
                                                 className="mb-2"
                                             />
-                                            {necesitaComentario && (
-                                                <>
-                                                    <small className="campo-note">Comentario obligatorio para NC o NA</small>
-                                                    <InputText
-                                                        value={val.comentario}
-                                                        onChange={(e) => onItemChange(it.key, "comentario", e.target.value)}
-                                                        placeholder="Explique la causa/acción correctiva"
-                                                    />
-                                                    {submitted && !val.comentario?.trim() && <small className="p-error"> Requerido</small>}
-                                                </>
-                                            )}
                                         </div>
                                     );
                                 })}
@@ -564,9 +493,19 @@ export default function LimpiezaOficinaReunionesComedor() {
                         </div>
                     ))}
 
-                    <div className="field col-12 md:col-6">
+                    <div className="field col-12">
                         <label className="font-bold">Fecha de Registro (auto)</label>
-                        <InputText value={form.fecha_correccion_preview} disabled />
+                        <InputText value={form.fecha_registro_preview} disabled />
+                        <small className="text-color-secondary">Se genera automáticamente al guardar.</small>
+                    </div>
+
+                    <div className="field col-12">
+                        <label className="font-bold">Observaciones</label>
+                        <InputText
+                            value={form.observaciones}
+                            onChange={(e) => onHeaderChange(e, "observaciones")}
+                            placeholder="Comentarios adicionales (opcional)"
+                        />
                     </div>
                 </div>
             </Dialog>

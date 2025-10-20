@@ -15,12 +15,9 @@ import { Dialog } from "primereact/dialog";
 import { InputText } from "primereact/inputtext";
 import { Dropdown } from "primereact/dropdown";
 import { Checkbox } from "primereact/checkbox";
+import * as XLSX from "xlsx";
 
-
-// 👇 importa tu CSS común de Inocuidad
 import "../Inocuidad.css";
-
-// Permisos (Mantenimiento01 / Produccion01)
 import useCanReview from "./Hooks/useCanReview.js";
 
 const ESTADOS = [
@@ -37,7 +34,7 @@ const ITEMS = [
     { key: "banos_orinales", label: "Orinales (Diario)", grupo: "Banos" },
     { key: "banos_recoleccion_basura", label: "Recolección de basura (Diario)", grupo: "Banos" },
     { key: "banos_paredes", label: "Paredes (Quincenal)", grupo: "Banos" },
-    { key: "banos_techos", label: "Techos (Semestral)", grupo: "Banos" }, // nuevo
+    { key: "banos_techos", label: "Techos (Semestral)", grupo: "Banos" },
 
     // Camerinos
     { key: "camerinos_pisos", label: "Pisos (Diario)", grupo: "Camerinos" },
@@ -76,51 +73,44 @@ const emptyForm = () => ({
     hora_registro: nowHM(),
     firma_encargado: "",
     verificacion_investigacion_desarrollo: "",
-    fecha_correccion_preview: new Date().toLocaleString(), // visual
+    observaciones: "", // ← nuevo
+    fecha_registro_preview: new Date().toLocaleString(), // visual
     items: ITEMS.reduce((acc, it) => {
-        acc[it.key] = { estado: "", comentario: "" };
+        acc[it.key] = { estado: "" }; // ← sin comentario
         return acc;
     }, {}),
 });
 
+// DB -> UI (solo estados)
 const packRow = (dbRow) => {
-    const fromWide =
-        dbRow.estado_banos_sanitarios !== undefined ||
-        dbRow.estado_camerinos_pisos !== undefined ||
-        dbRow.estado_crecimiento_piso !== undefined ||
-        dbRow.estado_pediluvios_area_externa !== undefined;
+    const itemsMap = {
+        // Baños
+        banos_sanitarios: { estado: dbRow.estado_banos_sanitarios || "" },
+        banos_pisos: { estado: dbRow.estado_banos_pisos || "" },
+        banos_lavamanos: { estado: dbRow.estado_banos_lavamanos || "" },
+        banos_orinales: { estado: dbRow.estado_banos_orinales || "" },
+        banos_recoleccion_basura: { estado: dbRow.estado_banos_recoleccion_basura || "" },
+        banos_paredes: { estado: dbRow.estado_banos_paredes || "" },
+        banos_techos: { estado: dbRow.estado_banos_techos || "" },
 
-    const itemsMap = fromWide
-        ? {
-            // Baños
-            banos_sanitarios: { estado: dbRow.estado_banos_sanitarios || "", comentario: dbRow.comentario_banos_sanitarios || "" },
-            banos_pisos: { estado: dbRow.estado_banos_pisos || "", comentario: dbRow.comentario_banos_pisos || "" },
-            banos_lavamanos: { estado: dbRow.estado_banos_lavamanos || "", comentario: dbRow.comentario_banos_lavamanos || "" },
-            banos_orinales: { estado: dbRow.estado_banos_orinales || "", comentario: dbRow.comentario_banos_orinales || "" },
-            banos_recoleccion_basura: { estado: dbRow.estado_banos_recoleccion_basura || "", comentario: dbRow.comentario_banos_recoleccion_basura || "" },
-            banos_paredes: { estado: dbRow.estado_banos_paredes || "", comentario: dbRow.comentario_banos_paredes || "" },
-            banos_techos: { estado: dbRow.estado_banos_techos || "", comentario: dbRow.comentario_banos_techos || "" },
-            // Camerinos
-            camerinos_pisos: { estado: dbRow.estado_camerinos_pisos || "", comentario: dbRow.comentario_camerinos_pisos || "" },
-            camerinos_lavamanos: { estado: dbRow.estado_camerinos_lavamanos || "", comentario: dbRow.comentario_camerinos_lavamanos || "" },
-            camerinos_paredes: { estado: dbRow.estado_camerinos_paredes || "", comentario: dbRow.comentario_camerinos_paredes || "" },
-            camerinos_casilleros_exterior: { estado: dbRow.estado_camerinos_casilleros_exterior || "", comentario: dbRow.comentario_camerinos_casilleros_exterior || "" },
-            // Crecimiento
-            crecimiento_piso: { estado: dbRow.estado_crecimiento_piso || "", comentario: dbRow.comentario_crecimiento_piso || "" },
-            crecimiento_muebles: { estado: dbRow.estado_crecimiento_muebles || "", comentario: dbRow.comentario_crecimiento_muebles || "" },
-            crecimiento_paredes: { estado: dbRow.estado_crecimiento_paredes || "", comentario: dbRow.comentario_crecimiento_paredes || "" },
-            crecimiento_techo: { estado: dbRow.estado_crecimiento_techo || "", comentario: dbRow.comentario_crecimiento_techo || "" },
-            // Pediluvios
-            pediluvios_area_externa: { estado: dbRow.estado_pediluvios_area_externa || "", comentario: dbRow.comentario_pediluvios_area_externa || "" },
-            pediluvios_area_interna: { estado: dbRow.estado_pediluvios_area_interna || "", comentario: dbRow.comentario_pediluvios_area_interna || "" },
-            pediluvios_solucion: { estado: dbRow.estado_pediluvios_solucion || "", comentario: dbRow.comentario_pediluvios_solucion || "" },
-            pediluvios_techo: { estado: dbRow.estado_pediluvios_techo || "", comentario: dbRow.comentario_pediluvios_techo || "" },
-        }
-        : ITEMS.reduce((acc, it) => {
-            const found = (dbRow.items || []).find((x) => x.item_key === it.key);
-            acc[it.key] = { estado: found?.estado || "", comentario: found?.comentario || "" };
-            return acc;
-        }, {});
+        // Camerinos
+        camerinos_pisos: { estado: dbRow.estado_camerinos_pisos || "" },
+        camerinos_lavamanos: { estado: dbRow.estado_camerinos_lavamanos || "" },
+        camerinos_paredes: { estado: dbRow.estado_camerinos_paredes || "" },
+        camerinos_casilleros_exterior: { estado: dbRow.estado_camerinos_casilleros_exterior || "" },
+
+        // Crecimiento
+        crecimiento_piso: { estado: dbRow.estado_crecimiento_piso || "" },
+        crecimiento_muebles: { estado: dbRow.estado_crecimiento_muebles || "" },
+        crecimiento_paredes: { estado: dbRow.estado_crecimiento_paredes || "" },
+        crecimiento_techo: { estado: dbRow.estado_crecimiento_techo || "" },
+
+        // Pediluvios
+        pediluvios_area_externa: { estado: dbRow.estado_pediluvios_area_externa || "" },
+        pediluvios_area_interna: { estado: dbRow.estado_pediluvios_area_interna || "" },
+        pediluvios_solucion: { estado: dbRow.estado_pediluvios_solucion || "" },
+        pediluvios_techo: { estado: dbRow.estado_pediluvios_techo || "" },
+    };
 
     return {
         id: dbRow.id,
@@ -128,14 +118,14 @@ const packRow = (dbRow) => {
         hora_registro: dbRow.hora_registro,
         firma_encargado: dbRow.firma_encargado,
         verificacion_investigacion_desarrollo: dbRow.verificacion_investigacion_desarrollo,
-        fecha_correccion: dbRow.fecha_correccion,
+        fecha_registro_sistema: dbRow.created_at ?? dbRow.fecha_correccion ?? null, // preferimos created_at
         revisado: dbRow.revisado ?? false,
         revisado_por_username: dbRow.revisado_por_username ?? null,
         revisado_fecha: dbRow.revisado_fecha ?? null,
+        observaciones: dbRow.observaciones || "",
         items: itemsMap,
     };
 };
-
 
 export default function LimpiezaBanosCasillerosPediluvios() {
     const toast = useRef(null);
@@ -150,7 +140,6 @@ export default function LimpiezaBanosCasillerosPediluvios() {
     const [submitted, setSubmitted] = useState(false);
     const [form, setForm] = useState(emptyForm());
 
-    // Filtro + permisos
     const [filtroRevisado, setFiltroRevisado] = useState("all");
     const { canReview, username } = useCanReview();
 
@@ -170,30 +159,25 @@ export default function LimpiezaBanosCasillerosPediluvios() {
             showToast("warn", "Exportación", "No hay registros para exportar.");
             return;
         }
+        const toFlat = (row) => {
+            const base = {
+                fecha_registro: row.fecha_registro,
+                hora_registro: row.hora_registro,
+                firma_encargado: row.firma_encargado || "",
+                verificacion_investigacion_desarrollo: row.verificacion_investigacion_desarrollo || "",
+                "fecha registro (sistema)": row.fecha_registro_sistema ? new Date(row.fecha_registro_sistema).toLocaleString() : "",
+                revisado: row.revisado ? "Sí" : "No",
+                observaciones: row.observaciones || "",
+            };
+            ITEMS.forEach((it) => {
+                const v = row.items?.[it.key] || {};
+                base[it.label] = v.estado || "";
+            });
+            return base;
+        };
 
         try {
-            // import dinámico (más compatible con Vite)
             const XLSX = await import("xlsx");
-
-            // aplanar fila para Excel
-            const toFlat = (row) => {
-                const base = {
-                    fecha_registro: row.fecha_registro,
-                    hora_registro: row.hora_registro,
-                    firma_encargado: row.firma_encargado || "",
-                    verificacion_investigacion_desarrollo: row.verificacion_investigacion_desarrollo || "",
-                    fecha_registro_sistema: row.fecha_correccion ? new Date(row.fecha_correccion).toLocaleString() : "",
-                    revisado: row.revisado ? "Sí" : "No",
-                };
-                // columnas por ítem (mismo criterio que usamos en otros módulos)
-                ITEMS.forEach((it) => {
-                    const v = row.items?.[it.key] || {};
-                    base[`${it.label}`] = v.estado || "";
-                    base[`${it.label} - comentario`] = v.comentario || "";
-                });
-                return base;
-            };
-
             const rowsToExport = data.map(toFlat);
             const ws = XLSX.utils.json_to_sheet(rowsToExport);
             const wb = XLSX.utils.book_new();
@@ -212,37 +196,39 @@ export default function LimpiezaBanosCasillerosPediluvios() {
             let query = supabase
                 .from("limpieza_banos_casilleros_pediluvios_1")
                 .select(`
-        id,
-        fecha_registro,
-        hora_registro,
-        firma_encargado,
-        verificacion_investigacion_desarrollo,
-        fecha_correccion,
-        revisado, revisado_por_username, revisado_fecha,
+          id,
+          fecha_registro,
+          hora_registro,
+          firma_encargado,
+          verificacion_investigacion_desarrollo,
+          created_at,
+          fecha_correccion,
+          revisado, revisado_por_username, revisado_fecha,
+          observaciones,
 
-        estado_banos_sanitarios, comentario_banos_sanitarios,
-        estado_banos_pisos, comentario_banos_pisos,
-        estado_banos_lavamanos, comentario_banos_lavamanos,
-        estado_banos_orinales, comentario_banos_orinales,
-        estado_banos_recoleccion_basura, comentario_banos_recoleccion_basura,
-        estado_banos_paredes, comentario_banos_paredes,
-        estado_banos_techos, comentario_banos_techos,
+          estado_banos_sanitarios,
+          estado_banos_pisos,
+          estado_banos_lavamanos,
+          estado_banos_orinales,
+          estado_banos_recoleccion_basura,
+          estado_banos_paredes,
+          estado_banos_techos,
 
-        estado_camerinos_pisos, comentario_camerinos_pisos,
-        estado_camerinos_lavamanos, comentario_camerinos_lavamanos,
-        estado_camerinos_paredes, comentario_camerinos_paredes,
-        estado_camerinos_casilleros_exterior, comentario_camerinos_casilleros_exterior,
+          estado_camerinos_pisos,
+          estado_camerinos_lavamanos,
+          estado_camerinos_paredes,
+          estado_camerinos_casilleros_exterior,
 
-        estado_crecimiento_piso, comentario_crecimiento_piso,
-        estado_crecimiento_muebles, comentario_crecimiento_muebles,
-        estado_crecimiento_paredes, comentario_crecimiento_paredes,
-        estado_crecimiento_techo, comentario_crecimiento_techo,
+          estado_crecimiento_piso,
+          estado_crecimiento_muebles,
+          estado_crecimiento_paredes,
+          estado_crecimiento_techo,
 
-        estado_pediluvios_area_externa, comentario_pediluvios_area_externa,
-        estado_pediluvios_area_interna, comentario_pediluvios_area_interna,
-        estado_pediluvios_solucion, comentario_pediluvios_solucion,
-        estado_pediluvios_techo, comentario_pediluvios_techo
-      `)
+          estado_pediluvios_area_externa,
+          estado_pediluvios_area_interna,
+          estado_pediluvios_solucion,
+          estado_pediluvios_techo
+        `)
                 .order("fecha_registro", { ascending: false });
 
             if (filtroRevisado === "checked") query = query.eq("revisado", true);
@@ -259,24 +245,20 @@ export default function LimpiezaBanosCasillerosPediluvios() {
         }
     };
 
-
     useEffect(() => { fetchRows(); }, [filtroRevisado]);
 
     const openNew = () => { setForm(emptyForm()); setSubmitted(false); setDialogOpen(true); };
     const hideDialog = () => { setDialogOpen(false); setSubmitted(false); };
 
     const onHeaderChange = (e, field) => setForm((p) => ({ ...p, [field]: e.target.value }));
-    const onItemChange = (key, field, value) =>
-        setForm((p) => ({ ...p, items: { ...p.items, [key]: { ...(p.items[key] || {}), [field]: value } } }));
+    const onItemChange = (key, value) =>
+        setForm((p) => ({ ...p, items: { ...p.items, [key]: { estado: value } } }));
 
     const validate = () => {
         const errs = [];
         ITEMS.forEach((it) => {
             const v = form.items[it.key]?.estado;
             if (!v) errs.push(`Seleccione estado para: ${it.label}`);
-            if (v && v !== "C" && !form.items[it.key]?.comentario?.trim()) {
-                errs.push(`Comentario requerido en ${it.label} (NC/NA).`);
-            }
         });
         return errs;
     };
@@ -287,54 +269,50 @@ export default function LimpiezaBanosCasillerosPediluvios() {
         if (errs.length) { showToast("error", "Validación", errs[0]); return; }
 
         try {
-            const p = (k) => ({
-                estado: form.items[k]?.estado || null,
-                comentario: form.items[k]?.comentario || null,
-            });
-
             const payload = {
                 fecha_registro: form.fecha_registro,
                 hora_registro: form.hora_registro,
                 firma_encargado: form.firma_encargado || "",
                 verificacion_investigacion_desarrollo: form.verificacion_investigacion_desarrollo || null,
+                observaciones: form.observaciones?.trim() ? form.observaciones : null,
 
                 // Baños
-                estado_banos_sanitarios: p("banos_sanitarios").estado, comentario_banos_sanitarios: p("banos_sanitarios").comentario,
-                estado_banos_pisos: p("banos_pisos").estado, comentario_banos_pisos: p("banos_pisos").comentario,
-                estado_banos_lavamanos: p("banos_lavamanos").estado, comentario_banos_lavamanos: p("banos_lavamanos").comentario,
-                estado_banos_orinales: p("banos_orinales").estado, comentario_banos_orinales: p("banos_orinales").comentario,
-                estado_banos_recoleccion_basura: p("banos_recoleccion_basura").estado, comentario_banos_recoleccion_basura: p("banos_recoleccion_basura").comentario,
-                estado_banos_paredes: p("banos_paredes").estado, comentario_banos_paredes: p("banos_paredes").comentario,
-                estado_banos_techos: p("banos_techos").estado, comentario_banos_techos: p("banos_techos").comentario,
+                estado_banos_sanitarios: form.items.banos_sanitarios?.estado,
+                estado_banos_pisos: form.items.banos_pisos?.estado,
+                estado_banos_lavamanos: form.items.banos_lavamanos?.estado,
+                estado_banos_orinales: form.items.banos_orinales?.estado,
+                estado_banos_recoleccion_basura: form.items.banos_recoleccion_basura?.estado,
+                estado_banos_paredes: form.items.banos_paredes?.estado,
+                estado_banos_techos: form.items.banos_techos?.estado,
 
                 // Camerinos
-                estado_camerinos_pisos: p("camerinos_pisos").estado, comentario_camerinos_pisos: p("camerinos_pisos").comentario,
-                estado_camerinos_lavamanos: p("camerinos_lavamanos").estado, comentario_camerinos_lavamanos: p("camerinos_lavamanos").comentario,
-                estado_camerinos_paredes: p("camerinos_paredes").estado, comentario_camerinos_paredes: p("camerinos_paredes").comentario,
-                estado_camerinos_casilleros_exterior: p("camerinos_casilleros_exterior").estado, comentario_camerinos_casilleros_exterior: p("camerinos_casilleros_exterior").comentario,
+                estado_camerinos_pisos: form.items.camerinos_pisos?.estado,
+                estado_camerinos_lavamanos: form.items.camerinos_lavamanos?.estado,
+                estado_camerinos_paredes: form.items.camerinos_paredes?.estado,
+                estado_camerinos_casilleros_exterior: form.items.camerinos_casilleros_exterior?.estado,
 
                 // Crecimiento
-                estado_crecimiento_piso: p("crecimiento_piso").estado, comentario_crecimiento_piso: p("crecimiento_piso").comentario,
-                estado_crecimiento_muebles: p("crecimiento_muebles").estado, comentario_crecimiento_muebles: p("crecimiento_muebles").comentario,
-                estado_crecimiento_paredes: p("crecimiento_paredes").estado, comentario_crecimiento_paredes: p("crecimiento_paredes").comentario,
-                estado_crecimiento_techo: p("crecimiento_techo").estado, comentario_crecimiento_techo: p("crecimiento_techo").comentario,
+                estado_crecimiento_piso: form.items.crecimiento_piso?.estado,
+                estado_crecimiento_muebles: form.items.crecimiento_muebles?.estado,
+                estado_crecimiento_paredes: form.items.crecimiento_paredes?.estado,
+                estado_crecimiento_techo: form.items.crecimiento_techo?.estado,
 
                 // Pediluvios
-                estado_pediluvios_area_externa: p("pediluvios_area_externa").estado, comentario_pediluvios_area_externa: p("pediluvios_area_externa").comentario,
-                estado_pediluvios_area_interna: p("pediluvios_area_interna").estado, comentario_pediluvios_area_interna: p("pediluvios_area_interna").comentario,
-                estado_pediluvios_solucion: p("pediluvios_solucion").estado, comentario_pediluvios_solucion: p("pediluvios_solucion").comentario,
-                estado_pediluvios_techo: p("pediluvios_techo").estado, comentario_pediluvios_techo: p("pediluvios_techo").comentario,
+                estado_pediluvios_area_externa: form.items.pediluvios_area_externa?.estado,
+                estado_pediluvios_area_interna: form.items.pediluvios_area_interna?.estado,
+                estado_pediluvios_solucion: form.items.pediluvios_solucion?.estado,
+                estado_pediluvios_techo: form.items.pediluvios_techo?.estado,
             };
 
-            const { error } = await supabase
+            const { data, error } = await supabase
                 .from("limpieza_banos_casilleros_pediluvios_1")
                 .insert([payload])
-                .select("id")
+                .select("id, created_at")
                 .single();
 
             if (error) throw error;
 
-            showToast("success", "Éxito", "Registro guardado correctamente");
+            showToast("success", "Éxito", `Registro guardado. Fecha de Registro (auto): ${new Date(data.created_at).toLocaleString()}`);
             await fetchRows();
             setDialogOpen(false);
             setForm(emptyForm());
@@ -345,8 +323,8 @@ export default function LimpiezaBanosCasillerosPediluvios() {
         }
     };
 
-
-    const countBy = (row, val) => ITEMS.reduce((acc, it) => acc + (row.items?.[it.key]?.estado === val ? 1 : 0), 0);
+    const countBy = (row, val) =>
+        ITEMS.reduce((acc, it) => acc + (row.items?.[it.key]?.estado === val ? 1 : 0), 0);
 
     const dynamicColumns = ITEMS.map((it) => ({
         header: it.label,
@@ -367,14 +345,15 @@ export default function LimpiezaBanosCasillerosPediluvios() {
                 })
                 .eq("id", row.id);
 
-
             if (error) { showToast("error", "No se guardó", error.message); return; }
 
-            setRows((prev) => prev.map((r) =>
-                r.id === row.id
-                    ? { ...r, revisado: next, revisado_por_username: next ? username : null, revisado_fecha: next ? new Date().toISOString() : null }
-                    : r
-            ));
+            setRows((prev) =>
+                prev.map((r) =>
+                    r.id === row.id
+                        ? { ...r, revisado: next, revisado_por_username: next ? username : null, revisado_fecha: next ? new Date().toISOString() : null }
+                        : r
+                )
+            );
             showToast("success", "OK", next ? "Marcado revisado" : "Marcado no revisado");
         };
 
@@ -426,16 +405,10 @@ export default function LimpiezaBanosCasillerosPediluvios() {
                 <p style={{ textAlign: "center" }}>
                     <span>
                         <b className="bold-space">Rúbrica:</b>
-                        <b className="bold-space">C</b> (Cumple),
-                        <b className="bold-space">NC</b> (No cumple),
-                        <b className="bold-space">NA</b> (No aplica).
+                        <b className="bold-space"> C</b> (Cumple),
+                        <b className="bold-space"> NC</b> (No cumple),
+                        <b className="bold-space"> NA</b> (No aplica).
                     </span>
-                    <br />
-                    <span>
-                        Para <b className="bold-space">NC/NA</b> el comentario es obligatorio.
-                    </span>
-                    <br />
-
                 </p>
             </div>
 
@@ -446,7 +419,7 @@ export default function LimpiezaBanosCasillerosPediluvios() {
 
             <Toolbar
                 className="mb-4"
-                left={() => <Button label="Nuevo" icon="pi pi-plus" severity="success" onClick={openNew} />}
+                left={() => <Button label="Nuevo" icon="pi pi-plus" severity="success" onClick={() => { setForm(emptyForm()); setSubmitted(false); setDialogOpen(true); }} />}
                 right={() => <Button label="Exportar a Excel" icon="pi pi-upload" className="p-button-help" onClick={exportXlsx} />}
             />
 
@@ -458,7 +431,9 @@ export default function LimpiezaBanosCasillerosPediluvios() {
                 selectionMode="multiple"
                 header={header}
                 globalFilter={globalFilter}
-                paginator rows={10} rowsPerPageOptions={[5, 10, 25]}
+                paginator
+                rows={10}
+                rowsPerPageOptions={[5, 10, 25]}
                 paginatorTemplate="FirstPageLink PrevPageLink PageLinks NextPageLink LastPageLink CurrentPageReport RowsPerPageDropdown"
                 currentPageReportTemplate="Mostrando del {first} al {last} de {totalRecords} Registros"
                 dataKey="id"
@@ -470,17 +445,21 @@ export default function LimpiezaBanosCasillerosPediluvios() {
                 <Column field="firma_encargado" header="Operario" />
 
                 <Column
-                    field="fecha_correccion"
+                    field="fecha_registro_sistema"
                     header="Fecha de Registro"
-                    body={(r) => (r.fecha_correccion ? new Date(r.fecha_correccion).toLocaleString() : "")}
+                    body={(r) => (r.fecha_registro_sistema ? new Date(r.fecha_registro_sistema).toLocaleString() : "")}
                     sortable
                 />
                 <Column header="#C" body={(r) => countBy(r, "C")} />
                 <Column header="#NC" body={(r) => countBy(r, "NC")} />
                 <Column header="#NA" body={(r) => countBy(r, "NA")} />
+
                 {dynamicColumns.map((c, i) => (
                     <Column key={i} header={c.header} body={c.body} />
                 ))}
+
+                <Column field="observaciones" header="Observaciones" body={(r) => r.observaciones || "—"} />
+
                 <Column header="Revisado" body={revisadoTemplate} style={{ width: "10rem", textAlign: "center" }} />
             </DataTable>
 
@@ -513,12 +492,10 @@ export default function LimpiezaBanosCasillerosPediluvios() {
 
                     {["Banos", "Camerinos", "Crecimiento", "Pediluvios"].map((grp) => (
                         <div key={grp} className="col-12">
-                            {/* 👇 MISMO formato que el registro de Oficinas/Sala/Comedor */}
                             <div className="subarea-title">{GROUP_LABEL[grp]}</div>
                             <div className="grid">
                                 {grupos[grp].map((it) => {
-                                    const val = form.items[it.key] || { estado: "", comentario: "" };
-                                    const necesitaComentario = val.estado && val.estado !== "C";
+                                    const val = form.items[it.key] || { estado: "" };
                                     return (
                                         <div className="field col-12 md:col-6" key={it.key}>
                                             <label className="font-bold">
@@ -527,21 +504,10 @@ export default function LimpiezaBanosCasillerosPediluvios() {
                                             <Dropdown
                                                 value={val.estado}
                                                 options={ESTADOS}
-                                                onChange={(e) => onItemChange(it.key, "estado", e.value)}
+                                                onChange={(e) => onItemChange(it.key, e.value)}
                                                 placeholder="Seleccione"
                                                 className="mb-2"
                                             />
-                                            {necesitaComentario && (
-                                                <>
-                                                    <small className="campo-note">Comentario obligatorio para NC o NA</small>
-                                                    <InputText
-                                                        value={val.comentario}
-                                                        onChange={(e) => onItemChange(it.key, "comentario", e.target.value)}
-                                                        placeholder="Explique la causa/acción correctiva"
-                                                    />
-                                                    {submitted && !val.comentario?.trim() && <small className="p-error"> Requerido</small>}
-                                                </>
-                                            )}
                                         </div>
                                     );
                                 })}
@@ -551,7 +517,17 @@ export default function LimpiezaBanosCasillerosPediluvios() {
 
                     <div className="field col-12 md:col-6">
                         <label className="font-bold">Fecha de Registro (auto)</label>
-                        <InputText value={form.fecha_correccion_preview} disabled />
+                        <InputText value={form.fecha_registro_preview} disabled />
+                        <small className="text-color-secondary">Se genera automáticamente al guardar.</small>
+                    </div>
+
+                    <div className="field col-12">
+                        <label className="font-bold">Observaciones</label>
+                        <InputText
+                            value={form.observaciones}
+                            onChange={(e) => onHeaderChange(e, "observaciones")}
+                            placeholder="Comentarios adicionales (opcional)"
+                        />
                     </div>
                 </div>
             </Dialog>

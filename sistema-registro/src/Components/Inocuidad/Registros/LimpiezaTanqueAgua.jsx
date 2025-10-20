@@ -1,3 +1,4 @@
+// Components/Inocuidad/Registros/LimpiezaTanqueAgua.jsx
 import React, { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import supabase from "../../../supabaseClient";
@@ -16,12 +17,11 @@ import { Dropdown } from "primereact/dropdown";
 import { Checkbox } from "primereact/checkbox";
 import * as XLSX from "xlsx";
 
-// Permisos (ajusta la ruta si difiere)
 import useCanReview from "./Hooks/useCanReview.js";
 
-/* ---------- SOLO las 4 preguntas requeidas ---------- */
+/* ---------- 4 preguntas requeridas (P1 con texto corregido) ---------- */
 const QUESTIONS = [
-    { key: "q3", label: "¿Verificó el estado detuberías/válvulas/grietas/desgaste del tanque?" },
+    { key: "q3", label: "¿Verificó el estado de tuberías/válvulas/grietas/desgaste del tanque?" },
     { key: "q4", label: "¿Removió residuos sólidos del fondo del tanque?" },
     { key: "q13", label: "¿Se realizaron varios lavados con agua potable eliminando así los residuos de desinfectante?" },
     { key: "q12", label: "¿Se instaló correctamente la tapa para evitar el ingreso de contaminantes?" },
@@ -34,9 +34,7 @@ const YESNO = [
 
 const todayISO = () => {
     const d = new Date();
-    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(
-        d.getDate()
-    ).padStart(2, "0")}`;
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 };
 const nowHM = () =>
     new Date().toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit", hour12: false });
@@ -44,11 +42,10 @@ const nowHM = () =>
 const emptyForm = () => ({
     fecha_registro: todayISO(),
     hora_registro: nowHM(),
-    ubicacion_tanque: "",
     responsable_lavado: "",
     fecha_proximo_lavado: "",
     observaciones: "",
-    fecha_correccion_preview: new Date().toLocaleString(), // visual; DB guarda la real (now())
+    fecha_correccion_preview: new Date().toLocaleString(), // visual
     items: QUESTIONS.reduce((acc, q) => {
         acc[q.key] = { respuesta: "" };
         return acc;
@@ -56,7 +53,6 @@ const emptyForm = () => ({
 });
 
 const packRow = (dbRow) => {
-    // reconstruir el objeto items desde columnas anchas
     const itemsMap = {
         q3: { respuesta: dbRow.respuesta_q3 || "" },
         q4: { respuesta: dbRow.respuesta_q4 || "" },
@@ -68,19 +64,16 @@ const packRow = (dbRow) => {
         id: dbRow.id,
         fecha_registro: dbRow.fecha_registro,
         hora_registro: dbRow.hora_registro,
-        ubicacion_tanque: dbRow.ubicacion_tanque,
         responsable_lavado: dbRow.responsable_lavado,
         fecha_proximo_lavado: dbRow.fecha_proximo_lavado,
-        fecha_correccion: dbRow.fecha_correccion, // “Fecha de Registro” del sistema
+        fecha_correccion: dbRow.fecha_correccion,
         observaciones: dbRow.observaciones,
-        // revisión
         revisado: dbRow.revisado ?? false,
         revisado_por_username: dbRow.revisado_por_username ?? null,
         revisado_fecha: dbRow.revisado_fecha ?? null,
         items: itemsMap,
     };
 };
-
 
 export default function LimpiezaTanqueAgua() {
     const toast = useRef(null);
@@ -95,9 +88,7 @@ export default function LimpiezaTanqueAgua() {
     const [submitted, setSubmitted] = useState(false);
     const [form, setForm] = useState(emptyForm());
 
-    // filtro revisado
-    const [filtroRevisado, setFiltroRevisado] = useState("all"); // 'all' | 'checked' | 'unchecked'
-    // permisos
+    const [filtroRevisado, setFiltroRevisado] = useState("all");
     const { canReview, username } = useCanReview();
 
     const showToast = (severity, summary, detail, life = 3000) =>
@@ -109,11 +100,12 @@ export default function LimpiezaTanqueAgua() {
             let query = supabase
                 .from("limpieza_tanque_agua_1")
                 .select(`
-        id, fecha_registro, hora_registro, ubicacion_tanque, responsable_lavado,
-        fecha_proximo_lavado, fecha_correccion, observaciones,
-        revisado, revisado_por_username, revisado_fecha,
-        respuesta_q3, respuesta_q4, respuesta_q13, respuesta_q12
-      `)
+          id, fecha_registro, hora_registro,
+          responsable_lavado,
+          fecha_proximo_lavado, fecha_correccion, observaciones,
+          revisado, revisado_por_username, revisado_fecha,
+          respuesta_q3, respuesta_q4, respuesta_q13, respuesta_q12
+        `)
                 .order("fecha_registro", { ascending: false })
                 .order("created_at", { ascending: false });
 
@@ -131,7 +123,6 @@ export default function LimpiezaTanqueAgua() {
         }
     };
 
-
     useEffect(() => {
         fetchRows();
     }, [filtroRevisado]);
@@ -146,14 +137,31 @@ export default function LimpiezaTanqueAgua() {
         setSubmitted(false);
     };
 
-    const onHeaderChange = (e, field) => setForm((p) => ({ ...p, [field]: e.target.value }));
+    // ⬇️ Enforce future (>= hoy) for fecha_proximo_lavado
+    const onHeaderChange = (e, field) => {
+        const value = e.target.value;
+        if (field === "fecha_proximo_lavado" && value) {
+            const today = todayISO();
+            if (value < today) {
+                showToast("warn", "Fecha inválida", "La fecha del próximo lavado debe ser hoy o posterior.");
+                return; // no actualizamos el estado si es pasada
+            }
+        }
+        setForm((p) => ({ ...p, [field]: value }));
+    };
+
     const onYesNoChange = (key, value) =>
         setForm((p) => ({ ...p, items: { ...p.items, [key]: { respuesta: value } } }));
 
     const validate = () => {
         const errs = [];
-        if (!form.ubicacion_tanque?.trim()) errs.push("La ubicación del tanque es requerida");
         if (!form.responsable_lavado?.trim()) errs.push("El responsable de lavado es requerido");
+
+        // Validar fecha próxima (si fue seleccionada)
+        if (form.fecha_proximo_lavado && form.fecha_proximo_lavado < todayISO()) {
+            errs.push("La fecha del próximo lavado debe ser hoy o posterior.");
+        }
+
         QUESTIONS.forEach((q) => {
             if (!form.items[q.key]?.respuesta) errs.push(`Responda: ${q.label}`);
         });
@@ -172,12 +180,9 @@ export default function LimpiezaTanqueAgua() {
             const payload = {
                 fecha_registro: form.fecha_registro,
                 hora_registro: form.hora_registro,
-                ubicacion_tanque: form.ubicacion_tanque,
                 responsable_lavado: form.responsable_lavado,
                 fecha_proximo_lavado: form.fecha_proximo_lavado || null,
-                observaciones: form.observaciones || null,
-
-                // 4 respuestas SI/NO
+                observaciones: form.observaciones?.trim() ? form.observaciones.trim() : null,
                 respuesta_q3: form.items.q3?.respuesta || null,
                 respuesta_q4: form.items.q4?.respuesta || null,
                 respuesta_q13: form.items.q13?.respuesta || null,
@@ -203,7 +208,6 @@ export default function LimpiezaTanqueAgua() {
         }
     };
 
-
     const countBy = (row, val) =>
         QUESTIONS.reduce((acc, q) => acc + (row.items?.[q.key]?.respuesta === val ? 1 : 0), 0);
 
@@ -212,7 +216,6 @@ export default function LimpiezaTanqueAgua() {
         body: (row) => row.items?.[q.key]?.respuesta || "",
     }));
 
-    // ✔️ plantilla checkbox Revisado
     const revisadoTemplate = (row) => {
         if (!canReview) return <span>{row.revisado ? "Sí" : "No"}</span>;
 
@@ -229,7 +232,6 @@ export default function LimpiezaTanqueAgua() {
                     revisado_fecha: next ? new Date().toISOString() : null,
                 })
                 .eq("id", row.id);
-
 
             if (error) {
                 showToast("error", "No se guardó", error.message);
@@ -265,7 +267,6 @@ export default function LimpiezaTanqueAgua() {
         );
     };
 
-    // Header con búsqueda + filtro revisado
     const header = (
         <div className="flex flex-wrap gap-2 align-items-center justify-content-between">
             <span className="p-input-icon-left">
@@ -303,7 +304,6 @@ export default function LimpiezaTanqueAgua() {
             const base = {
                 fecha_registro: r.fecha_registro,
                 hora_registro: r.hora_registro,
-                ubicacion_tanque: r.ubicacion_tanque,
                 responsable_lavado: r.responsable_lavado,
                 fecha_proximo_lavado: r.fecha_proximo_lavado || "",
                 fecha_registro_sistema: r.fecha_correccion ? new Date(r.fecha_correccion).toLocaleString() : "",
@@ -329,11 +329,8 @@ export default function LimpiezaTanqueAgua() {
 
             <div className="welcome-message">
                 <p>
-                    <span>
-                        Responda las 4 preguntas (Sí/No).
-                    </span>
+                    <span>Responda las 4 preguntas (Sí/No).</span>
                     <br />
-
                     <br />
                     <span>
                         Además puede programar la <b className="bold-space">Fecha del Próximo Lavado</b>.
@@ -377,14 +374,14 @@ export default function LimpiezaTanqueAgua() {
                 <Column selectionMode="multiple" exportable={false} />
                 <Column field="fecha_registro" header="Fecha" sortable />
                 <Column field="hora_registro" header="Hora" />
-                <Column field="ubicacion_tanque" header="Ubicación" sortable />
-                <Column field="responsable_lavado" header="Responsable" sortable />
+                <Column field="responsable_lavado" header="Operario" sortable />
                 <Column
                     field="fecha_proximo_lavado"
                     header="Próximo lavado"
                     body={(r) => (r?.fecha_proximo_lavado ? new Date(r.fecha_proximo_lavado).toLocaleDateString() : "")}
                     sortable
                 />
+                <Column field="observaciones" header="Observaciones" body={(r) => r.observaciones || "—"} />
                 <Column header="#SI" body={(r) => countBy(r, "SI")} />
                 <Column header="#NO" body={(r) => countBy(r, "NO")} />
                 <Column
@@ -396,7 +393,6 @@ export default function LimpiezaTanqueAgua() {
                 {dynamicColumns.map((c, i) => (
                     <Column key={i} header={c.header} body={c.body} />
                 ))}
-                {/* última columna: checkbox revisado */}
                 <Column header="Revisado" body={revisadoTemplate} style={{ width: "10rem", textAlign: "center" }} />
             </DataTable>
 
@@ -434,9 +430,13 @@ export default function LimpiezaTanqueAgua() {
                         <label className="font-bold">Selecciona la Fecha del Próximo lavado</label>
                         <InputText
                             type="date"
+                            min={todayISO()}             // ⬅️ no permite fechas pasadas
                             value={form.fecha_proximo_lavado}
                             onChange={(e) => onHeaderChange(e, "fecha_proximo_lavado")}
                         />
+                        {submitted && form.fecha_proximo_lavado && form.fecha_proximo_lavado < todayISO() && (
+                            <small className="p-error">La fecha debe ser hoy o posterior.</small>
+                        )}
                     </div>
 
                     <div className="field col-12 md:col-6">
@@ -449,17 +449,6 @@ export default function LimpiezaTanqueAgua() {
                             placeholder="Nombre del operario"
                         />
                     </div>
-                    <div className="field col-12 md:col-6">
-                        <label className="font-bold">
-                            Ubicación del tanque* {submitted && !form.ubicacion_tanque && <small className="p-error"> Requerido</small>}
-                        </label>
-                        <InputText
-                            value={form.ubicacion_tanque}
-                            onChange={(e) => onHeaderChange(e, "ubicacion_tanque")}
-                            placeholder=""//Dejo este ph por aquello de que pidan agregarle algo. JV
-                        />
-                    </div>
-
 
                     {/* 4 preguntas */}
                     {QUESTIONS.map((q) => {
@@ -476,7 +465,11 @@ export default function LimpiezaTanqueAgua() {
 
                     <div className="field col-12">
                         <label className="font-bold">Observaciones</label>
-                        <InputText value={form.observaciones} onChange={(e) => onHeaderChange(e, "observaciones")} />
+                        <InputText
+                            value={form.observaciones}
+                            onChange={(e) => onHeaderChange(e, "observaciones")}
+                            placeholder="Comentarios adicionales (opcional)"
+                        />
                     </div>
 
                     <div className="field col-12 md:col-3">
