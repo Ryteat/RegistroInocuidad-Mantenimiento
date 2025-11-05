@@ -1,12 +1,7 @@
-import React from 'react'
-import MantenimientoAlertas from '../../Components/MantenimientoAlertas/MantenimientoAlertas'
+import React from "react";
+import { Outlet } from "react-router-dom";
 
-const PagesMantenimientoAlertas = () => {
-    return (
-        <div>
-            <MantenimientoAlertas />
-        </div>
-    )
+export default function PagesMantenimientoAlertas() {
+    // Contenedor puro: no renderiza MantenimientoAlertas, solo Outlet
+    return <Outlet />;
 }
-
-export default PagesMantenimientoAlertas

@@ -1,3 +1,4 @@
+// src/Components/MantenimientoAlertas/Alertas/ContenedorAlertas.jsx
 import React, { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import supabase from "../../../supabaseClient.js";
@@ -14,14 +15,24 @@ import { Dropdown } from "primereact/dropdown";
 
 import NotificationBell from "./NotificationBell.jsx";
 
-// Rutas de cada formulario por ID/Posición
+// Helpers de fecha
+const fmtDMY = (iso) => {
+    if (!iso) return "—";
+    const d = new Date(iso);
+    const dd = String(d.getDate()).padStart(2, "0");
+    const mm = String(d.getMonth() + 1).padStart(2, "0");
+    const yy = d.getFullYear();
+    return `${dd}/${mm}/${yy}`;
+};
+
+// Mapa de formularios por ID (posicion_id)
 const FORM_MAP = {
     IN1: "/MantenimientoAlertas/PanelElectrico",
     IN2: "/MantenimientoAlertas/Iluminacion",
     IN3: "/MantenimientoAlertas/CuartosElectricos",
 };
 
-/* Semana ISO util */
+// util semana ISO (fallback si la vista no trae semana_proximo/anio_proximo)
 const semanaIso = (isoStr) => {
     if (!isoStr) return { semana: "—", anio: "" };
     const d = new Date(isoStr);
@@ -47,7 +58,7 @@ export default function ContenedorAlertas() {
     const [rows, setRows] = useState([]);
     const [loading, setLoading] = useState(false);
 
-    // 🔎 Buscador con debounce
+    // Buscador con debounce simple
     const [searchInput, setSearchInput] = useState("");
     const [globalFilter, setGlobalFilter] = useState("");
 
@@ -60,22 +71,12 @@ export default function ContenedorAlertas() {
     const fetchRows = async () => {
         try {
             setLoading(true);
-
-            // Vista unificada
             let q = supabase
                 .from("vw_infra_registros_unificado")
                 .select(`
-          tabla,
-          id,
-          posicion_id,
-          equipo,
-          registro,
-          periodicidad,
-          ultimo_mantenimiento,
-          proximo_mantenimiento,
-          semana_proximo,
-          anio_proximo,
-          estado
+          tabla, id, posicion_id, equipo, registro, periodicidad,
+          ultimo_mantenimiento, proximo_mantenimiento,
+          semana_proximo, anio_proximo, estado
         `)
                 .order("posicion_id", { ascending: true });
 
@@ -100,20 +101,15 @@ export default function ContenedorAlertas() {
         }
     };
 
-    // Carga/recarga por cambio de periodo
-    useEffect(() => {
-        fetchRows();
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [periodo]);
+    useEffect(() => { fetchRows(); }, [periodo]);
 
-    // Debounce del buscador
+    // Debounce de buscador
     useEffect(() => {
         const t = setTimeout(() => setGlobalFilter(searchInput), 220);
         return () => clearTimeout(t);
     }, [searchInput]);
 
-    const semanaBody = (r) =>
-        r.proximo_mantenimiento ? `${r.semana_proximo} año ${r.anio_proximo}` : "—";
+    const semanaBody = (r) => r.proximo_mantenimiento ? `${r.semana_proximo} año ${r.anio_proximo}` : "—";
 
     const accionesBody = (r) => (
         <div className="flex gap-2">
@@ -133,18 +129,12 @@ export default function ContenedorAlertas() {
         </div>
     );
 
-    // ---------- CONTROLES (con botones dinámicos por ID) ----------
-    const idsDisponibles = Object.keys(FORM_MAP);
-
     return (
         <div className="controlrendcosechayfrass-container">
             <Toast ref={toast} />
 
-            {/* Encabezado con campanita a la derecha */}
-            <div
-                className="flex align-items-center justify-content-center"
-                style={{ gap: 12, position: "relative" }}
-            >
+            {/* Encabezado + campanita a la derecha */}
+            <div className="flex align-items-center justify-content-center" style={{ gap: 12, position: "relative" }}>
                 <h1 className="m-0 flex align-items-center" style={{ gap: 12 }}>
                     <img src={logo2} alt="mosca" className="logo2" />
                     <span>Alertas de Mantenimiento</span>
@@ -154,37 +144,16 @@ export default function ContenedorAlertas() {
                 </span>
             </div>
 
-            {/* BOTONES SUPERIORES (como Inocuidad) */}
+            {/* Acciones superiores (sin +Nuevo aquí) */}
             <div className="flex justify-content-center gap-2 mt-3 mb-3">
-                <Button
-                    label="Volver al Menú Principal"
-                    icon="pi pi-arrow-left"
-                    onClick={() => navigate(-1)}   // 👈 igual que Inocuidad
-                />
-                <Button
-                    label="Cerrar sesión"
-                    icon="pi pi-sign-out"
-                    severity="danger"
-                    onClick={() => navigate("/", { replace: true })}
-                />
-            </div>
-
-            <div className="welcome-message">
-                <p>
-                    <a
-                        onClick={() => navigate("/MantenimientoAlertas")}
-                        style={{ cursor: "pointer", textDecoration: "underline" }}
-                    >
-                        Infraestructura de Planta
-                    </a>
-                </p>
+                <Button label="Volver al Menú de Registros" icon="pi pi-arrow-left"
+                    onClick={() => navigate("/MantenimientoAlertas")} />
+                <Button label="Cerrar sesión" icon="pi pi-sign-out" severity="danger"
+                    onClick={() => navigate("/", { replace: true })} />
             </div>
 
             {/* Controles */}
-            <div
-                className="flex flex-wrap gap-2 align-items-center justify-content-between"
-                style={{ marginBottom: 12 }}
-            >
+            <div className="flex flex-wrap gap-2 align-items-center justify-content-between" style={{ marginBottom: 12 }}>
                 <div className="flex gap-2 align-items-center" style={{ flex: 1, minWidth: 280 }}>
                     <span className="p-input-icon-left" style={{ width: "100%" }}>
                         <i className="pi pi-search" />
@@ -215,17 +184,6 @@ export default function ContenedorAlertas() {
                         placeholder="Periodicidad"
                         style={{ minWidth: 180 }}
                     />
-
-                    {/* Botones dinámicos */}
-                    {idsDisponibles.map((id) => (
-                        <Button
-                            key={id}
-                            label={`+ Nuevo ${id}`}
-                            icon="pi pi-plus"
-                            severity="success"
-                            onClick={() => navigate(FORM_MAP[id])}
-                        />
-                    ))}
                 </div>
             </div>
 
@@ -234,29 +192,21 @@ export default function ContenedorAlertas() {
                 loading={loading}
                 globalFilter={globalFilter}
                 globalFilterFields={[
-                    "posicion_id",
-                    "equipo",
-                    "registro",
-                    "periodicidad",
-                    "estado",
-                    "ultimo_mantenimiento",
-                    "proximo_mantenimiento",
+                    "posicion_id", "equipo", "registro", "periodicidad",
+                    "estado", "ultimo_mantenimiento", "proximo_mantenimiento",
                 ]}
-                paginator
-                rows={10}
-                rowsPerPageOptions={[5, 10, 25]}
-                dataKey="id"
-                showGridlines
-                emptyMessage="No hay registros para mostrar"
+                paginator rows={10} rowsPerPageOptions={[5, 10, 25]}
+                dataKey="id" showGridlines
                 paginatorTemplate="FirstPageLink PrevPageLink PageLinks NextPageLink LastPageLink CurrentPageReport RowsPerPageDropdown"
                 currentPageReportTemplate="Mostrando del {first} al {last} de {totalRecords} Registros"
+                emptyMessage="No hay registros para mostrar"
             >
                 <Column field="posicion_id" header="Posición" sortable />
                 <Column field="equipo" header="Equipo" sortable />
                 <Column field="registro" header="Registro" />
                 <Column field="periodicidad" header="Periodicidad" />
-                <Column field="ultimo_mantenimiento" header="Último Mantenimiento" sortable />
-                <Column field="proximo_mantenimiento" header="Próximo Mantenimiento" sortable />
+                <Column header="Último Mantenimiento" body={(r) => fmtDMY(r.ultimo_mantenimiento)} sortable />
+                <Column header="Próximo Mantenimiento" body={(r) => fmtDMY(r.proximo_mantenimiento)} sortable />
                 <Column header="Semana" body={semanaBody} />
                 <Column field="estado" header="Estado" />
                 <Column header="Acciones" body={accionesBody} style={{ width: "10rem" }} />

@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import supabase from "../../../../supabaseClient.js"; // ⬅️ 4 niveles arriba a src/supabaseClient.js
+import supabase from "../../../../supabaseClient.js";
 import logo2 from "../../../../assets/mosca.png";
 
 import "primereact/resources/themes/lara-light-indigo/theme.css";
@@ -16,12 +16,42 @@ import { Dropdown } from "primereact/dropdown";
 import { Checkbox } from "primereact/checkbox";
 import * as XLSX from "xlsx";
 
-// Hook canReview opcional (mismo fallback que usaste)
-let useCanReview = () => ({ canReview: false, username: null });
-try {
-    useCanReview = require("../../Inocuidad/Registros/Hooks/useCanReview.js").default || useCanReview;
-} catch (_) { }
+// ✅ ÚNICO import del hook compartido
+import useCanReview from "../../../Inocuidad/Registros/Hooks/useCanReview.js";
 
+/* ===================== Helpers de fecha ===================== */
+const fmtDMY = (iso) => {
+    if (!iso) return "—";
+    const d = new Date(iso);
+    const dd = String(d.getDate()).padStart(2, "0");
+    const mm = String(d.getMonth() + 1).padStart(2, "0");
+    const yy = d.getFullYear();
+    return `${dd}/${mm}/${yy}`;
+};
+const fmtDMYHM = (isoOrDate) => {
+    if (!isoOrDate) return "—";
+    const d = new Date(isoOrDate);
+    const hh = String(d.getHours()).padStart(2, "0");
+    const mi = String(d.getMinutes()).padStart(2, "0");
+    return `${fmtDMY(d.toISOString())} ${hh}:${mi}`;
+};
+const toDateISO = (d = new Date()) =>
+    `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+const toHM = (d = new Date()) =>
+    d.toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit", hour12: false });
+
+const addDays = (iso, days) => {
+    const d = new Date(iso);
+    d.setDate(d.getDate() + days);
+    return d.toISOString().slice(0, 10);
+};
+const addMonths = (iso, months) => {
+    const d = new Date(iso);
+    d.setMonth(d.getMonth() + months);
+    return d.toISOString().slice(0, 10);
+};
+
+/* ===================== Constantes ===================== */
 const POSICION_ID = "IN2";
 const EQUIPO = "Iluminación";
 const PERIODICIDAD = "MENSUAL";
@@ -31,40 +61,31 @@ const YESNO = [
     { label: "No", value: "NO" },
 ];
 
-const toDateISO = (d = new Date()) =>
-    `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
-const toHM = (d = new Date()) => d.toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit", hour12: false });
-
-const addDays = (iso, days) => { const d = new Date(iso); d.setDate(d.getDate() + days); return d.toISOString().slice(0, 10); };
-const addMonths = (iso, months) => { const d = new Date(iso); d.setMonth(d.getMonth() + months); return d.toISOString().slice(0, 10); };
-
-/** Lista basada en la orden adjunta */
+/** Lista de chequeo */
 const QUESTIONS = [
     { key: "q1", label: "Revisar funcionamiento de luminarias en el área; reparar si es necesario" },
     { key: "q2", label: "Desmontar difusores si aplica y limpiarlos" },
     { key: "q3", label: "Verificar funcionamiento de los interruptores; reparar si es necesario" },
 ];
 
+/* ===================== Estado inicial ===================== */
 const emptyForm = () => ({
-    fecha_registro: toDateISO(),
-    hora_registro: toHM(),
+    fecha_registro: toDateISO(),  // editable
+    hora_registro: toHM(),        // editable
     posicion_id: POSICION_ID,
     equipo: EQUIPO,
-    registro: "",        // Infraestructura: vacío
+    registro: "",
     cantidad: "",
     tecnico: "",
-    fecha_inicio: toDateISO(),
-    hora_inicio: toHM(),
-    fecha_fin: "",
-    hora_fin: "",
     ejecutado: "",
     observaciones: "",
     items: QUESTIONS.reduce((a, q) => ({ ...a, [q.key]: { respuesta: "" } }), {}),
-    fecha_correccion_preview: new Date().toLocaleString(),
+    fecha_correccion_preview: fmtDMYHM(new Date()), // sólo visual
 });
 
 const packRow = (r) => ({ ...r, tecnico: r.tecnico ?? "", observaciones: r.observaciones ?? "" });
 
+/* ===================== Componente ===================== */
 export default function Iluminacion() {
     const navigate = useNavigate();
     const toast = useRef(null);
@@ -84,6 +105,7 @@ export default function Iluminacion() {
     const showToast = (severity, summary, detail, life = 3000) =>
         toast.current?.show({ severity, summary, detail, life });
 
+    /* --------------------- Carga --------------------- */
     const fetchRows = async () => {
         try {
             setLoading(true);
@@ -93,7 +115,6 @@ export default function Iluminacion() {
           id, created_at,
           fecha_registro, hora_registro,
           posicion_id, equipo, registro, cantidad, tecnico,
-          fecha_inicio, hora_inicio, fecha_fin, hora_fin,
           ejecutado, observaciones,
           respuesta_q1, respuesta_q2, respuesta_q3,
           periodicidad, ultimo_mantenimiento, proximo_mantenimiento,
@@ -123,8 +144,10 @@ export default function Iluminacion() {
     const hideDialog = () => { setDialogOpen(false); setSubmitted(false); };
 
     const onChange = (field, value) => setForm((p) => ({ ...p, [field]: value }));
-    const onYesNoChange = (key, value) => setForm((p) => ({ ...p, items: { ...p.items, [key]: { respuesta: value } } }));
+    const onYesNoChange = (key, value) =>
+        setForm((p) => ({ ...p, items: { ...p.items, [key]: { respuesta: value } } }));
 
+    /* --------------------- Validación --------------------- */
     const validate = () => {
         const errs = [];
         if (!form.tecnico?.trim()) errs.push("El campo Técnico es requerido.");
@@ -136,6 +159,7 @@ export default function Iluminacion() {
         return errs;
     };
 
+    /* --------------------- Guardado --------------------- */
     const save = async () => {
         setSubmitted(true);
         const errs = validate();
@@ -146,20 +170,18 @@ export default function Iluminacion() {
             const proximo_mantenimiento = form.ejecutado === "NO" ? addDays(baseDate, 7) : addMonths(baseDate, 1);
 
             const payload = {
+                // Solo intervención y registro base
                 fecha_registro: form.fecha_registro,
                 hora_registro: form.hora_registro,
                 posicion_id: POSICION_ID,
                 equipo: EQUIPO,
-                registro: null, // Infraestructura: campo visualmente en blanco
+                registro: null, // visual en blanco
                 cantidad: form.cantidad ? Number(String(form.cantidad).replace(/\D/g, "")) : null,
                 tecnico: form.tecnico,
-                fecha_inicio: form.fecha_inicio || null,
-                hora_inicio: form.hora_inicio || null,
-                fecha_fin: form.fecha_fin || null,
-                hora_fin: form.hora_fin || null,
                 ejecutado: form.ejecutado,
                 observaciones: form.observaciones || null,
 
+                // Checklist solo si se ejecuta
                 respuesta_q1: form.ejecutado === "SI" ? form.items.q1?.respuesta || null : null,
                 respuesta_q2: form.ejecutado === "SI" ? form.items.q2?.respuesta || null : null,
                 respuesta_q3: form.ejecutado === "SI" ? form.items.q3?.respuesta || null : null,
@@ -184,6 +206,7 @@ export default function Iluminacion() {
     const countSiNo = (row, val) =>
         [1, 2, 3].reduce((acc, i) => acc + (((row[`respuesta_q${i}`] || "") === val) ? 1 : 0), 0);
 
+    /* --------------------- Columna Revisado --------------------- */
     const revisadoTemplate = (row) => {
         if (!canReview) return <span>{row.revisado ? "Sí" : "No"}</span>;
         const onToggle = async (next) => {
@@ -196,11 +219,13 @@ export default function Iluminacion() {
                 })
                 .eq("id", row.id);
             if (error) { showToast("error", "No se guardó", error.message); return; }
-            setRows((prev) => prev.map((r) =>
-                r.id === row.id
-                    ? { ...r, revisado: next, revisado_por_username: next ? username : null, revisado_fecha: next ? new Date().toISOString() : null }
-                    : r
-            ));
+            setRows((prev) =>
+                prev.map((r) =>
+                    r.id === row.id
+                        ? { ...r, revisado: next, revisado_por_username: next ? username : null, revisado_fecha: next ? new Date().toISOString() : null }
+                        : r
+                )
+            );
             showToast("success", "OK", next ? "Marcado revisado" : "Marcado no revisado");
         };
         return (
@@ -211,11 +236,17 @@ export default function Iluminacion() {
         );
     };
 
+    /* --------------------- Header tabla --------------------- */
     const header = (
         <div className="flex flex-wrap gap-2 align-items-center justify-content-between">
             <span className="p-input-icon-left">
                 <i className="pi pi-search" />
-                <InputText type="search" value={globalFilter} onInput={(e) => setGlobalFilter(e.target.value)} placeholder="Buscar (ej. IN2, técnico, notas)" />
+                <InputText
+                    type="search"
+                    value={globalFilter}
+                    onInput={(e) => setGlobalFilter(e.target.value)}
+                    placeholder="Buscar (ej. IN2, técnico, notas)"
+                />
             </span>
             <div className="flex align-items-center gap-2">
                 <span className="text-sm font-medium">Filtro:</span>
@@ -235,6 +266,32 @@ export default function Iluminacion() {
 
     const semanaBody = (r) => r.proximo_mantenimiento ? `${r.semana_proximo} año ${r.anio_proximo}` : "—";
 
+    /* --------------------- Exportar Excel --------------------- */
+    const exportXlsx = () => {
+        if (!rows?.length) { showToast("warn", "Exportación", "No hay datos"); return; }
+        const out = rows.map((r) => ({
+            posicion: r.posicion_id,
+            equipo: r.equipo,
+            registro: r.registro ?? "",
+            periodicidad: r.periodicidad ?? "",
+            ultimo_mantenimiento: fmtDMY(r.ultimo_mantenimiento),
+            proximo_mantenimiento: fmtDMY(r.proximo_mantenimiento),
+            semana: semanaBody(r),
+            tecnico: r.tecnico ?? "",
+            fecha_intervencion: fmtDMY(r.fecha_registro),
+            hora_intervencion: r.hora_registro || "",
+            "#SI": countSiNo(r, "SI"),
+            "#NO": countSiNo(r, "NO"),
+            revisado: r.revisado ? "Sí" : "No",
+            creado: fmtDMYHM(r.created_at),
+        }));
+        const ws = XLSX.utils.json_to_sheet(out);
+        const wb = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(wb, ws, "Iluminacion");
+        XLSX.writeFile(wb, `Iluminacion_${new Date().toISOString().slice(0, 10)}.xlsx`);
+    };
+
+    /* --------------------- Render --------------------- */
     return (
         <div className="controlrendcosechayfrass-container">
             <Toast ref={toast} />
@@ -263,27 +320,7 @@ export default function Iluminacion() {
                         label="Exportar a Excel"
                         icon="pi pi-upload"
                         className="p-button-help"
-                        onClick={() => {
-                            if (!rows?.length) { showToast("warn", "Exportación", "No hay datos"); return; }
-                            const out = rows.map((r) => ({
-                                posicion: r.posicion_id,
-                                equipo: r.equipo,
-                                registro: r.registro ?? "",
-                                periodicidad: r.periodicidad ?? "",
-                                ultimo_mantenimiento: r.ultimo_mantenimiento ?? "",
-                                proximo_mantenimiento: r.proximo_mantenimiento ?? "",
-                                semana: semanaBody(r),
-                                tecnico: r.tecnico ?? "",
-                                fecha: r.fecha_registro, hora: r.hora_registro,
-                                "#SI": countSiNo(r, "SI"), "#NO": countSiNo(r, "NO"),
-                                revisado: r.revisado ? "Sí" : "No",
-                                creado: r.created_at ? new Date(r.created_at).toLocaleString() : "",
-                            }));
-                            const ws = XLSX.utils.json_to_sheet(out);
-                            const wb = XLSX.utils.book_new();
-                            XLSX.utils.book_append_sheet(wb, ws, "Iluminacion");
-                            XLSX.writeFile(wb, `Iluminacion_${new Date().toISOString().slice(0, 10)}.xlsx`);
-                        }}
+                        onClick={exportXlsx}
                     />
                 )}
             />
@@ -309,14 +346,14 @@ export default function Iluminacion() {
                 <Column field="equipo" header="Equipo" sortable />
                 <Column field="registro" header="Registro" />
                 <Column field="periodicidad" header="Periodicidad" />
-                <Column field="ultimo_mantenimiento" header="Último Mto." sortable />
-                <Column field="proximo_mantenimiento" header="Próximo Mto." sortable />
+                <Column header="Último Mto." body={(r) => fmtDMY(r.ultimo_mantenimiento)} sortable />
+                <Column header="Próximo Mto." body={(r) => fmtDMY(r.proximo_mantenimiento)} sortable />
                 <Column header="Semana" body={semanaBody} />
                 <Column field="tecnico" header="Técnico" sortable />
                 <Column
                     field="created_at"
                     header="Fecha de Registro"
-                    body={(r) => (r.created_at ? new Date(r.created_at).toLocaleString() : "—")}
+                    body={(r) => fmtDMYHM(r.created_at)}
                     sortable
                 />
                 <Column header="Revisado" body={revisadoTemplate} style={{ width: "10rem", textAlign: "center" }} />
@@ -336,13 +373,13 @@ export default function Iluminacion() {
                 }
             >
                 <div className="p-fluid grid">
-                    {/* Cabecera mínima */}
+                    {/* Intervención */}
                     <div className="field col-12 md:col-3">
-                        <label className="font-bold">Fecha</label>
+                        <label className="font-bold">Fecha intervención</label>
                         <InputText type="date" value={form.fecha_registro} onChange={(e) => onChange("fecha_registro", e.target.value)} />
                     </div>
                     <div className="field col-12 md:col-3">
-                        <label className="font-bold">Hora</label>
+                        <label className="font-bold">Hora intervención</label>
                         <InputText type="time" value={form.hora_registro} onChange={(e) => onChange("hora_registro", e.target.value)} />
                     </div>
                     <div className="field col-6 md:col-3">
@@ -361,24 +398,6 @@ export default function Iluminacion() {
                     <div className="field col-6 md:col-3">
                         <label className="font-bold">Cantidad (referencia)</label>
                         <InputText value={form.cantidad} onChange={(e) => onChange("cantidad", e.target.value ? e.target.value.replace(/\D/g, "") : "")} placeholder="Ej. 8" />
-                    </div>
-
-                    {/* Inicio / Fin */}
-                    <div className="field col-6 md:col-3">
-                        <label className="font-bold">Fecha inicio</label>
-                        <InputText type="date" value={form.fecha_inicio} onChange={(e) => onChange("fecha_inicio", e.target.value)} />
-                    </div>
-                    <div className="field col-6 md:col-3">
-                        <label className="font-bold">Hora inicio</label>
-                        <InputText type="time" value={form.hora_inicio} onChange={(e) => onChange("hora_inicio", e.target.value)} />
-                    </div>
-                    <div className="field col-6 md:col-3">
-                        <label className="font-bold">Fecha fin</label>
-                        <InputText type="date" value={form.fecha_fin} onChange={(e) => onChange("fecha_fin", e.target.value)} />
-                    </div>
-                    <div className="field col-6 md:col-3">
-                        <label className="font-bold">Hora fin</label>
-                        <InputText type="time" value={form.hora_fin} onChange={(e) => onChange("hora_fin", e.target.value)} />
                     </div>
 
                     {/* ¿Se ejecuta? */}

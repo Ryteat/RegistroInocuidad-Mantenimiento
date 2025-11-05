@@ -1,26 +1,44 @@
+/* src/Components/MantenimientoAlertas/MantenimientoAlertas.css */
 .mantenimientoAlertas-container {
-    text-align: center;
-    padding: 20px;
-    background-color: #f2f7f1;
-    height: 100vh;
+    padding: 12px;
 }
 
-.mantenimiento-container h1 {
-    color: #556b2f;
+.header-alertas {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 12px;
 }
 
-.back-button {
-    margin-top: 20px;
-    padding: 10px 20px;
-    font-size: 16px;
-    background-color: #556b2f;
-    color: white;
-    border: none;
+.top-actions {
+    display: flex;
+    gap: 12px;
+    justify-content: center;
+    margin: 12px 0;
+    flex-wrap: wrap;
+}
+
+.grid-botones {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+    gap: 12px;
+}
+
+.boton-grid {
+    padding: 14px 16px;
     border-radius: 8px;
-    cursor: pointer;
-    transition: background-color 0.3s ease;
+    border: 1px solid #e5e7eb;
 }
 
-.back-button:hover {
-    background-color: #6b8e23;
+.logout-button {
+    background: #fee2e2;
+}
+
+.logo2 {
+    height: 36px;
+}
+
+.welcome-message {
+    text-align: center;
+    margin: 8px 0 16px;
 }

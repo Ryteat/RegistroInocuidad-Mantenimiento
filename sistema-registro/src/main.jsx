@@ -4,11 +4,11 @@ import './index.css';
 import { PrimeReactProvider } from 'primereact/api';
 import { createBrowserRouter, Outlet, RouterProvider } from 'react-router-dom';
 
-//imports de las paginas principales
+// imports de las paginas principales
 import Login from './pages/Login/PagesLogin.jsx';
 import MenuPrincipal from './pages/MenuPrincipal/PagesMenuPrincipal.jsx';
 
-//imports paginas Hatchery
+// imports paginas Hatchery
 import Hatchery from './pages/Hatchery/PagesHatchery.jsx';
 import ColectaInvernadero from './pages/Hatchery/Registros/PagesColectaInvernadero.jsx';
 import IngresoPPInvernadero from './pages/Hatchery/Registros/PagesIngresoPPInvernadero.jsx';
@@ -16,13 +16,13 @@ import NIB from './pages/Hatchery/Registros/PagesNIB.jsx';
 import ControlRendimientoCosechaReproduccion from './pages/Hatchery/Registros/PagesControlRendimientoCosechaReproduccion.jsx';
 import ControlDespachoLabPro from './pages/Hatchery/Registros/PagesControlDespachoLabPro.jsx';
 
-//imports paginas Dieta
+// imports paginas Dieta
 import Dieta from './pages/Dieta/PagesDieta.jsx';
 import ControlInventarioCascaraPila from './pages/Dieta/Registros/PagesControlInventarioCascaraPila.jsx';
 import ControlRendimientoDietaySiembra from './pages/Dieta/Registros/PagesControlRendimientoDietaySiembra.jsx';
 import ControlMovimientosCajasProceso from './pages/Dieta/Registros/PagesControlMovimientosCajasProceso.jsx';
 
-//imports paginas Gerencia
+// imports paginas Gerencia
 import Gerencia from './pages/Gerencia/PagesGerencia.jsx';
 import GestionUsuarios from './pages/Gerencia/Registros/PagesGestionUsuarios.jsx';
 
@@ -38,18 +38,21 @@ import PagesLimpiezaOficinaReunionesComedor from './pages/Inocuidad/Registros/Pa
 import PagesControlPlagasRoedores from './pages/Inocuidad/Registros/PagesControlPlagasRoedores.jsx';
 import PagesLimpiezaTanqueAgua from "./pages/Inocuidad/Registros/PagesLimpiezaTanqueAgua.jsx";
 
-//imports de paginas de MantenimientoAlertas
+// imports de páginas de Mantenimiento/Alertas
 import PagesMantenimientoAlertas from './pages/MantenimientoAlertas/PagesMantenimientoAlertas.jsx';
+import MantenimientoAlertas from './Components/MantenimientoAlertas/MantenimientoAlertas.jsx';
+import InfraestructuraDePlanta from "./Components/MantenimientoAlertas/InfraestructuraDePlanta/InfraestructuraDePlanta.jsx";
+
 import ContenedorAlertas from './Components/MantenimientoAlertas/Alertas/ContenedorAlertas.jsx';
 import PanelElectrico from "./Components/MantenimientoAlertas/InfraestructuraDePlanta/Registros/PanelElectrico.jsx";
 import Iluminacion from "./Components/MantenimientoAlertas/InfraestructuraDePlanta/Registros/Iluminacion.jsx";
 import CuartosElectricos from "./Components/MantenimientoAlertas/InfraestructuraDePlanta/Registros/CuartosElectricos.jsx";
 
 
-//control de tiempos imports
+// control de tiempos imports
 import ControlTiempos from './pages/ControlTiempos/PagesControlTiempos.jsx';
 
-//imports de paginas de horno
+// imports de páginas de Horno
 import Horno from './pages/Horno/PagesHorno.jsx';
 import ControlRendimientoSecadoHornoMultilevel from './pages/Horno/Registros/PagesControlRendimientoSecadoHornoMultilevel.jsx';
 import ControlRendimientoSecadoHornoMicroondas from './pages/Horno/Registros/PagesControlRendimientoSecadoHornoMicroondas.jsx';
@@ -58,7 +61,7 @@ import ControlRendimientoProductoTerminado from './pages/Horno/Registros/PagesCo
 import ControlReempaque from './pages/Horno/Registros/PagesControlReempaque.jsx';
 import ControlLarvaMolida from './pages/Horno/Registros/PagesControlLarvaMolida.jsx';
 
-//imports de paginas de Calidad
+// imports de páginas de Calidad
 import Calidad from './pages/Calidad/PagesCalidad.jsx';
 import ControlCalidadCosecha from './pages/Calidad/Registros/PagesControlCalidadCosecha.jsx';
 import RecepcionMateriasPrimas from './pages/Calidad/Registros/PagesRecepcionMateriasPrimas.jsx';
@@ -68,177 +71,180 @@ import ControlCalidadHornoMicroondas from './pages/Calidad/Registros/PagesContro
 import ControlCalidadHornoMultilevel from './pages/Calidad/Registros/PagesControlCalidadHornoMultilevel.jsx';
 import ControlCalidadDietaSiembra from './pages/Calidad/Registros/PagesControlCalidadDietaSiembra.jsx';
 
-//imports de paginas de Mantenimiento
+// imports de páginas de Mantenimiento
 import Mantenimiento from './pages/Mantenimiento/PagesMantenimiento.jsx';
 import LimpiezaDesinfeccionEquiposMaquinariaPesada from './pages/Mantenimiento/Registros/PagesLimpiezaDesinfeccionEquiposMaquinariaPesada.jsx';
 import ReporteInspeccion from './pages/Mantenimiento/Registros/PagesReporteInspeccion.jsx'
 import ReporteInspeccionSemanal from './pages/Mantenimiento/Registros/PagesReporteInspeccionSemanal.jsx'
 import PreoperacionalTeletruk from './pages/Mantenimiento/Registros/PagesPreoperacionalTeletruk.jsx'
 
-//imports de paginas de Cosecha
+// imports de páginas de Cosecha
 import Cosecha from './pages/Cosecha/PagesCosecha.jsx';
 import ControlRendimientoCosechayFrass from './pages/Cosecha/Registros/PagesControlRendimientoCosechayFrass.jsx'
 import ControlIngresoySalidaRacks from './pages/Cosecha/Registros/PagesControlIngresoySalidaRacks.jsx'
 
-//imports de páginas visualizar
-// En main.js
+// imports de páginas Visualizar
 import Visualizar from './pages/Visualizar/PagesVisualizar';
 import VisualizarKPIs from './pages/Visualizar/Registros/PagesVisualizarKPIs';
 import VisualizarLotes from './pages/Visualizar/Registros/PagesVisualizarLotes';
 import VisualizarSKUs from './pages/Visualizar/Registros/PagesVisuazlizarSKUs';
 import FlashReport from './pages/Visualizar/Registros/PagesFlashReport';
-import PagesControlLarvaMolida from './pages/Horno/Registros/PagesControlLarvaMolida.jsx';
+// 🔧 OJO: se eliminó import duplicado de PagesControlLarvaMolida
 
-const Layout = () => {
-  return (
-    <div>
-      <Outlet />
-    </div>
-  )
-}
+const Layout = () => (
+  <div>
+    <Outlet />
+  </div>
+);
 
-const router = createBrowserRouter([{
-  path: `/`,
-  element: <Layout />, // Componente general que incluye el Outlet
-  children: [
-    { path: `/`, element: <Login /> }, // Página principal (login)
-    { path: `/MenuPrincipal`, element: <MenuPrincipal /> },
-
-    // Ruta de Inocuidad
+const router = createBrowserRouter(
+  [
     {
-      path: `/Inocuidad`,
-      element: <PagesInocuidad />,
+      path: `/`,
+      element: <Layout />,
       children: [
-        { path: 'RegistroLimpiezaHatchery', element: <LimpiezaAreaHatchery /> },
-        { path: 'RegistroLimpiezaCosecha', element: <LimpiezaAreaCosecha /> },
-        { path: 'LimpiezaTarimasCajas', element: <LimpiezaTarimasCajas /> },
-        { path: `LimpiezaDietaSiembra`, element: <PagesLimpiezaDietaSiembra /> },
-        { path: `LimpiezaHornoMultilevel`, element: <PagesLimpiezaHornoMultilevel /> },
-        { path: `LimpiezaBanosCasillerosPediluvios`, element: <PagesLimpiezaBanosCasillerosPediluvios /> },
-        { path: 'LimpiezaOficinaReunionesComedor', element: <PagesLimpiezaOficinaReunionesComedor />, },
-        { path: `ControlPlagasRoedores`, element: <PagesControlPlagasRoedores /> },
-        { path: `LimpiezaTanqueAgua`, element: <PagesLimpiezaTanqueAgua /> },
+        { path: `/`, element: <Login /> },
+        { path: `/MenuPrincipal`, element: <MenuPrincipal /> },
+
+        // Inocuidad
+        {
+          path: `/Inocuidad`,
+          element: <PagesInocuidad />,
+          children: [
+            { path: 'RegistroLimpiezaHatchery', element: <LimpiezaAreaHatchery /> },
+            { path: 'RegistroLimpiezaCosecha', element: <LimpiezaAreaCosecha /> },
+            { path: 'LimpiezaTarimasCajas', element: <LimpiezaTarimasCajas /> },
+            { path: `LimpiezaDietaSiembra`, element: <PagesLimpiezaDietaSiembra /> },
+            { path: `LimpiezaHornoMultilevel`, element: <PagesLimpiezaHornoMultilevel /> },
+            { path: `LimpiezaBanosCasillerosPediluvios`, element: <PagesLimpiezaBanosCasillerosPediluvios /> },
+            { path: 'LimpiezaOficinaReunionesComedor', element: <PagesLimpiezaOficinaReunionesComedor /> },
+            { path: `ControlPlagasRoedores`, element: <PagesControlPlagasRoedores /> },
+            { path: `LimpiezaTanqueAgua`, element: <PagesLimpiezaTanqueAgua /> },
+          ],
+        },
+
+        // Hatchery
+        {
+          path: `/Hatchery`,
+          element: <Hatchery />,
+          children: [
+            { path: `IngresoPPInvernadero`, element: <IngresoPPInvernadero /> },
+            { path: `ColectaInvernadero`, element: <ColectaInvernadero /> },
+            { path: `NIB`, element: <NIB /> },
+            { path: `ControlRendimientoCosechaReproduccion`, element: <ControlRendimientoCosechaReproduccion /> },
+            { path: `ControlDespachoLabPro`, element: <ControlDespachoLabPro /> },
+          ],
+        },
+
+        // Dieta
+        {
+          path: `/Dieta`,
+          element: <Dieta />,
+          children: [
+            { path: `ControlInventarioCascaraPila`, element: <ControlInventarioCascaraPila /> },
+            { path: `ControlRendimientoDietaySiembra`, element: <ControlRendimientoDietaySiembra /> },
+            { path: `ControlMovimientosCajasProceso`, element: <ControlMovimientosCajasProceso /> },
+          ],
+        },
+
+        // Gerencia
+        {
+          path: `/Gerencia`,
+          element: <Gerencia />,
+          children: [
+            { path: `GestionUsuarios`, element: <GestionUsuarios /> },
+          ],
+        },
+
+        // Visualizar
+        {
+          path: `/Visualizar`,
+          element: <Visualizar />,
+          children: [
+            { path: `VisualizarKPIs`, element: <VisualizarKPIs /> },
+            { path: `VisualizarLotes`, element: <VisualizarLotes /> },
+            { path: `VisualizarSKUs`, element: <VisualizarSKUs /> },
+            { path: `FlashReport`, element: <FlashReport /> },
+          ],
+        },
+
+        // Control de Tiempos
+        { path: `/ControlTiempos`, element: <ControlTiempos /> },
+
+        // --- Mantenimiento / Alertas ---
+        {
+          path: `/MantenimientoAlertas`,
+          element: <PagesMantenimientoAlertas />, // esta página renderiza <MantenimientoAlertas />
+          children: [
+            // 👇 index renderiza el menú principal (botonera de áreas)
+            { index: true, element: <MantenimientoAlertas /> },
+
+            // Tabla de alertas
+            { path: `Alertas`, element: <ContenedorAlertas /> },
+
+            // Submenú Infraestructura + Formularios
+            { path: `Infraestructura`, element: <InfraestructuraDePlanta /> },
+            { path: `PanelElectrico`, element: <PanelElectrico /> },    // ✅ nombre correcto
+            { path: `Iluminacion`, element: <Iluminacion /> },
+            { path: `CuartosElectricos`, element: <CuartosElectricos /> },
+          ],
+        },
+
+        // Horno
+        {
+          path: `/Horno`,
+          element: <Horno />,
+          children: [
+            { path: `ControlRendimientoSecadoHornoMultilevel`, element: <ControlRendimientoSecadoHornoMultilevel /> },
+            { path: `ControlRendimientoSecadoHornoMicroondas`, element: <ControlRendimientoSecadoHornoMicroondas /> },
+            { path: `ControlOperativoHornoMultilevel`, element: <ControlOperativoHornoMultilevel /> },
+            { path: `ControlRendimientoProductoTerminado`, element: <ControlRendimientoProductoTerminado /> },
+            { path: `ControlReempaque`, element: <ControlReempaque /> },
+            { path: `ControlLarvaMolida`, element: <ControlLarvaMolida /> },
+          ],
+        },
+
+        // Calidad
+        {
+          path: `/Calidad`,
+          element: <Calidad />,
+          children: [
+            { path: `ControlCalidadCosecha`, element: <ControlCalidadCosecha /> },
+            { path: `RecepcionMateriasPrimas`, element: <RecepcionMateriasPrimas /> },
+            { path: `ControlNeonatos`, element: <ControlNeonatos /> },
+            { path: `ControlCalidadEngordeHatchery`, element: <ControlCalidadEngordeHatchery /> },
+            { path: `ControlCalidadHornoMicroondas`, element: <ControlCalidadHornoMicroondas /> },
+            { path: `ControlCalidadHornoMultilevel`, element: <ControlCalidadHornoMultilevel /> },
+            { path: `ControlCalidadDietaSiembra`, element: <ControlCalidadDietaSiembra /> },
+          ],
+        },
+
+        // Mantenimiento
+        {
+          path: `/Mantenimiento`,
+          element: <Mantenimiento />,
+          children: [
+            { path: `LimpiezaDesinfeccionEquiposMaquinariaPesada`, element: <LimpiezaDesinfeccionEquiposMaquinariaPesada /> },
+            { path: `ReporteInspeccion`, element: <ReporteInspeccion /> },
+            { path: `ReporteInspeccionSemanal`, element: <ReporteInspeccionSemanal /> },
+            { path: `PreoperacionalTeletruk`, element: <PreoperacionalTeletruk /> },
+          ],
+        },
+
+        // Cosecha
+        {
+          path: `/Cosecha`,
+          element: <Cosecha />,
+          children: [
+            { path: `ControlRendimientoCosechayFrass`, element: <ControlRendimientoCosechayFrass /> },
+            { path: `ControlIngresoySalidaRacks`, element: <ControlIngresoySalidaRacks /> },
+          ],
+        },
       ],
     },
-
-    // Grupo de rutas de Hatchery
-    {
-      path: `/Hatchery`,
-      element: <Hatchery />, // Componente principal de Hatchery
-      children: [
-        { path: `IngresoPPInvernadero`, element: <IngresoPPInvernadero /> },
-        { path: `ColectaInvernadero`, element: <ColectaInvernadero /> },
-        { path: `NIB`, element: <NIB /> },
-        { path: `ControlRendimientoCosechaReproduccion`, element: <ControlRendimientoCosechaReproduccion /> },
-        { path: `ControlDespachoLabPro`, element: <ControlDespachoLabPro /> },
-      ],
-    },
-
-    // Grupo de rutas de Dieta
-    {
-      path: `/Dieta`,
-      element: <Dieta />, // Componente principal de Dieta
-      children: [
-        { path: `ControlInventarioCascaraPila`, element: <ControlInventarioCascaraPila /> },
-        { path: `ControlRendimientoDietaySiembra`, element: <ControlRendimientoDietaySiembra /> },
-        { path: `ControlMovimientosCajasProceso`, element: <ControlMovimientosCajasProceso /> },
-      ],
-    },
-
-    // Grupo de rutas de Gerencia
-    {
-      path: `/Gerencia`,
-      element: <Gerencia />, // Componente principal de Gerencia
-      children: [
-        { path: `GestionUsuarios`, element: <GestionUsuarios /> }
-      ],
-    },
-
-    // Grupo de rutas de Visualizar
-    {
-      path: `/Visualizar`,
-      element: <Visualizar />, // Componente padre
-      children: [
-        { path: `VisualizarKPIs`, element: <VisualizarKPIs /> }, // Componente hijo
-        { path: `VisualizarLotes`, element: <VisualizarLotes /> }, // Componente hijo
-        { path: `VisualizarSKUs`, element: <VisualizarSKUs /> }, // Componente hijo
-        { path: `FlashReport`, element: <FlashReport /> }, // Componente hijo
-      ],
-    },
-
-    // Grupo de rutas de Control de Tiempos
-    {
-      path: `/ControlTiempos`,
-      element: <ControlTiempos />, // único componente registro de ControlTiempos
-    },
-
-    // --- Grupo de rutas de MantenimientoAlertas (NUEVO) ---
-    {
-      path: `/MantenimientoAlertas`,
-      element: <PagesMantenimientoAlertas />,
-      children: [
-        { path: `Alertas`, element: <ContenedorAlertas /> },
-        // ✅ usar el mismo nombre del import:
-        { path: `PanelElectrico`, element: <PanelElectrico /> },
-        { path: `Iluminacion`, element: <Iluminacion /> },
-        { path: `CuartosElectricos`, element: <CuartosElectricos /> },
-
-      ],
-    },
-
-    // Grupo de rutas de Horno
-    {
-      path: `/Horno`,
-      element: <Horno />, // Componente principal de Horno
-      children: [
-        { path: `ControlRendimientoSecadoHornoMultilevel`, element: <ControlRendimientoSecadoHornoMultilevel /> },
-        { path: `ControlRendimientoSecadoHornoMicroondas`, element: <ControlRendimientoSecadoHornoMicroondas /> },
-        { path: `ControlOperativoHornoMultilevel`, element: <ControlOperativoHornoMultilevel /> },
-        { path: `ControlRendimientoProductoTerminado`, element: <ControlRendimientoProductoTerminado /> },
-        { path: `ControlReempaque`, element: <ControlReempaque /> },
-        { path: `ControlLarvaMolida`, element: <PagesControlLarvaMolida /> },
-      ],
-    },
-
-    // Grupo de rutas de Calidad
-    {
-      path: `/Calidad`,
-      element: <Calidad />, // Componente principal de Calidad
-      children: [
-        { path: `ControlCalidadCosecha`, element: <ControlCalidadCosecha /> },
-        { path: `RecepcionMateriasPrimas`, element: <RecepcionMateriasPrimas /> },
-        { path: `ControlNeonatos`, element: <ControlNeonatos /> },
-        { path: `ControlCalidadEngordeHatchery`, element: <ControlCalidadEngordeHatchery /> },
-        { path: `ControlCalidadHornoMicroondas`, element: <ControlCalidadHornoMicroondas /> },
-        { path: `ControlCalidadHornoMultilevel`, element: <ControlCalidadHornoMultilevel /> },
-        { path: `ControlCalidadDietaSiembra`, element: <ControlCalidadDietaSiembra /> },
-      ],
-    },
-
-    // Grupo de rutas de Mantenimiento
-    {
-      path: `/Mantenimiento`,
-      element: <Mantenimiento />, // Componente principal de Mantenimiento
-      children: [
-        { path: `LimpiezaDesinfeccionEquiposMaquinariaPesada`, element: <LimpiezaDesinfeccionEquiposMaquinariaPesada /> },
-        { path: `ReporteInspeccion`, element: <ReporteInspeccion /> },
-        { path: `ReporteInspeccionSemanal`, element: <ReporteInspeccionSemanal /> },
-        { path: `PreoperacionalTeletruk`, element: <PreoperacionalTeletruk /> }
-        // Eliminados: LimpiezaAreaHatchery y LimpiezaAreaCosecha
-      ],
-    },
-
-    {
-      path: `/Cosecha`,
-      element: <Cosecha />, // Componente principal de Gerencia
-      children: [
-        { path: `ControlRendimientoCosechayFrass`, element: <ControlRendimientoCosechayFrass /> },
-        { path: `ControlIngresoySalidaRacks`, element: <ControlIngresoySalidaRacks /> },
-      ],
-    },
-
-  ]
-}], { basename: "/ProNuvo" }) // 👈 Importante: Se establece la base para todas las rutas )
+  ],
+  { basename: "/ProNuvo" } // base de la app
+);
 
 const root = ReactDOM.createRoot(document.getElementById('root'));
 root.render(

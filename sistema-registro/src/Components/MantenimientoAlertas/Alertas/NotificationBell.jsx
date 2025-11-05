@@ -15,6 +15,16 @@ const addDays = (isoOrDate, days) => {
     return d.toISOString().slice(0, 10);
 };
 
+// Helpers de fecha
+const fmtDMY = (iso) => {
+    if (!iso) return "—";
+    const d = new Date(iso);
+    const dd = String(d.getDate()).padStart(2, "0");
+    const mm = String(d.getMonth() + 1).padStart(2, "0");
+    const yy = d.getFullYear();
+    return `${dd}/${mm}/${yy}`;
+};
+
 export default function NotificationBell({ navigate }) {
     const [open, setOpen] = useState(false);
     const [loading, setLoading] = useState(false);
@@ -112,7 +122,6 @@ export default function NotificationBell({ navigate }) {
             // Remueve la tarjeta del panel inmediatamente
             setItems((prev) => prev.filter((it) => !(it.id === n.id && it.tabla === n.tabla)));
         } catch (e) {
-            // opcional: podrías mostrar un toast aquí si lo deseas
             console.error("No se pudo posponer 7 días:", e.message || e);
         }
     };
@@ -273,7 +282,7 @@ export default function NotificationBell({ navigate }) {
                                     </div>
 
                                     <div style={{ color: "#374151", fontSize: 13, lineHeight: 1.4 }}>
-                                        Fecha objetivo: <b>{n.proximo_mantenimiento || "—"}</b>
+                                        Fecha objetivo: <b>{fmtDMY(n.proximo_mantenimiento)}</b>
                                         {n.registro ? <> • Registro: <i>{n.registro}</i></> : null}
                                     </div>
                                 </div>

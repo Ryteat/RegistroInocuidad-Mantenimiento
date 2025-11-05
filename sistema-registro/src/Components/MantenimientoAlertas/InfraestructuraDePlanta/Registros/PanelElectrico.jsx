@@ -1,7 +1,7 @@
 import React, { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import supabase from "../../../../supabaseClient.js"; // ⬅️ 4 niveles arriba a src/supabaseClient.js
-import logo2 from "../../../../assets/mosca.png";      // ⬅️ 4 niveles arriba a src/assets/mosca.png
+import supabase from "../../../../supabaseClient.js";
+import logo2 from "../../../../assets/mosca.png";
 
 import "primereact/resources/themes/lara-light-indigo/theme.css";
 import "primeicons/primeicons.css";
@@ -16,16 +16,34 @@ import { Dropdown } from "primereact/dropdown";
 import { Checkbox } from "primereact/checkbox";
 import * as XLSX from "xlsx";
 
-// Hook de revisión (fallback si no existe)
-let useCanReview = () => ({ canReview: false, username: null });
-try {
-    // ⬅️ 3 niveles arriba hasta Components, luego a Inocuidad/Registros/Hooks
-    useCanReview =
-        require("../../../Inocuidad/Registros/Hooks/useCanReview.js").default ||
-        useCanReview;
-} catch (_) { }
+import useCanReview from "../../../Inocuidad/Registros/Hooks/useCanReview.js";
 
-const POSICION_ID = "IN1"; // ID visible (buscarás por esto)
+/* ===================== Helpers de fecha ===================== */
+const fmtDMY = (iso) => {
+    if (!iso) return "—";
+    const d = new Date(iso);
+    const dd = String(d.getDate()).padStart(2, "0");
+    const mm = String(d.getMonth() + 1).padStart(2, "0");
+    const yy = d.getFullYear();
+    return `${dd}/${mm}/${yy}`;
+};
+const fmtDMYHM = (isoOrDate) => {
+    if (!isoOrDate) return "—";
+    const d = new Date(isoOrDate);
+    const hh = String(d.getHours()).padStart(2, "0");
+    const mi = String(d.getMinutes()).padStart(2, "0");
+    return `${fmtDMY(d.toISOString())} ${hh}:${mi}`;
+};
+const toDateISO = (d = new Date()) =>
+    `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+const toHM = (d = new Date()) =>
+    d.toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit", hour12: false });
+
+const addDays = (iso, days) => { const d = new Date(iso); d.setDate(d.getDate() + days); return d.toISOString().slice(0, 10); };
+const addMonths = (iso, months) => { const d = new Date(iso); d.setMonth(d.getMonth() + months); return d.toISOString().slice(0, 10); };
+
+/* ===================== Constantes ===================== */
+const POSICION_ID = "IN1"; // ID visible
 const EQUIPO = "Paneles Eléctricos";
 const PERIODICIDAD = "MENSUAL";
 
@@ -34,54 +52,18 @@ const YESNO = [
     { label: "No", value: "NO" },
 ];
 
-const toDateISO = (d = new Date()) =>
-    `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(
-        d.getDate()
-    ).padStart(2, "0")}`;
-const toHM = (d = new Date()) =>
-    d.toLocaleTimeString("en-GB", {
-        hour: "2-digit",
-        minute: "2-digit",
-        hour12: false,
-    });
-
-const addDays = (iso, days) => {
-    const d = new Date(iso);
-    d.setDate(d.getDate() + days);
-    return d.toISOString().slice(0, 10);
-};
-const addMonths = (iso, months) => {
-    const d = new Date(iso);
-    d.setMonth(d.getMonth() + months);
-    return d.toISOString().slice(0, 10);
-};
-
 const QUESTIONS = [
     { key: "q1", label: "Botoneras y selectores: revisar funcionamiento" },
-    {
-        key: "q2",
-        label: "Luces: revisar indicadores/luminarias, cambiar si es necesario",
-    },
-    {
-        key: "q3",
-        label: "Cables: revisar estado del cableado y realizar su acomodo",
-    },
-    {
-        key: "q4",
-        label: "Puertas/llavines: verificar funcionamiento, reparar si es necesario",
-    },
+    { key: "q2", label: "Luces: revisar indicadores/luminarias, cambiar si es necesario" },
+    { key: "q3", label: "Cables: revisar estado del cableado y realizar su acomodo" },
+    { key: "q4", label: "Puertas/llavines: verificar funcionamiento, reparar si es necesario" },
     { key: "q5", label: "Panel interior/exterior: limpieza de polvo y suciedad" },
-    {
-        key: "q6",
-        label: "Dispositivos eléctricos: verificar sujeción de bornes/contacto",
-    },
-    {
-        key: "q7",
-        label: "Bornero: fijación de cables, síntomas de calentamiento",
-    },
+    { key: "q6", label: "Dispositivos eléctricos: verificar sujeción de bornes/contacto" },
+    { key: "q7", label: "Bornero: fijación de cables, síntomas de calentamiento" },
     { key: "q8", label: "Tornillería/etiquetado general en orden" },
 ];
 
+/* ===================== Estado inicial ===================== */
 const emptyForm = () => ({
     fecha_registro: toDateISO(),
     hora_registro: toHM(),
@@ -90,14 +72,10 @@ const emptyForm = () => ({
     registro: "", // En Infraestructura queda vacío
     cantidad: "",
     tecnico: "",
-    fecha_inicio: toDateISO(),
-    hora_inicio: toHM(),
-    fecha_fin: "",
-    hora_fin: "",
     ejecutado: "",
     observaciones: "",
     items: QUESTIONS.reduce((a, q) => ({ ...a, [q.key]: { respuesta: "" } }), {}),
-    fecha_correccion_preview: new Date().toLocaleString(),
+    fecha_correccion_preview: fmtDMYHM(new Date()),
 });
 
 const packRow = (r) => ({
@@ -106,6 +84,7 @@ const packRow = (r) => ({
     observaciones: r.observaciones ?? "",
 });
 
+/* ===================== Componente ===================== */
 export default function PanelElectrico() {
     const navigate = useNavigate();
     const toast = useRef(null);
@@ -125,6 +104,7 @@ export default function PanelElectrico() {
     const showToast = (severity, summary, detail, life = 3000) =>
         toast.current?.show({ severity, summary, detail, life });
 
+    /* --------------------- Carga --------------------- */
     const fetchRows = async () => {
         try {
             setLoading(true);
@@ -135,7 +115,6 @@ export default function PanelElectrico() {
           id, created_at,
           fecha_registro, hora_registro,
           posicion_id, equipo, registro, cantidad, tecnico,
-          fecha_inicio, hora_inicio, fecha_fin, hora_fin,
           ejecutado, observaciones,
           respuesta_q1, respuesta_q2, respuesta_q3, respuesta_q4,
           respuesta_q5, respuesta_q6, respuesta_q7, respuesta_q8,
@@ -161,25 +140,16 @@ export default function PanelElectrico() {
         }
     };
 
-    useEffect(() => {
-        fetchRows();
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [filtroRevisado]);
+    useEffect(() => { fetchRows(); /* eslint-disable-next-line */ }, [filtroRevisado]);
 
-    const openNew = () => {
-        setForm(emptyForm());
-        setSubmitted(false);
-        setDialogOpen(true);
-    };
-    const hideDialog = () => {
-        setDialogOpen(false);
-        setSubmitted(false);
-    };
+    const openNew = () => { setForm(emptyForm()); setSubmitted(false); setDialogOpen(true); };
+    const hideDialog = () => { setDialogOpen(false); setSubmitted(false); };
 
     const onChange = (field, value) => setForm((p) => ({ ...p, [field]: value }));
     const onYesNoChange = (key, value) =>
         setForm((p) => ({ ...p, items: { ...p.items, [key]: { respuesta: value } } }));
 
+    /* --------------------- Validación --------------------- */
     const validate = () => {
         const errs = [];
         if (!form.tecnico?.trim()) errs.push("El campo Técnico es requerido.");
@@ -194,13 +164,11 @@ export default function PanelElectrico() {
         return errs;
     };
 
+    /* --------------------- Guardado --------------------- */
     const save = async () => {
         setSubmitted(true);
         const errs = validate();
-        if (errs.length) {
-            showToast("warn", "Validación", errs[0]);
-            return;
-        }
+        if (errs.length) { showToast("warn", "Validación", errs[0]); return; }
 
         try {
             const baseDate = form.fecha_registro || toDateISO();
@@ -208,38 +176,26 @@ export default function PanelElectrico() {
                 form.ejecutado === "NO" ? addDays(baseDate, 7) : addMonths(baseDate, 1);
 
             const payload = {
+                // Solo intervención + datos del registro
                 fecha_registro: form.fecha_registro,
                 hora_registro: form.hora_registro,
-                posicion_id: POSICION_ID, // fijo: IN1
+                posicion_id: POSICION_ID,
                 equipo: EQUIPO,
-                registro: null, // en Infraestructura va vacío
-                cantidad: form.cantidad
-                    ? Number(String(form.cantidad).replace(/\D/g, ""))
-                    : null,
+                registro: null,
+                cantidad: form.cantidad ? Number(String(form.cantidad).replace(/\D/g, "")) : null,
                 tecnico: form.tecnico,
-                fecha_inicio: form.fecha_inicio || null,
-                hora_inicio: form.hora_inicio || null,
-                fecha_fin: form.fecha_fin || null,
-                hora_fin: form.hora_fin || null,
                 ejecutado: form.ejecutado,
                 observaciones: form.observaciones || null,
 
-                respuesta_q1:
-                    form.ejecutado === "SI" ? form.items.q1?.respuesta || null : null,
-                respuesta_q2:
-                    form.ejecutado === "SI" ? form.items.q2?.respuesta || null : null,
-                respuesta_q3:
-                    form.ejecutado === "SI" ? form.items.q3?.respuesta || null : null,
-                respuesta_q4:
-                    form.ejecutado === "SI" ? form.items.q4?.respuesta || null : null,
-                respuesta_q5:
-                    form.ejecutado === "SI" ? form.items.q5?.respuesta || null : null,
-                respuesta_q6:
-                    form.ejecutado === "SI" ? form.items.q6?.respuesta || null : null,
-                respuesta_q7:
-                    form.ejecutado === "SI" ? form.items.q7?.respuesta || null : null,
-                respuesta_q8:
-                    form.ejecutado === "SI" ? form.items.q8?.respuesta || null : null,
+                // checklist si se ejecuta
+                respuesta_q1: form.ejecutado === "SI" ? form.items.q1?.respuesta || null : null,
+                respuesta_q2: form.ejecutado === "SI" ? form.items.q2?.respuesta || null : null,
+                respuesta_q3: form.ejecutado === "SI" ? form.items.q3?.respuesta || null : null,
+                respuesta_q4: form.ejecutado === "SI" ? form.items.q4?.respuesta || null : null,
+                respuesta_q5: form.ejecutado === "SI" ? form.items.q5?.respuesta || null : null,
+                respuesta_q6: form.ejecutado === "SI" ? form.items.q6?.respuesta || null : null,
+                respuesta_q7: form.ejecutado === "SI" ? form.items.q7?.respuesta || null : null,
+                respuesta_q8: form.ejecutado === "SI" ? form.items.q8?.respuesta || null : null,
 
                 periodicidad: PERIODICIDAD,
                 ultimo_mantenimiento: form.ejecutado === "SI" ? baseDate : null,
@@ -266,6 +222,7 @@ export default function PanelElectrico() {
             0
         );
 
+    /* --------------------- Columna Revisado --------------------- */
     const revisadoTemplate = (row) => {
         if (!canReview) return <span>{row.revisado ? "Sí" : "No"}</span>;
         const onToggle = async (next) => {
@@ -277,10 +234,7 @@ export default function PanelElectrico() {
                     revisado_fecha: next ? new Date().toISOString() : null,
                 })
                 .eq("id", row.id);
-            if (error) {
-                showToast("error", "No se guardó", error.message);
-                return;
-            }
+            if (error) { showToast("error", "No se guardó", error.message); return; }
             setRows((prev) =>
                 prev.map((r) =>
                     r.id === row.id
@@ -293,11 +247,7 @@ export default function PanelElectrico() {
                         : r
                 )
             );
-            showToast(
-                "success",
-                "OK",
-                next ? "Marcado revisado" : "Marcado no revisado"
-            );
+            showToast("success", "OK", next ? "Marcado revisado" : "Marcado no revisado");
         };
         return (
             <div className="flex align-items-center justify-content-center gap-2">
@@ -313,6 +263,7 @@ export default function PanelElectrico() {
         );
     };
 
+    /* --------------------- Header tabla --------------------- */
     const header = (
         <div className="flex flex-wrap gap-2 align-items-center justify-content-between">
             <span className="p-input-icon-left">
@@ -343,6 +294,32 @@ export default function PanelElectrico() {
     const semanaBody = (r) =>
         r.proximo_mantenimiento ? `${r.semana_proximo} año ${r.anio_proximo}` : "—";
 
+    /* --------------------- Exportación Excel --------------------- */
+    const exportXlsx = () => {
+        if (!rows?.length) { showToast("warn", "Exportación", "No hay datos"); return; }
+        const out = rows.map((r) => ({
+            posicion: r.posicion_id,
+            equipo: r.equipo,
+            registro: r.registro ?? "",
+            periodicidad: r.periodicidad ?? "",
+            ultimo_mantenimiento: fmtDMY(r.ultimo_mantenimiento),
+            proximo_mantenimiento: fmtDMY(r.proximo_mantenimiento),
+            semana: semanaBody(r),
+            tecnico: r.tecnico ?? "",
+            fecha_intervencion: fmtDMY(r.fecha_registro),
+            hora_intervencion: r.hora_registro || "",
+            "#SI": countSiNo(r, "SI"),
+            "#NO": countSiNo(r, "NO"),
+            revisado: r.revisado ? "Sí" : "No",
+            creado: fmtDMYHM(r.created_at),
+        }));
+        const ws = XLSX.utils.json_to_sheet(out);
+        const wb = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(wb, ws, "Paneles Eléctricos");
+        XLSX.writeFile(wb, `Paneles_Electricos_${new Date().toISOString().slice(0, 10)}.xlsx`);
+    };
+
+    /* --------------------- Render --------------------- */
     return (
         <div className="controlrendcosechayfrass-container">
             <Toast ref={toast} />
@@ -353,8 +330,7 @@ export default function PanelElectrico() {
 
             <div className="welcome-message">
                 <p>
-                    <b>Posición (ID):</b> {POSICION_ID} &nbsp; | &nbsp; <b>Equipo:</b>{" "}
-                    {EQUIPO} &nbsp; | &nbsp;
+                    <b>Posición (ID):</b> {POSICION_ID} &nbsp; | &nbsp; <b>Equipo:</b> {EQUIPO} &nbsp; | &nbsp;
                     <b>Periodicidad:</b> {PERIODICIDAD}
                 </p>
             </div>
@@ -383,37 +359,7 @@ export default function PanelElectrico() {
                         label="Exportar a Excel"
                         icon="pi pi-upload"
                         className="p-button-help"
-                        onClick={() => {
-                            if (!rows?.length) {
-                                showToast("warn", "Exportación", "No hay datos");
-                                return;
-                            }
-                            const out = rows.map((r) => ({
-                                posicion: r.posicion_id,
-                                equipo: r.equipo,
-                                registro: r.registro ?? "",
-                                periodicidad: r.periodicidad ?? "",
-                                ultimo_mantenimiento: r.ultimo_mantenimiento ?? "",
-                                proximo_mantenimiento: r.proximo_mantenimiento ?? "",
-                                semana: semanaBody(r),
-                                tecnico: r.tecnico ?? "",
-                                fecha: r.fecha_registro,
-                                hora: r.hora_registro,
-                                "#SI": countSiNo(r, "SI"),
-                                "#NO": countSiNo(r, "NO"),
-                                revisado: r.revisado ? "Sí" : "No",
-                                creado: r.created_at
-                                    ? new Date(r.created_at).toLocaleString()
-                                    : "",
-                            }));
-                            const ws = XLSX.utils.json_to_sheet(out);
-                            const wb = XLSX.utils.book_new();
-                            XLSX.utils.book_append_sheet(wb, ws, "Paneles Eléctricos");
-                            XLSX.writeFile(
-                                wb,
-                                `Paneles_Electricos_${new Date().toISOString().slice(0, 10)}.xlsx`
-                            );
-                        }}
+                        onClick={exportXlsx}
                     />
                 )}
             />
@@ -439,16 +385,14 @@ export default function PanelElectrico() {
                 <Column field="equipo" header="Equipo" sortable />
                 <Column field="registro" header="Registro" />
                 <Column field="periodicidad" header="Periodicidad" />
-                <Column field="ultimo_mantenimiento" header="Último Mto." sortable />
-                <Column field="proximo_mantenimiento" header="Próximo Mto." sortable />
+                <Column header="Último Mto." body={(r) => fmtDMY(r.ultimo_mantenimiento)} sortable />
+                <Column header="Próximo Mto." body={(r) => fmtDMY(r.proximo_mantenimiento)} sortable />
                 <Column header="Semana" body={semanaBody} />
                 <Column field="tecnico" header="Técnico" sortable />
                 <Column
                     field="created_at"
                     header="Fecha de Registro"
-                    body={(r) =>
-                        r.created_at ? new Date(r.created_at).toLocaleString() : "—"
-                    }
+                    body={(r) => fmtDMYHM(r.created_at)}
                     sortable
                 />
                 <Column
@@ -472,9 +416,9 @@ export default function PanelElectrico() {
                 }
             >
                 <div className="p-fluid grid">
-                    {/* Cabecera mínima */}
+                    {/* Intervención */}
                     <div className="field col-12 md:col-3">
-                        <label className="font-bold">Fecha</label>
+                        <label className="font-bold">Fecha intervención</label>
                         <InputText
                             type="date"
                             value={form.fecha_registro}
@@ -482,7 +426,7 @@ export default function PanelElectrico() {
                         />
                     </div>
                     <div className="field col-12 md:col-3">
-                        <label className="font-bold">Hora</label>
+                        <label className="font-bold">Hora intervención</label>
                         <InputText
                             type="time"
                             value={form.hora_registro}
@@ -500,9 +444,7 @@ export default function PanelElectrico() {
 
                     <div className="field col-6 md:col-3">
                         <label className="font-bold">
-                            Técnico* {submitted && !form.tecnico && (
-                                <small className="p-error"> Requerido</small>
-                            )}
+                            Técnico* {submitted && !form.tecnico && (<small className="p-error"> Requerido</small>)}
                         </label>
                         <InputText
                             value={form.tecnico}
@@ -515,46 +457,9 @@ export default function PanelElectrico() {
                         <InputText
                             value={form.cantidad}
                             onChange={(e) =>
-                                onChange(
-                                    "cantidad",
-                                    e.target.value ? e.target.value.replace(/\D/g, "") : ""
-                                )
+                                onChange("cantidad", e.target.value ? e.target.value.replace(/\D/g, "") : "")
                             }
                             placeholder="Ej. 2"
-                        />
-                    </div>
-
-                    {/* Inicio / Fin */}
-                    <div className="field col-6 md:col-3">
-                        <label className="font-bold">Fecha inicio</label>
-                        <InputText
-                            type="date"
-                            value={form.fecha_inicio}
-                            onChange={(e) => onChange("fecha_inicio", e.target.value)}
-                        />
-                    </div>
-                    <div className="field col-6 md:col-3">
-                        <label className="font-bold">Hora inicio</label>
-                        <InputText
-                            type="time"
-                            value={form.hora_inicio}
-                            onChange={(e) => onChange("hora_inicio", e.target.value)}
-                        />
-                    </div>
-                    <div className="field col-6 md:col-3">
-                        <label className="font-bold">Fecha fin</label>
-                        <InputText
-                            type="date"
-                            value={form.fecha_fin}
-                            onChange={(e) => onChange("fecha_fin", e.target.value)}
-                        />
-                    </div>
-                    <div className="field col-6 md:col-3">
-                        <label className="font-bold">Hora fin</label>
-                        <InputText
-                            type="time"
-                            value={form.hora_fin}
-                            onChange={(e) => onChange("hora_fin", e.target.value)}
                         />
                     </div>
 
@@ -562,9 +467,7 @@ export default function PanelElectrico() {
                     <div className="field col-12 md:col-6">
                         <label className="font-bold">
                             ¿Se va a efectuar el mantenimiento?*{" "}
-                            {submitted && !form.ejecutado && (
-                                <small className="p-error"> Requerido</small>
-                            )}
+                            {submitted && !form.ejecutado && (<small className="p-error"> Requerido</small>)}
                         </label>
                         <Dropdown
                             value={form.ejecutado}
@@ -578,9 +481,7 @@ export default function PanelElectrico() {
                         <div className="field col-12">
                             <label className="font-bold">
                                 Observaciones (obligatorio si NO){" "}
-                                {submitted && !form.observaciones.trim() && (
-                                    <small className="p-error"> Requerido</small>
-                                )}
+                                {submitted && !form.observaciones.trim() && (<small className="p-error"> Requerido</small>)}
                             </label>
                             <InputText
                                 value={form.observaciones}
@@ -595,13 +496,7 @@ export default function PanelElectrico() {
 
                     {form.ejecutado === "SI" && (
                         <div className="field col-12">
-                            <div
-                                style={{
-                                    border: "1px solid #d1d5db",
-                                    borderRadius: 8,
-                                    padding: 12,
-                                }}
-                            >
+                            <div style={{ border: "1px solid #d1d5db", borderRadius: 8, padding: 12 }}>
                                 <div style={{ fontWeight: 700, marginBottom: 8 }}>
                                     PANEL – Lista de verificación
                                 </div>
@@ -612,9 +507,7 @@ export default function PanelElectrico() {
                                             <div key={q.key} className="col-12 md:col-6">
                                                 <label className="font-bold">
                                                     {q.label}*{" "}
-                                                    {submitted && !val && (
-                                                        <small className="p-error"> Requerido</small>
-                                                    )}
+                                                    {submitted && !val && (<small className="p-error"> Requerido</small>)}
                                                 </label>
                                                 <Dropdown
                                                     value={val}
