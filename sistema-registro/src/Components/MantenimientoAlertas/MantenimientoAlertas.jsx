@@ -6,13 +6,36 @@ import logo2 from "../../assets/mosca.png";
 export default function MantenimientoAlertas() {
     const navigate = useNavigate();
     const location = useLocation();
-    const isRootPath = location.pathname === "/MantenimientoAlertas";
+
+    // ✅ Soporta basename o rutas anidadas
+    const isRootPath =
+        location.pathname === "/MantenimientoAlertas" ||
+        location.pathname.endsWith("/MantenimientoAlertas");
 
     const botones = [
         {
-            texto: "Limpieza y Desinfección de Equipos Maquinaria Pesada",
-            ruta: "/Mantenimiento/LimpiezaDesinfeccionEquiposMaquinariaPesada",
+            texto: "Mantenimiento de Panel Eléctrico",
+            ruta: "/MantenimientoAlertas/PanelElectrico",
             cols: 1,
+            className: "boton-grid",
+        },
+
+        {
+            texto: "Mantenimiento de Iluminación",
+            ruta: "/MantenimientoAlertas/Iluminacion",
+            cols: 1,
+            className: "boton-grid",
+        },
+        {
+            texto: "Mantenimiento Cuartos Eléctricos",
+            ruta: "/MantenimientoAlertas/CuartosElectricos",
+            cols: 1,
+            className: "boton-grid",
+        },
+        {
+            texto: "Ver Alertas (Infraestructura)",
+            ruta: "/MantenimientoAlertas/Alertas",
+            cols: 2,
             className: "boton-grid",
         },
         {
@@ -45,6 +68,7 @@ export default function MantenimientoAlertas() {
                             >
                                 {b.texto}
                             </button>
+
                         ))}
                     </div>
                 </>

@@ -40,6 +40,10 @@ import PagesLimpiezaTanqueAgua from "./pages/Inocuidad/Registros/PagesLimpiezaTa
 
 //imports de paginas de MantenimientoAlertas
 import PagesMantenimientoAlertas from './pages/MantenimientoAlertas/PagesMantenimientoAlertas.jsx';
+import ContenedorAlertas from './Components/MantenimientoAlertas/Alertas/ContenedorAlertas.jsx';
+import PanelElectrico from "./Components/MantenimientoAlertas/InfraestructuraDePlanta/Registros/PanelElectrico.jsx";
+import Iluminacion from "./Components/MantenimientoAlertas/InfraestructuraDePlanta/Registros/Iluminacion.jsx";
+import CuartosElectricos from "./Components/MantenimientoAlertas/InfraestructuraDePlanta/Registros/CuartosElectricos.jsx";
 
 
 //control de tiempos imports
@@ -100,8 +104,6 @@ const router = createBrowserRouter([{
     { path: `/`, element: <Login /> }, // Página principal (login)
     { path: `/MenuPrincipal`, element: <MenuPrincipal /> },
 
-
-
     // Ruta de Inocuidad
     {
       path: `/Inocuidad`,
@@ -119,32 +121,16 @@ const router = createBrowserRouter([{
       ],
     },
 
-
     // Grupo de rutas de Hatchery
     {
       path: `/Hatchery`,
       element: <Hatchery />, // Componente principal de Hatchery
       children: [
-        {
-          path: `IngresoPPInvernadero`,
-          element: <IngresoPPInvernadero />,
-        },
-        {
-          path: `ColectaInvernadero`,
-          element: <ColectaInvernadero />,
-        },
-        {
-          path: `NIB`,
-          element: <NIB />,
-        },
-        {
-          path: `ControlRendimientoCosechaReproduccion`,
-          element: <ControlRendimientoCosechaReproduccion />,
-        },
-        {
-          path: `ControlDespachoLabPro`,
-          element: <ControlDespachoLabPro />,
-        },
+        { path: `IngresoPPInvernadero`, element: <IngresoPPInvernadero /> },
+        { path: `ColectaInvernadero`, element: <ColectaInvernadero /> },
+        { path: `NIB`, element: <NIB /> },
+        { path: `ControlRendimientoCosechaReproduccion`, element: <ControlRendimientoCosechaReproduccion /> },
+        { path: `ControlDespachoLabPro`, element: <ControlDespachoLabPro /> },
       ],
     },
 
@@ -153,18 +139,9 @@ const router = createBrowserRouter([{
       path: `/Dieta`,
       element: <Dieta />, // Componente principal de Dieta
       children: [
-        {
-          path: `ControlInventarioCascaraPila`,
-          element: <ControlInventarioCascaraPila />,
-        },
-        {
-          path: `ControlRendimientoDietaySiembra`,
-          element: <ControlRendimientoDietaySiembra />,
-        },
-        {
-          path: `ControlMovimientosCajasProceso`,
-          element: <ControlMovimientosCajasProceso />,
-        },
+        { path: `ControlInventarioCascaraPila`, element: <ControlInventarioCascaraPila /> },
+        { path: `ControlRendimientoDietaySiembra`, element: <ControlRendimientoDietaySiembra /> },
+        { path: `ControlMovimientosCajasProceso`, element: <ControlMovimientosCajasProceso /> },
       ],
     },
 
@@ -173,11 +150,7 @@ const router = createBrowserRouter([{
       path: `/Gerencia`,
       element: <Gerencia />, // Componente principal de Gerencia
       children: [
-        {
-          path: `GestionUsuarios`,
-          element: <GestionUsuarios />,
-        }
-
+        { path: `GestionUsuarios`, element: <GestionUsuarios /> }
       ],
     },
 
@@ -186,22 +159,10 @@ const router = createBrowserRouter([{
       path: `/Visualizar`,
       element: <Visualizar />, // Componente padre
       children: [
-        {
-          path: `VisualizarKPIs`,
-          element: <VisualizarKPIs />, // Componente hijo
-        },
-        {
-          path: `VisualizarLotes`,
-          element: <VisualizarLotes />, // Componente hijo
-        },
-        {
-          path: `VisualizarSKUs`,
-          element: <VisualizarSKUs />, // Componente hijo
-        },
-        {
-          path: `FlashReport`,
-          element: <FlashReport />, // Componente hijo
-        },
+        { path: `VisualizarKPIs`, element: <VisualizarKPIs /> }, // Componente hijo
+        { path: `VisualizarLotes`, element: <VisualizarLotes /> }, // Componente hijo
+        { path: `VisualizarSKUs`, element: <VisualizarSKUs /> }, // Componente hijo
+        { path: `FlashReport`, element: <FlashReport /> }, // Componente hijo
       ],
     },
 
@@ -211,35 +172,31 @@ const router = createBrowserRouter([{
       element: <ControlTiempos />, // único componente registro de ControlTiempos
     },
 
+    // --- Grupo de rutas de MantenimientoAlertas (NUEVO) ---
+    {
+      path: `/MantenimientoAlertas`,
+      element: <PagesMantenimientoAlertas />,
+      children: [
+        { path: `Alertas`, element: <ContenedorAlertas /> },
+        // ✅ usar el mismo nombre del import:
+        { path: `PanelElectrico`, element: <PanelElectrico /> },
+        { path: `Iluminacion`, element: <Iluminacion /> },
+        { path: `CuartosElectricos`, element: <CuartosElectricos /> },
+
+      ],
+    },
+
     // Grupo de rutas de Horno
     {
       path: `/Horno`,
       element: <Horno />, // Componente principal de Horno
       children: [
-        {
-          path: `ControlRendimientoSecadoHornoMultilevel`,
-          element: <ControlRendimientoSecadoHornoMultilevel />,
-        },
-        {
-          path: `ControlRendimientoSecadoHornoMicroondas`,
-          element: <ControlRendimientoSecadoHornoMicroondas />,
-        },
-        {
-          path: `ControlOperativoHornoMultilevel`,
-          element: <ControlOperativoHornoMultilevel />,
-        },
-        {
-          path: `ControlRendimientoProductoTerminado`,
-          element: <ControlRendimientoProductoTerminado />,
-        },
-        {
-          path: `ControlReempaque`,
-          element: <ControlReempaque />,
-        },
-        {
-          path: `ControlLarvaMolida`,
-          element: <PagesControlLarvaMolida />,
-        },
+        { path: `ControlRendimientoSecadoHornoMultilevel`, element: <ControlRendimientoSecadoHornoMultilevel /> },
+        { path: `ControlRendimientoSecadoHornoMicroondas`, element: <ControlRendimientoSecadoHornoMicroondas /> },
+        { path: `ControlOperativoHornoMultilevel`, element: <ControlOperativoHornoMultilevel /> },
+        { path: `ControlRendimientoProductoTerminado`, element: <ControlRendimientoProductoTerminado /> },
+        { path: `ControlReempaque`, element: <ControlReempaque /> },
+        { path: `ControlLarvaMolida`, element: <PagesControlLarvaMolida /> },
       ],
     },
 
@@ -248,37 +205,13 @@ const router = createBrowserRouter([{
       path: `/Calidad`,
       element: <Calidad />, // Componente principal de Calidad
       children: [
-        {
-          path: `ControlCalidadCosecha`,
-          element: <ControlCalidadCosecha />,
-        },
-        {
-          path: `RecepcionMateriasPrimas`,
-          element: <RecepcionMateriasPrimas />,
-        },
-        {
-          path: `ControlNeonatos`,
-          element: <ControlNeonatos />,
-        },
-        {
-          path: `ControlCalidadEngordeHatchery`,
-          element: <ControlCalidadEngordeHatchery />,
-        },
-
-        {
-          path: `ControlCalidadHornoMicroondas`,
-          element: <ControlCalidadHornoMicroondas />,
-        },
-
-        {
-          path: `ControlCalidadHornoMultilevel`,
-          element: <ControlCalidadHornoMultilevel />,
-        },
-        {
-          path: `ControlCalidadDietaSiembra`,
-          element: <ControlCalidadDietaSiembra />,
-        },
-
+        { path: `ControlCalidadCosecha`, element: <ControlCalidadCosecha /> },
+        { path: `RecepcionMateriasPrimas`, element: <RecepcionMateriasPrimas /> },
+        { path: `ControlNeonatos`, element: <ControlNeonatos /> },
+        { path: `ControlCalidadEngordeHatchery`, element: <ControlCalidadEngordeHatchery /> },
+        { path: `ControlCalidadHornoMicroondas`, element: <ControlCalidadHornoMicroondas /> },
+        { path: `ControlCalidadHornoMultilevel`, element: <ControlCalidadHornoMultilevel /> },
+        { path: `ControlCalidadDietaSiembra`, element: <ControlCalidadDietaSiembra /> },
       ],
     },
 
@@ -287,22 +220,10 @@ const router = createBrowserRouter([{
       path: `/Mantenimiento`,
       element: <Mantenimiento />, // Componente principal de Mantenimiento
       children: [
-        {
-          path: `LimpiezaDesinfeccionEquiposMaquinariaPesada`,
-          element: <LimpiezaDesinfeccionEquiposMaquinariaPesada />,
-        },
-        {
-          path: `ReporteInspeccion`,
-          element: <ReporteInspeccion />,
-        },
-        {
-          path: `ReporteInspeccionSemanal`,
-          element: <ReporteInspeccionSemanal />,
-        },
-        {
-          path: `PreoperacionalTeletruk`,
-          element: <PreoperacionalTeletruk />,
-        }
+        { path: `LimpiezaDesinfeccionEquiposMaquinariaPesada`, element: <LimpiezaDesinfeccionEquiposMaquinariaPesada /> },
+        { path: `ReporteInspeccion`, element: <ReporteInspeccion /> },
+        { path: `ReporteInspeccionSemanal`, element: <ReporteInspeccionSemanal /> },
+        { path: `PreoperacionalTeletruk`, element: <PreoperacionalTeletruk /> }
         // Eliminados: LimpiezaAreaHatchery y LimpiezaAreaCosecha
       ],
     },
@@ -311,15 +232,8 @@ const router = createBrowserRouter([{
       path: `/Cosecha`,
       element: <Cosecha />, // Componente principal de Gerencia
       children: [
-        {
-          path: `ControlRendimientoCosechayFrass`,
-          element: <ControlRendimientoCosechayFrass />,
-        },
-        {
-          path: `ControlIngresoySalidaRacks`,
-          element: <ControlIngresoySalidaRacks />,
-        },
-
+        { path: `ControlRendimientoCosechayFrass`, element: <ControlRendimientoCosechayFrass /> },
+        { path: `ControlIngresoySalidaRacks`, element: <ControlIngresoySalidaRacks /> },
       ],
     },
 
@@ -331,5 +245,4 @@ root.render(
   <PrimeReactProvider>
     <RouterProvider router={router} />
   </PrimeReactProvider>
-
 );

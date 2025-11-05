@@ -9,7 +9,7 @@ function MenuPrincipal() {
   const location = useLocation();
   const { departamento } = location.state || {};
 
-  // Función mejorada para verificar departamentos
+  // Verificación de departamentos (acepta string separado por comas o array)
   const hasDepartment = (requiredDepartments) => {
     try {
       if (!departamento) return false;
@@ -68,7 +68,7 @@ function MenuPrincipal() {
       cols: 1
     },
     {
-      texto: 'Registros Transporte',
+      texto: 'Registros Mantenimiento',
       ruta: '/Mantenimiento',
       departamentos: ['Mantenimiento'],
       cols: 1
@@ -80,24 +80,25 @@ function MenuPrincipal() {
       cols: 1
     },
     {
+      // ✅ Va directo al frame de alertas
       texto: 'Alertas de Mantenimiento',
-      ruta: '/MantenimientoAlertas',
-      departamentos: ['MantenimientoAlertas'],
+      ruta: '/MantenimientoAlertas/Alertas',
+      // ✅ Visible si el usuario tiene Mantenimiento o MantenimientoAlertas
+      departamentos: ['Mantenimiento', 'MantenimientoAlertas'],
       cols: 1
     },
     {
       texto: 'Información Gerencia',
       ruta: '/Gerencia',
       departamentos: ['Gerencia'],
-      cols: 2  // Este ocupará dos columnas
+      cols: 2
     },
     {
       texto: 'Visualizar información',
       ruta: '/Visualizar',
       departamentos: ['Visualizar'],
-      cols: 2  // Este ocupará dos columnas
+      cols: 2
     },
-
   ];
 
   return (
