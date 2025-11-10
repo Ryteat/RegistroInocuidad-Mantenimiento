@@ -47,6 +47,11 @@ import Iluminacion from './Components/MantenimientoAlertas/InfraestructuraDePlan
 import CuartosElectricos from './Components/MantenimientoAlertas/InfraestructuraDePlanta/Registros/CuartosElectricos.jsx';
 import ContenedorAlertas from './Components/MantenimientoAlertas/Alertas/ContenedorAlertas.jsx';
 import MotorReductor from './Components/MantenimientoAlertas/Horno/Registros/MotorReductor.jsx';
+import Vibrador from './Components/MantenimientoAlertas/Horno/Registros/Vibrador.jsx';
+import MotorReductorEnfriador from './Components/MantenimientoAlertas/Horno/Registros/MotorReductorEnfriador.jsx';
+import LubricacionBandasEnfriador from './Components/MantenimientoAlertas/Horno/Registros/LubricacionBandasEnfriador.jsx';
+
+
 
 // ⬇️ Horno del módulo de Alertas (MENÚ)
 import HornoMA from './Components/MantenimientoAlertas/Horno/HornoMA.jsx';
@@ -195,6 +200,9 @@ const router = createBrowserRouter(
             { path: `Horno`, element: <HornoMA /> },
             { path: `Horno/SistemaNeumatico`, element: <SistemaNeumatico /> },
             { path: `Horno/MotorReductor`, element: <MotorReductor /> },
+            { path: `Horno/Vibrador`, element: <Vibrador /> },
+            { path: `Horno/MotorReductorEnfriador`, element: <MotorReductorEnfriador /> },
+            { path: `Horno/LubricacionBandasEnfriador`, element: <LubricacionBandasEnfriador /> },
           ],
         },
 

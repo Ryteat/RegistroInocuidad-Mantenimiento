@@ -27,6 +27,27 @@ export default function HornoMA() {
             className: "boton-grid"
         },
 
+        {
+            titulo: "*H-EL-V* Vibrador - Empacadora Larva",
+            ruta: "/MantenimientoAlertas/Horno/Vibrador",
+            cols: 2,
+            className: "boton-grid"
+        },
+        {
+            titulo: "*H-ENL-MR* Motor Reductor - Enfriador de Larva ",
+            ruta: "/MantenimientoAlertas/Horno/MotorReductorEnfriador",
+            cols: 2,
+            className: "boton-grid"
+        },
+
+        {
+            titulo: "*H-EL-LB* Lubricación de Bandas - Enfriador de Larva",
+            ruta: "/MantenimientoAlertas/Horno/LubricacionBandasEnfriador",
+            cols: 2,
+            className: "boton-grid"
+        },
+
+
     ];
 
     return (
