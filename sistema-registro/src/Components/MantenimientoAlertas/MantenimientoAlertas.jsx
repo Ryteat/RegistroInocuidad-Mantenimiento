@@ -14,7 +14,6 @@ export default function MantenimientoAlertas() {
 
     const secciones = [
         { titulo: "Infraestructura de Planta", ruta: "/MantenimientoAlertas/Infraestructura" },
-        { titulo: "Hatchery", ruta: "/MantenimientoAlertas/Hatchery" },   // (placeholder)
         { titulo: "Horno", ruta: "/MantenimientoAlertas/Horno" },         // (placeholder)
         { titulo: "Dieta", ruta: "/MantenimientoAlertas/Dieta" },         // (placeholder)
         { titulo: "Crecimiento", ruta: "/MantenimientoAlertas/Crecimiento" }, // (placeholder)

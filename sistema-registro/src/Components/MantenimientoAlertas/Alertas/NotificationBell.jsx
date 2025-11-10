@@ -3,22 +3,63 @@ import React, { useEffect, useMemo, useRef, useState } from "react";
 import supabase from "../../../supabaseClient.js";
 import { Button } from "primereact/button";
 
+// Tablas que pueden actualizarse desde la campanita
 const ALLOWED_TABLES = new Set([
     "mto_paneles_electrico",
     "mto_iluminacion",
     "mto_cuartos_electricos",
+    "mto_horno_empacadora_sistema_neumatico",
 ]);
 
-const addDays = (isoOrDate, days) => {
-    const d = new Date(isoOrDate || new Date());
-    d.setDate(d.getDate() + days);
-    return d.toISOString().slice(0, 10);
+/* ===================== Helpers de fecha SEGUROS ===================== */
+// Construye Date local a partir de YYYY-MM-DD (evita TZ shift)
+const parseYMD = (isoDateStr) => {
+    if (!isoDateStr) return null;
+    const [y, m, d] = String(isoDateStr).split("-").map(Number);
+    if (!y || !m || !d) return null;
+    return new Date(y, m - 1, d, 0, 0, 0, 0);
 };
 
-// Helpers de fecha
+// YYYY-MM-DD desde Date local
+const toDateISO = (d = new Date()) =>
+    `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(
+        d.getDate()
+    ).padStart(2, "0")}`;
+
+// Suma de días robusta para base Date o 'YYYY-MM-DD'
+const addDaysISO = (base, days) => {
+    let d;
+    if (typeof base === "string" && /^\d{4}-\d{2}-\d{2}$/.test(base)) {
+        d = parseYMD(base);
+    } else if (base instanceof Date) {
+        d = new Date(base);
+    } else {
+        d = new Date();
+    }
+    d.setHours(0, 0, 0, 0);
+    d.setDate(d.getDate() + Number(days || 0));
+    return toDateISO(d);
+};
+
+// Suma de años robusta para base Date o 'YYYY-MM-DD'
+const addYearsISO = (base, years) => {
+    let d;
+    if (typeof base === "string" && /^\d{4}-\d{2}-\d{2}$/.test(base)) {
+        d = parseYMD(base);
+    } else if (base instanceof Date) {
+        d = new Date(base);
+    } else {
+        d = new Date();
+    }
+    d.setHours(0, 0, 0, 0);
+    d.setFullYear(d.getFullYear() + Number(years || 0));
+    return toDateISO(d);
+};
+
+// Formato DD/MM/AAAA (para mostrar)
 const fmtDMY = (iso) => {
-    if (!iso) return "—";
-    const d = new Date(iso);
+    const d = parseYMD(iso);
+    if (!d) return "—";
     const dd = String(d.getDate()).padStart(2, "0");
     const mm = String(d.getMonth() + 1).padStart(2, "0");
     const yy = d.getFullYear();
@@ -40,9 +81,8 @@ export default function NotificationBell({ navigate }) {
         try {
             setLoading(true);
             const { data, error } = await supabase
-                .from("vw_infra_registros_unificado")
+                .from("vw_alertas_unificado")
                 .select(
-                    // incluye 'tabla' para poder actualizar la tabla real
                     "tabla,id,posicion_id,equipo,registro,estado,proximo_mantenimiento"
                 )
                 .in("estado", ["VENCIDO", "PROX7"])
@@ -65,64 +105,79 @@ export default function NotificationBell({ navigate }) {
                 anchorRef.current &&
                 !anchorRef.current.contains(e.target) &&
                 !e.target.closest?.(".nbell-panel")
-            ) {
+            )
                 setOpen(false);
-            }
         };
         document.addEventListener("mousedown", onDocClick);
         return () => document.removeEventListener("mousedown", onDocClick);
     }, [open]);
-
-    const pill = (estado) => {
-        const styles = {
-            base: {
-                display: "inline-block",
-                padding: "4px 8px",
-                fontSize: 12,
-                fontWeight: 700,
-                borderRadius: 999,
-                letterSpacing: 0.3,
-            },
-            VENCIDO: { background: "#fee2e2", color: "#991b1b" },
-            PROX7: { background: "#dbeafe", color: "#1e40af" },
-        };
-        return (
-            <span style={{ ...styles.base, ...(styles[estado] || {}) }}>
-                {estado}
-            </span>
-        );
-    };
 
     const goToForm = (pos) => {
         const map = {
             IN1: "/MantenimientoAlertas/PanelElectrico",
             IN2: "/MantenimientoAlertas/Iluminacion",
             IN3: "/MantenimientoAlertas/CuartosElectricos",
+            "H-EL-SN": "/MantenimientoAlertas/Horno/SistemaNeumatico",
         };
         const ruta = map[pos];
         if (ruta) navigate(ruta);
     };
 
+    // +7 días (VENCIDO -> posponer una semana)
     const snooze7Days = async (n) => {
-        // Solo permitir si viene marcado VENCIDO
         if (n.estado !== "VENCIDO") return;
-        // Seguridad: solo tablas conocidas
         if (!ALLOWED_TABLES.has(n.tabla)) return;
-
         try {
-            // Nuevo próximo mantenimiento = hoy + 7 días
-            const newDate = addDays(new Date(), 7);
-
+            const today = toDateISO(new Date());
+            const next = addDaysISO(today, 7);
             const { error } = await supabase
                 .from(n.tabla)
-                .update({ proximo_mantenimiento: newDate })
+                .update({ proximo_mantenimiento: next })
                 .eq("id", n.id);
             if (error) throw error;
 
-            // Remueve la tarjeta del panel inmediatamente
-            setItems((prev) => prev.filter((it) => !(it.id === n.id && it.tabla === n.tabla)));
+            // Remueve la tarjeta del panel
+            setItems((prev) =>
+                prev.filter((it) => !(it.id === n.id && it.tabla === n.tabla))
+            );
         } catch (e) {
             console.error("No se pudo posponer 7 días:", e.message || e);
+        }
+    };
+
+    // ✔ Completar — lo marca como completado y lo saca del panel
+    const markCompleted = async (n) => {
+        if (!ALLOWED_TABLES.has(n.tabla)) return;
+        const today = toDateISO(new Date());
+        try {
+            // Intento ideal: si existe columna 'estado'
+            const { error } = await supabase
+                .from(n.tabla)
+                .update({
+                    estado: "COMPLETADO",
+                    ultimo_mantenimiento: today,
+                    proximo_mantenimiento: null,
+                })
+                .eq("id", n.id);
+
+            if (error) {
+                // Fallback: sin tocar esquema, empujar próximo mto. lejos
+                const { error: fbErr } = await supabase
+                    .from(n.tabla)
+                    .update({
+                        ultimo_mantenimiento: today,
+                        proximo_mantenimiento: addYearsISO(today, 100),
+                    })
+                    .eq("id", n.id);
+                if (fbErr) throw fbErr;
+            }
+
+            // Quita del panel inmediatamente
+            setItems((prev) =>
+                prev.filter((it) => !(it.id === n.id && it.tabla === n.tabla))
+            );
+        } catch (e) {
+            console.error("No se pudo completar:", e.message || e);
         }
     };
 
@@ -169,7 +224,7 @@ export default function NotificationBell({ navigate }) {
                 )}
             </button>
 
-            {/* Panel */}
+            {/* Panel (más ancho y con scroll) */}
             {open && (
                 <div
                     className="nbell-panel"
@@ -177,7 +232,7 @@ export default function NotificationBell({ navigate }) {
                         position: "absolute",
                         top: 48,
                         right: 0,
-                        width: 420,
+                        width: 640,
                         maxWidth: "calc(100vw - 24px)",
                         background: "white",
                         borderRadius: 12,
@@ -232,20 +287,29 @@ export default function NotificationBell({ navigate }) {
                         </div>
                     </div>
 
-                    <div style={{ height: 1, background: "#e5e7eb", margin: "8px 0 12px" }} />
+                    <div
+                        style={{ height: 1, background: "#e5e7eb", margin: "8px 0 12px" }}
+                    />
 
                     <div
                         style={{
                             display: "flex",
                             flexDirection: "column",
                             gap: 12,
-                            maxHeight: 360,
+                            maxHeight: 420,
                             overflowY: "auto",
                             paddingRight: 4,
                         }}
                     >
                         {!items.length && !loading && (
-                            <div style={{ color: "#6b7280", fontSize: 14, textAlign: "center", padding: "12px 0" }}>
+                            <div
+                                style={{
+                                    color: "#6b7280",
+                                    fontSize: 14,
+                                    textAlign: "center",
+                                    padding: "12px 0",
+                                }}
+                            >
                                 Sin notificaciones pendientes.
                             </div>
                         )}
@@ -265,8 +329,27 @@ export default function NotificationBell({ navigate }) {
                                 }}
                             >
                                 <div style={{ minWidth: 0 }}>
-                                    <div style={{ display: "flex", gap: 8, alignItems: "center", marginBottom: 4 }}>
-                                        {pill(n.estado)}
+                                    <div
+                                        style={{
+                                            display: "flex",
+                                            gap: 8,
+                                            alignItems: "center",
+                                            marginBottom: 4,
+                                        }}
+                                    >
+                                        <span
+                                            style={{
+                                                background:
+                                                    n.estado === "VENCIDO" ? "#fee2e2" : "#dbeafe",
+                                                color: n.estado === "VENCIDO" ? "#991b1b" : "#1e40af",
+                                                fontSize: 12,
+                                                fontWeight: 700,
+                                                padding: "4px 8px",
+                                                borderRadius: 999,
+                                            }}
+                                        >
+                                            {n.estado}
+                                        </span>
                                         <div
                                             style={{
                                                 fontWeight: 700,
@@ -283,12 +366,16 @@ export default function NotificationBell({ navigate }) {
 
                                     <div style={{ color: "#374151", fontSize: 13, lineHeight: 1.4 }}>
                                         Fecha objetivo: <b>{fmtDMY(n.proximo_mantenimiento)}</b>
-                                        {n.registro ? <> • Registro: <i>{n.registro}</i></> : null}
+                                        {n.registro ? (
+                                            <>
+                                                {" "}
+                                                • Registro: <i>{n.registro}</i>
+                                            </>
+                                        ) : null}
                                     </div>
                                 </div>
 
                                 <div style={{ display: "flex", gap: 8 }}>
-                                    {/* Mini botón +7d (solo VENCIDO) */}
                                     {n.estado === "VENCIDO" && (
                                         <Button
                                             icon="pi pi-plus"
@@ -298,6 +385,15 @@ export default function NotificationBell({ navigate }) {
                                             outlined
                                         />
                                     )}
+                                    {/* ✔ Completar */}
+                                    <Button
+                                        icon="pi pi-check"
+                                        tooltip="Marcar como completado"
+                                        onClick={() => markCompleted(n)}
+                                        size="small"
+                                        severity="success"
+                                        outlined
+                                    />
                                     <Button
                                         label="Abrir"
                                         icon="pi pi-external-link"

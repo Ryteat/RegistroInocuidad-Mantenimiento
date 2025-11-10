@@ -17,29 +17,64 @@ import { Checkbox } from "primereact/checkbox";
 import * as XLSX from "xlsx";
 import useCanReview from "../../../Inocuidad/Registros/Hooks/useCanReview.js";
 
-/* ---------- helpers fecha ---------- */
+/* ---------- helpers fecha (seguros en zona horaria) ---------- */
+// Parse seguro para strings "YYYY-MM-DD" sin convertir a UTC
+const parseYMD = (isoDateStr) => {
+    if (!isoDateStr) return null;
+    const [y, m, d] = isoDateStr.split("-").map(Number);
+    if (!y || !m || !d) return null;
+    // Date local en medianoche local => sin desfases
+    return new Date(y, m - 1, d, 0, 0, 0, 0);
+};
+
+const toDateISO = (d = new Date()) =>
+    `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+
+const toHM = (d = new Date()) =>
+    d.toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit", hour12: false });
+
+// Formatea campos DATE (YYYY-MM-DD)
 const fmtDMY = (iso) => {
     if (!iso) return "—";
-    const d = new Date(iso);
+    const d = parseYMD(iso);
+    if (!d) return "—";
     const dd = String(d.getDate()).padStart(2, "0");
     const mm = String(d.getMonth() + 1).padStart(2, "0");
     const yyyy = d.getFullYear();
     return `${dd}/${mm}/${yyyy}`;
 };
+
+// Para timestamps (created_at) sí usamos Date normal
 const fmtDMYHM = (isoOrDate) => {
     if (!isoOrDate) return "—";
     const d = new Date(isoOrDate);
-    const ddmmyyyy = fmtDMY(d.toISOString());
+    const dd = String(d.getDate()).padStart(2, "0");
+    const mm = String(d.getMonth() + 1).padStart(2, "0");
+    const yyyy = d.getFullYear();
     const hh = String(d.getHours()).padStart(2, "0");
     const mi = String(d.getMinutes()).padStart(2, "0");
-    return `${ddmmyyyy} ${hh}:${mi}`;
+    return `${dd}/${mm}/${yyyy} ${hh}:${mi}`;
 };
-const toDateISO = (d = new Date()) =>
-    `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
-const toHM = (d = new Date()) => d.toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit", hour12: false });
 
-const addDays = (iso, days) => { const d = new Date(iso); d.setDate(d.getDate() + days); return d.toISOString().slice(0, 10); };
-const addMonths = (iso, months) => { const d = new Date(iso); d.setMonth(d.getMonth() + months); return d.toISOString().slice(0, 10); };
+// Sumar días a una fecha DATE (YYYY-MM-DD) sin UTC
+const addDays = (iso, days) => {
+    const d = parseYMD(iso) ?? new Date();
+    d.setDate(d.getDate() + days);
+    return toDateISO(d);
+};
+
+// Sumar meses a una fecha DATE (YYYY-MM-DD) sin UTC
+const addMonths = (iso, months) => {
+    const d = parseYMD(iso) ?? new Date();
+    const day = d.getDate();
+    d.setMonth(d.getMonth() + months);
+
+    // Ajuste de fin de mes (p.ej., sumar 1 mes a 31/01 -> 29/02 o 28/02)
+    while (d.getDate() < day) {
+        d.setDate(d.getDate() - 1);
+    }
+    return toDateISO(d);
+};
 
 const POSICION_ID = "IN3";
 const EQUIPO = "Cuartos Eléctricos";
@@ -91,7 +126,8 @@ export default function CuartosElectricos() {
     const [filtroRevisado, setFiltroRevisado] = useState("all");
     const { canReview, username } = useCanReview();
 
-    const showToast = (sev, sum, det, life = 3000) => toast.current?.show({ severity: sev, summary: sum, detail: det, life });
+    const showToast = (sev, sum, det, life = 3000) =>
+        toast.current?.show({ severity: sev, summary: sum, detail: det, life });
 
     const fetchRows = async () => {
         try {
@@ -145,8 +181,8 @@ export default function CuartosElectricos() {
             const proximo_mantenimiento = form.ejecutado === "NO" ? addDays(baseDate, 7) : addMonths(baseDate, 1);
 
             const payload = {
-                fecha_registro: form.fecha_registro,
-                hora_registro: form.hora_registro,
+                fecha_registro: form.fecha_registro, // YYYY-MM-DD
+                hora_registro: form.hora_registro,   // HH:mm
                 posicion_id: POSICION_ID,
                 equipo: EQUIPO,
                 registro: null,
@@ -168,8 +204,8 @@ export default function CuartosElectricos() {
                 respuesta_q11: form.ejecutado === "SI" ? form.items.q11?.respuesta || null : null,
 
                 periodicidad: PERIODICIDAD,
-                ultimo_mantenimiento: form.ejecutado === "SI" ? baseDate : null,
-                proximo_mantenimiento,
+                ultimo_mantenimiento: form.ejecutado === "SI" ? baseDate : null, // YYYY-MM-DD sin desfase
+                proximo_mantenimiento, // YYYY-MM-DD sin desfase
             };
 
             const { error } = await supabase.from("mto_cuartos_electricos").insert([payload]);
@@ -371,7 +407,7 @@ export default function CuartosElectricos() {
 
                     <div className="field col-12 md:col-4">
                         <label className="font-bold">Fecha de Registro (auto)</label>
-                        <InputText value={form.fecha_correccion_preview} disabled />
+                        <InputText value={fmtDMYHM(new Date())} disabled />
                     </div>
                 </div>
             </Dialog>

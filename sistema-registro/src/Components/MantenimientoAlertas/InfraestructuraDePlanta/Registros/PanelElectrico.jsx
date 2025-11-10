@@ -18,32 +18,57 @@ import * as XLSX from "xlsx";
 
 import useCanReview from "../../../Inocuidad/Registros/Hooks/useCanReview.js";
 
-/* ===================== Helpers de fecha ===================== */
-const fmtDMY = (iso) => {
-    if (!iso) return "—";
-    const d = new Date(iso);
-    const dd = String(d.getDate()).padStart(2, "0");
-    const mm = String(d.getMonth() + 1).padStart(2, "0");
-    const yy = d.getFullYear();
-    return `${dd}/${mm}/${yy}`;
-};
-const fmtDMYHM = (isoOrDate) => {
-    if (!isoOrDate) return "—";
-    const d = new Date(isoOrDate);
-    const hh = String(d.getHours()).padStart(2, "0");
-    const mi = String(d.getMinutes()).padStart(2, "0");
-    return `${fmtDMY(d.toISOString())} ${hh}:${mi}`;
+/* ===================== Helpers de fecha (seguros) ===================== */
+// Construye Date local sin cambiar de día por zona horaria
+const parseYMD = (isoDateStr) => {
+    if (!isoDateStr) return null;
+    const [y, m, d] = isoDateStr.split("-").map(Number);
+    if (!y || !m || !d) return null;
+    return new Date(y, m - 1, d, 0, 0, 0, 0);
 };
 const toDateISO = (d = new Date()) =>
     `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 const toHM = (d = new Date()) =>
     d.toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit", hour12: false });
 
-const addDays = (iso, days) => { const d = new Date(iso); d.setDate(d.getDate() + days); return d.toISOString().slice(0, 10); };
-const addMonths = (iso, months) => { const d = new Date(iso); d.setMonth(d.getMonth() + months); return d.toISOString().slice(0, 10); };
+// Para columnas DATE (YYYY-MM-DD)
+const fmtDMY = (iso) => {
+    if (!iso) return "—";
+    const d = parseYMD(iso);
+    if (!d) return "—";
+    const dd = String(d.getDate()).padStart(2, "0");
+    const mm = String(d.getMonth() + 1).padStart(2, "0");
+    const yy = d.getFullYear();
+    return `${dd}/${mm}/${yy}`;
+};
+
+// Para timestamps (created_at)
+const fmtDMYHM = (isoOrDate) => {
+    if (!isoOrDate) return "—";
+    const d = new Date(isoOrDate);
+    const dd = String(d.getDate()).padStart(2, "0");
+    const mm = String(d.getMonth() + 1).padStart(2, "0");
+    const yy = d.getFullYear();
+    const hh = String(d.getHours()).padStart(2, "0");
+    const mi = String(d.getMinutes()).padStart(2, "0");
+    return `${dd}/${mm}/${yy} ${hh}:${mi}`;
+};
+
+const addDays = (iso, days) => {
+    const d = parseYMD(iso) ?? new Date();
+    d.setDate(d.getDate() + days);
+    return toDateISO(d);
+};
+const addMonths = (iso, months) => {
+    const d = parseYMD(iso) ?? new Date();
+    const origDay = d.getDate();
+    d.setMonth(d.getMonth() + months);
+    while (d.getDate() < origDay) d.setDate(d.getDate() - 1); // ajusta fin de mes
+    return toDateISO(d);
+};
 
 /* ===================== Constantes ===================== */
-const POSICION_ID = "IN1"; // ID visible
+const POSICION_ID = "IN1";
 const EQUIPO = "Paneles Eléctricos";
 const PERIODICIDAD = "MENSUAL";
 
@@ -69,7 +94,7 @@ const emptyForm = () => ({
     hora_registro: toHM(),
     posicion_id: POSICION_ID,
     equipo: EQUIPO,
-    registro: "", // En Infraestructura queda vacío
+    registro: "",
     cantidad: "",
     tecnico: "",
     ejecutado: "",
@@ -110,8 +135,7 @@ export default function PanelElectrico() {
             setLoading(true);
             let q = supabase
                 .from("mto_paneles_electrico")
-                .select(
-                    `
+                .select(`
           id, created_at,
           fecha_registro, hora_registro,
           posicion_id, equipo, registro, cantidad, tecnico,
@@ -121,8 +145,7 @@ export default function PanelElectrico() {
           periodicidad, ultimo_mantenimiento, proximo_mantenimiento,
           semana_proximo, anio_proximo,
           revisado, revisado_por_username, revisado_fecha
-        `
-                )
+        `)
                 .order("fecha_registro", { ascending: false })
                 .order("created_at", { ascending: false });
 
@@ -176,9 +199,8 @@ export default function PanelElectrico() {
                 form.ejecutado === "NO" ? addDays(baseDate, 7) : addMonths(baseDate, 1);
 
             const payload = {
-                // Solo intervención + datos del registro
-                fecha_registro: form.fecha_registro,
-                hora_registro: form.hora_registro,
+                fecha_registro: form.fecha_registro, // YYYY-MM-DD (local)
+                hora_registro: form.hora_registro,   // HH:mm
                 posicion_id: POSICION_ID,
                 equipo: EQUIPO,
                 registro: null,
@@ -187,7 +209,6 @@ export default function PanelElectrico() {
                 ejecutado: form.ejecutado,
                 observaciones: form.observaciones || null,
 
-                // checklist si se ejecuta
                 respuesta_q1: form.ejecutado === "SI" ? form.items.q1?.respuesta || null : null,
                 respuesta_q2: form.ejecutado === "SI" ? form.items.q2?.respuesta || null : null,
                 respuesta_q3: form.ejecutado === "SI" ? form.items.q3?.respuesta || null : null,
@@ -202,9 +223,7 @@ export default function PanelElectrico() {
                 proximo_mantenimiento,
             };
 
-            const { error } = await supabase
-                .from("mto_paneles_electrico")
-                .insert([payload]);
+            const { error } = await supabase.from("mto_paneles_electrico").insert([payload]);
             if (error) throw error;
 
             showToast("success", "Éxito", "Registro guardado");
@@ -256,9 +275,7 @@ export default function PanelElectrico() {
                     checked={!!row.revisado}
                     onChange={(e) => onToggle(e.checked)}
                 />
-                <label htmlFor={`chk-rev-${row.id}`} className="text-sm">
-                    Revisado
-                </label>
+                <label htmlFor={`chk-rev-${row.id}`} className="text-sm">Revisado</label>
             </div>
         );
     };
@@ -336,32 +353,14 @@ export default function PanelElectrico() {
             </div>
 
             <div className="buttons-container">
-                <button onClick={() => navigate(-1)} className="return-button">
-                    Volver
-                </button>
-                <button onClick={() => navigate(-2)} className="menu-button">
-                    Menú principal
-                </button>
+                <button onClick={() => navigate(-1)} className="return-button">Volver</button>
+                <button onClick={() => navigate(-2)} className="menu-button">Menú principal</button>
             </div>
 
             <Toolbar
                 className="mb-4"
-                left={() => (
-                    <Button
-                        label="Nuevo"
-                        icon="pi pi-plus"
-                        severity="success"
-                        onClick={openNew}
-                    />
-                )}
-                right={() => (
-                    <Button
-                        label="Exportar a Excel"
-                        icon="pi pi-upload"
-                        className="p-button-help"
-                        onClick={exportXlsx}
-                    />
-                )}
+                left={() => (<Button label="Nuevo" icon="pi pi-plus" severity="success" onClick={openNew} />)}
+                right={() => (<Button label="Exportar a Excel" icon="pi pi-upload" className="p-button-help" onClick={exportXlsx} />)}
             />
 
             <DataTable
@@ -389,17 +388,8 @@ export default function PanelElectrico() {
                 <Column header="Próximo Mto." body={(r) => fmtDMY(r.proximo_mantenimiento)} sortable />
                 <Column header="Semana" body={semanaBody} />
                 <Column field="tecnico" header="Técnico" sortable />
-                <Column
-                    field="created_at"
-                    header="Fecha de Registro"
-                    body={(r) => fmtDMYHM(r.created_at)}
-                    sortable
-                />
-                <Column
-                    header="Revisado"
-                    body={revisadoTemplate}
-                    style={{ width: "10rem", textAlign: "center" }}
-                />
+                <Column field="created_at" header="Fecha de Registro" body={(r) => fmtDMYHM(r.created_at)} sortable />
+                <Column header="Revisado" body={revisadoTemplate} style={{ width: "10rem", textAlign: "center" }} />
             </DataTable>
 
             <Dialog
@@ -419,19 +409,11 @@ export default function PanelElectrico() {
                     {/* Intervención */}
                     <div className="field col-12 md:col-3">
                         <label className="font-bold">Fecha intervención</label>
-                        <InputText
-                            type="date"
-                            value={form.fecha_registro}
-                            onChange={(e) => onChange("fecha_registro", e.target.value)}
-                        />
+                        <InputText type="date" value={form.fecha_registro} onChange={(e) => onChange("fecha_registro", e.target.value)} />
                     </div>
                     <div className="field col-12 md:col-3">
                         <label className="font-bold">Hora intervención</label>
-                        <InputText
-                            type="time"
-                            value={form.hora_registro}
-                            onChange={(e) => onChange("hora_registro", e.target.value)}
-                        />
+                        <InputText type="time" value={form.hora_registro} onChange={(e) => onChange("hora_registro", e.target.value)} />
                     </div>
                     <div className="field col-6 md:col-3">
                         <label className="font-bold">Posición (ID)</label>
@@ -446,75 +428,44 @@ export default function PanelElectrico() {
                         <label className="font-bold">
                             Técnico* {submitted && !form.tecnico && (<small className="p-error"> Requerido</small>)}
                         </label>
-                        <InputText
-                            value={form.tecnico}
-                            onChange={(e) => onChange("tecnico", e.target.value)}
-                            placeholder="Nombre del técnico"
-                        />
+                        <InputText value={form.tecnico} onChange={(e) => onChange("tecnico", e.target.value)} placeholder="Nombre del técnico" />
                     </div>
                     <div className="field col-6 md:col-3">
                         <label className="font-bold">Cantidad (referencia)</label>
-                        <InputText
-                            value={form.cantidad}
-                            onChange={(e) =>
-                                onChange("cantidad", e.target.value ? e.target.value.replace(/\D/g, "") : "")
-                            }
-                            placeholder="Ej. 2"
-                        />
+                        <InputText value={form.cantidad} onChange={(e) => onChange("cantidad", e.target.value ? e.target.value.replace(/\D/g, "") : "")} placeholder="Ej. 2" />
                     </div>
 
                     {/* ¿Se ejecuta? */}
                     <div className="field col-12 md:col-6">
                         <label className="font-bold">
-                            ¿Se va a efectuar el mantenimiento?*{" "}
-                            {submitted && !form.ejecutado && (<small className="p-error"> Requerido</small>)}
+                            ¿Se va a efectuar el mantenimiento?* {submitted && !form.ejecutado && (<small className="p-error"> Requerido</small>)}
                         </label>
-                        <Dropdown
-                            value={form.ejecutado}
-                            options={YESNO}
-                            onChange={(e) => onChange("ejecutado", e.value)}
-                            placeholder="Seleccione"
-                        />
+                        <Dropdown value={form.ejecutado} options={YESNO} onChange={(e) => onChange("ejecutado", e.value)} placeholder="Seleccione" />
                     </div>
 
                     {form.ejecutado === "NO" && (
                         <div className="field col-12">
                             <label className="font-bold">
-                                Observaciones (obligatorio si NO){" "}
-                                {submitted && !form.observaciones.trim() && (<small className="p-error"> Requerido</small>)}
+                                Observaciones (obligatorio si NO) {submitted && !form.observaciones.trim() && (<small className="p-error"> Requerido</small>)}
                             </label>
-                            <InputText
-                                value={form.observaciones}
-                                onChange={(e) => onChange("observaciones", e.target.value)}
-                                placeholder="Explique el motivo"
-                            />
-                            <small className="block mt-2">
-                                Se reprogramará automáticamente para dentro de <b>7 días</b>.
-                            </small>
+                            <InputText value={form.observaciones} onChange={(e) => onChange("observaciones", e.target.value)} placeholder="Explique el motivo" />
+                            <small className="block mt-2">Se reprogramará automáticamente para dentro de <b>7 días</b>.</small>
                         </div>
                     )}
 
                     {form.ejecutado === "SI" && (
                         <div className="field col-12">
                             <div style={{ border: "1px solid #d1d5db", borderRadius: 8, padding: 12 }}>
-                                <div style={{ fontWeight: 700, marginBottom: 8 }}>
-                                    PANEL – Lista de verificación
-                                </div>
+                                <div style={{ fontWeight: 700, marginBottom: 8 }}>PANEL – Lista de verificación</div>
                                 <div className="grid">
                                     {QUESTIONS.map((q) => {
                                         const val = form.items[q.key]?.respuesta || "";
                                         return (
                                             <div key={q.key} className="col-12 md:col-6">
                                                 <label className="font-bold">
-                                                    {q.label}*{" "}
-                                                    {submitted && !val && (<small className="p-error"> Requerido</small>)}
+                                                    {q.label}* {submitted && !val && (<small className="p-error"> Requerido</small>)}
                                                 </label>
-                                                <Dropdown
-                                                    value={val}
-                                                    options={YESNO}
-                                                    onChange={(e) => onYesNoChange(q.key, e.value)}
-                                                    placeholder="Seleccione"
-                                                />
+                                                <Dropdown value={val} options={YESNO} onChange={(e) => onYesNoChange(q.key, e.value)} placeholder="Seleccione" />
                                             </div>
                                         );
                                     })}
@@ -526,16 +477,13 @@ export default function PanelElectrico() {
                     {form.ejecutado === "SI" && (
                         <div className="field col-12">
                             <label className="font-bold">Observaciones (opcional)</label>
-                            <InputText
-                                value={form.observaciones}
-                                onChange={(e) => onChange("observaciones", e.target.value)}
-                            />
+                            <InputText value={form.observaciones} onChange={(e) => onChange("observaciones", e.target.value)} />
                         </div>
                     )}
 
                     <div className="field col-12 md:col-4">
                         <label className="font-bold">Fecha de Registro (auto)</label>
-                        <InputText value={form.fecha_correccion_preview} disabled />
+                        <InputText value={fmtDMYHM(new Date())} disabled />
                     </div>
                 </div>
             </Dialog>

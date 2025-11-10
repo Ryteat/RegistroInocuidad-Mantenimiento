@@ -38,17 +38,20 @@ import PagesLimpiezaOficinaReunionesComedor from './pages/Inocuidad/Registros/Pa
 import PagesControlPlagasRoedores from './pages/Inocuidad/Registros/PagesControlPlagasRoedores.jsx';
 import PagesLimpiezaTanqueAgua from "./pages/Inocuidad/Registros/PagesLimpiezaTanqueAgua.jsx";
 
-// imports de páginas de Mantenimiento/Alertas
+// --- Mantenimiento / Alertas ---
 import PagesMantenimientoAlertas from './pages/MantenimientoAlertas/PagesMantenimientoAlertas.jsx';
 import MantenimientoAlertas from './Components/MantenimientoAlertas/MantenimientoAlertas.jsx';
-import InfraestructuraDePlanta from "./Components/MantenimientoAlertas/InfraestructuraDePlanta/InfraestructuraDePlanta.jsx";
-
+import InfraestructuraDePlanta from './Components/MantenimientoAlertas/InfraestructuraDePlanta/InfraestructuraDePlanta.jsx';
+import PanelElectrico from './Components/MantenimientoAlertas/InfraestructuraDePlanta/Registros/PanelElectrico.jsx';
+import Iluminacion from './Components/MantenimientoAlertas/InfraestructuraDePlanta/Registros/Iluminacion.jsx';
+import CuartosElectricos from './Components/MantenimientoAlertas/InfraestructuraDePlanta/Registros/CuartosElectricos.jsx';
 import ContenedorAlertas from './Components/MantenimientoAlertas/Alertas/ContenedorAlertas.jsx';
-import PanelElectrico from "./Components/MantenimientoAlertas/InfraestructuraDePlanta/Registros/PanelElectrico.jsx";
-import Iluminacion from "./Components/MantenimientoAlertas/InfraestructuraDePlanta/Registros/Iluminacion.jsx";
-import CuartosElectricos from "./Components/MantenimientoAlertas/InfraestructuraDePlanta/Registros/CuartosElectricos.jsx";
 
+// ⬇️ Horno del módulo de Alertas (MENÚ)
+import HornoMA from './Components/MantenimientoAlertas/Horno/HornoMA.jsx';
 
+// Registro de Horno (Alertas)
+import SistemaNeumatico from './Components/MantenimientoAlertas/Horno/Registros/SistemaNeumatico.jsx';
 // control de tiempos imports
 import ControlTiempos from './pages/ControlTiempos/PagesControlTiempos.jsx';
 
@@ -172,23 +175,27 @@ const router = createBrowserRouter(
         { path: `/ControlTiempos`, element: <ControlTiempos /> },
 
         // --- Mantenimiento / Alertas ---
+
         {
           path: `/MantenimientoAlertas`,
-          element: <PagesMantenimientoAlertas />, // esta página renderiza <MantenimientoAlertas />
+          element: <PagesMantenimientoAlertas />,
           children: [
-            // 👇 index renderiza el menú principal (botonera de áreas)
             { index: true, element: <MantenimientoAlertas /> },
 
-            // Tabla de alertas
             { path: `Alertas`, element: <ContenedorAlertas /> },
 
-            // Submenú Infraestructura + Formularios
+            // Infraestructura
             { path: `Infraestructura`, element: <InfraestructuraDePlanta /> },
-            { path: `PanelElectrico`, element: <PanelElectrico /> },    // ✅ nombre correcto
+            { path: `PanelElectrico`, element: <PanelElectrico /> },
             { path: `Iluminacion`, element: <Iluminacion /> },
             { path: `CuartosElectricos`, element: <CuartosElectricos /> },
+
+            // Horno (módulo de Alertas) — usa HornoMA
+            { path: `Horno`, element: <HornoMA /> },
+            { path: `Horno/SistemaNeumatico`, element: <SistemaNeumatico /> },
           ],
         },
+
 
         // Horno
         {

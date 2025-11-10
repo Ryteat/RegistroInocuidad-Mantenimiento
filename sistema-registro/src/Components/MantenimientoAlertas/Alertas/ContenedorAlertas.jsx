@@ -15,40 +15,51 @@ import { Dropdown } from "primereact/dropdown";
 
 import NotificationBell from "./NotificationBell.jsx";
 
-// Helpers de fecha
+/* ================== Helpers de fecha — SEGUROS ================== */
+// Construye Date local a partir de YYYY-MM-DD (sin desfases por TZ)
+const parseYMD = (isoDateStr) => {
+    if (!isoDateStr) return null;
+    const [y, m, d] = String(isoDateStr).split("-").map(Number);
+    if (!y || !m || !d) return null;
+    return new Date(y, m - 1, d, 0, 0, 0, 0);
+};
+
+// Muestra DD/MM/AAAA para columnas DATE
 const fmtDMY = (iso) => {
-    if (!iso) return "—";
-    const d = new Date(iso);
+    const d = parseYMD(iso);
+    if (!d) return "—";
     const dd = String(d.getDate()).padStart(2, "0");
     const mm = String(d.getMonth() + 1).padStart(2, "0");
     const yy = d.getFullYear();
     return `${dd}/${mm}/${yy}`;
 };
 
-// Mapa de formularios por ID (posicion_id)
-const FORM_MAP = {
-    IN1: "/MantenimientoAlertas/PanelElectrico",
-    IN2: "/MantenimientoAlertas/Iluminacion",
-    IN3: "/MantenimientoAlertas/CuartosElectricos",
-};
-
-// util semana ISO (fallback si la vista no trae semana_proximo/anio_proximo)
+// Semana ISO a partir de YYYY-MM-DD (sin usar Date con la cadena original)
 const semanaIso = (isoStr) => {
-    if (!isoStr) return { semana: "—", anio: "" };
-    const d = new Date(isoStr);
+    const d = parseYMD(isoStr);
+    if (!d) return { semana: "—", anio: "" };
+
+    // Cálculo clásico de semana ISO (usando UTC para estabilidad)
     const target = new Date(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()));
-    const dayNr = (target.getUTCDay() + 6) % 7;
+    // Jueves de la semana actual
+    const dayNr = (target.getUTCDay() + 6) % 7; // 0..6 (lunes=0)
     target.setUTCDate(target.getUTCDate() - dayNr + 3);
     const firstThursday = new Date(Date.UTC(target.getUTCFullYear(), 0, 4));
     const week =
         1 +
         Math.round(
-            ((target.getTime() - firstThursday.getTime()) / 86400000 -
-                3 +
-                ((firstThursday.getUTCDay() + 6) % 7)) /
-            7
+            ((target.getTime() - firstThursday.getTime()) / 86400000 - 3 + ((firstThursday.getUTCDay() + 6) % 7)) / 7
         );
     return { semana: String(week).padStart(2, "0"), anio: target.getUTCFullYear() };
+};
+
+/* ================== Rutas de formularios ================== */
+const FORM_MAP = {
+    IN1: "/MantenimientoAlertas/PanelElectrico",
+    IN2: "/MantenimientoAlertas/Iluminacion",
+    IN3: "/MantenimientoAlertas/CuartosElectricos",
+    "H-EL-SN": "/MantenimientoAlertas/Horno/SistemaNeumatico",
+
 };
 
 export default function ContenedorAlertas() {
@@ -72,7 +83,7 @@ export default function ContenedorAlertas() {
         try {
             setLoading(true);
             let q = supabase
-                .from("vw_infra_registros_unificado")
+                .from("vw_alertas_unificado")
                 .select(`
           tabla, id, posicion_id, equipo, registro, periodicidad,
           ultimo_mantenimiento, proximo_mantenimiento,
@@ -85,6 +96,7 @@ export default function ContenedorAlertas() {
             const { data, error } = await q;
             if (error) throw error;
 
+            // Completar semana/año si la vista no los trae
             const mapped = (data || []).map((r) => {
                 if (!r.proximo_mantenimiento) return r;
                 if (r.semana_proximo && r.anio_proximo) return r;
@@ -109,7 +121,8 @@ export default function ContenedorAlertas() {
         return () => clearTimeout(t);
     }, [searchInput]);
 
-    const semanaBody = (r) => r.proximo_mantenimiento ? `${r.semana_proximo} año ${r.anio_proximo}` : "—";
+    const semanaBody = (r) =>
+        r.proximo_mantenimiento ? `${r.semana_proximo} año ${r.anio_proximo}` : "—";
 
     const accionesBody = (r) => (
         <div className="flex gap-2">
@@ -146,10 +159,17 @@ export default function ContenedorAlertas() {
 
             {/* Acciones superiores (sin +Nuevo aquí) */}
             <div className="flex justify-content-center gap-2 mt-3 mb-3">
-                <Button label="Volver al Menú de Registros" icon="pi pi-arrow-left"
-                    onClick={() => navigate("/MantenimientoAlertas")} />
-                <Button label="Cerrar sesión" icon="pi pi-sign-out" severity="danger"
-                    onClick={() => navigate("/", { replace: true })} />
+                <Button
+                    label="Volver al Menú de Registros"
+                    icon="pi pi-arrow-left"
+                    onClick={() => navigate("/MantenimientoAlertas")}
+                />
+                <Button
+                    label="Cerrar sesión"
+                    icon="pi pi-sign-out"
+                    severity="danger"
+                    onClick={() => navigate("/", { replace: true })}
+                />
             </div>
 
             {/* Controles */}
@@ -205,6 +225,7 @@ export default function ContenedorAlertas() {
                 <Column field="equipo" header="Equipo" sortable />
                 <Column field="registro" header="Registro" />
                 <Column field="periodicidad" header="Periodicidad" />
+                {/* 👇 Fechas con formateo seguro */}
                 <Column header="Último Mantenimiento" body={(r) => fmtDMY(r.ultimo_mantenimiento)} sortable />
                 <Column header="Próximo Mantenimiento" body={(r) => fmtDMY(r.proximo_mantenimiento)} sortable />
                 <Column header="Semana" body={semanaBody} />
