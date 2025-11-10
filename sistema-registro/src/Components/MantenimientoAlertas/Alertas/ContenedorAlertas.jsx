@@ -59,6 +59,7 @@ const FORM_MAP = {
     IN2: "/MantenimientoAlertas/Iluminacion",
     IN3: "/MantenimientoAlertas/CuartosElectricos",
     "H-EL-SN": "/MantenimientoAlertas/Horno/SistemaNeumatico",
+    'H-EL-MR': '/MantenimientoAlertas/Horno/MotorReductor',
 
 };
 

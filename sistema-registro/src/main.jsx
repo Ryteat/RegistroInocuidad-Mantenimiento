@@ -46,6 +46,7 @@ import PanelElectrico from './Components/MantenimientoAlertas/InfraestructuraDeP
 import Iluminacion from './Components/MantenimientoAlertas/InfraestructuraDePlanta/Registros/Iluminacion.jsx';
 import CuartosElectricos from './Components/MantenimientoAlertas/InfraestructuraDePlanta/Registros/CuartosElectricos.jsx';
 import ContenedorAlertas from './Components/MantenimientoAlertas/Alertas/ContenedorAlertas.jsx';
+import MotorReductor from './Components/MantenimientoAlertas/Horno/Registros/MotorReductor.jsx';
 
 // ⬇️ Horno del módulo de Alertas (MENÚ)
 import HornoMA from './Components/MantenimientoAlertas/Horno/HornoMA.jsx';
@@ -193,6 +194,7 @@ const router = createBrowserRouter(
             // Horno (módulo de Alertas) — usa HornoMA
             { path: `Horno`, element: <HornoMA /> },
             { path: `Horno/SistemaNeumatico`, element: <SistemaNeumatico /> },
+            { path: `Horno/MotorReductor`, element: <MotorReductor /> },
           ],
         },
 

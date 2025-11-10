@@ -20,7 +20,13 @@ export default function HornoMA() {
             cols: 2,
             className: "boton-grid",
         },
-        // aquí irán más registros de Horno (empacadora, bandas, etc.)
+        {
+            titulo: "*H-EL-MR* Motor Reductor — Empacadora de Larva ",
+            ruta: "/MantenimientoAlertas/Horno/MotorReductor",
+            cols: 2,
+            className: "boton-grid"
+        },
+
     ];
 
     return (

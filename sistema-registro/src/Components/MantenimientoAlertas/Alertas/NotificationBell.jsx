@@ -9,6 +9,7 @@ const ALLOWED_TABLES = new Set([
     "mto_iluminacion",
     "mto_cuartos_electricos",
     "mto_horno_empacadora_sistema_neumatico",
+    "mto_horno_empacadora_motor_reductor"
 ]);
 
 /* ===================== Helpers de fecha SEGUROS ===================== */
