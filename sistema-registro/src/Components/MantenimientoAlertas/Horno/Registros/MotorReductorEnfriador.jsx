@@ -51,7 +51,7 @@ const addDays = (ymd, days) => { const b = parseYMD(ymd); b.setDate(b.getDate() 
 const addMonths = (ymd, months) => { const b = parseYMD(ymd); b.setMonth(b.getMonth() + Number(months || 0)); return toDateISO(b); };
 
 /* ===== Constantes del registro ===== */
-const POSICION_ID = "H-ENL-MR"; // Horno - ENfriador de Larva - Motor Reductor
+const POSICION_ID = "H-ENF-MR"; // Horno - ENfriador de Larva - Motor Reductor
 const EQUIPO = "ENFRIADOR DE LARVA";
 const REGISTRO = "MOTOR REDUCTOR";
 const TABLE = "mto_horno_enfriador_motor_reductor";

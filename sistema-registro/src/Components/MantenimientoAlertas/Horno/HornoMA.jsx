@@ -34,19 +34,66 @@ export default function HornoMA() {
             className: "boton-grid"
         },
         {
-            titulo: "*H-ENL-MR* Motor Reductor - Enfriador de Larva ",
+            titulo: "*H-ENF-MR* Motor Reductor - Enfriador de Larva ",
             ruta: "/MantenimientoAlertas/Horno/MotorReductorEnfriador",
             cols: 2,
             className: "boton-grid"
         },
 
         {
-            titulo: "*H-EL-LB* Lubricación de Bandas - Enfriador de Larva",
+            titulo: "*H-ENF-LB* Lubricación de Bandas - Enfriador de Larva",
             ruta: "/MantenimientoAlertas/Horno/LubricacionBandasEnfriador",
             cols: 2,
             className: "boton-grid"
         },
-
+        {
+            titulo: "*H-ENF-V* Vibrador - Enfriador de Larva ",
+            ruta: "/MantenimientoAlertas/Horno/VibradorEnfriador",
+            cols: 2,
+            className: "boton-grid"
+        },
+        {
+            titulo: "*H-BS-G* - Banda de Salida - General",
+            ruta: "/MantenimientoAlertas/Horno/BandaSalidaGeneral",
+            cols: 2,
+            className: "boton-grid oven-button"
+        },
+        {
+            titulo: "*H-BE-G* Banda de Entrada - General ",
+            ruta: "/MantenimientoAlertas/Horno/BandaEntradaGeneral",
+            cols: 2,
+            className: "boton-grid oven-button"
+        },
+        {
+            titulo: "*H-HM-V* Horno Multilevel - Vibrador ",
+            ruta: "/MantenimientoAlertas/Horno/VibradorHornoMultilevel",
+            cols: 2,
+            className: "boton-grid oven-button"
+        },
+        {
+            titulo: "*H-HM-LG* Horno Multilevel - Línea de Gas GLP",
+            ruta: "/MantenimientoAlertas/Horno/LineaGasGLPHornoMultilevel",
+            cols: 2,
+            className: "boton-grid oven-button"
+        },
+        {
+            titulo: "*H-HM-TT* Horno Multilevel - Transmisión de Turbina",
+            ruta: "/MantenimientoAlertas/Horno/TransmisionTurbinaHornoMultilevel",
+            cols: 2,
+            className: "boton-grid oven-button"
+        },
+        {
+            titulo: "*H-HM-LB* Horno Multilevel - Lubricación de Bandas",
+            ruta: "/MantenimientoAlertas/Horno/LubricacionBandasHornoMultilevel",
+            cols: 2,
+            className: "boton-grid oven-button"
+        },
+        {
+            titulo: "*H-SBC-G* Selladora Banda Continua - General",
+            ruta: "/MantenimientoAlertas/Horno/SelladoraBandaContinuaGeneral",
+            cols: 2,
+            className: "boton-grid oven-button"
+        }
 
     ];
 

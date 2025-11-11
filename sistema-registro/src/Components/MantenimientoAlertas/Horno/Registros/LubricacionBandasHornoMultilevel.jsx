@@ -1,4 +1,4 @@
-// src/Components/MantenimientoAlertas/Horno/Registros/LubricacionBandasEnfriador.jsx
+// src/Components/MantenimientoAlertas/Horno/Registros/LubricacionBandasHornoMultilevel.jsx
 import React, { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import supabase from "../../../../supabaseClient.js";
@@ -18,55 +18,27 @@ import { Checkbox } from "primereact/checkbox";
 import * as XLSX from "xlsx";
 import useCanReview from "../../../Inocuidad/Registros/Hooks/useCanReview.js";
 
-/* ===== Helpers (idénticos a SistemaNeumatico) ===== */
-const parseYMD = (isoDateStr) => {
-    if (!isoDateStr) return null;
-    const [y, m, d] = String(isoDateStr).split("-").map(Number);
-    if (!y || !m || !d) return null;
-    return new Date(y, m - 1, d, 0, 0, 0, 0);
-};
-const fmtDMY = (iso) => {
-    const d = parseYMD(iso);
-    if (!d) return "—";
-    const dd = String(d.getDate()).padStart(2, "0");
-    const mm = String(d.getMonth() + 1).padStart(2, "0");
-    const yy = d.getFullYear();
-    return `${dd}/${mm}/${yy}`;
-};
-const fmtDMYHM = (isoOrDate) => {
-    if (!isoOrDate) return "—";
-    const d = isoOrDate instanceof Date ? isoOrDate : new Date(isoOrDate);
-    const dd = String(d.getDate()).padStart(2, "0");
-    const mm = String(d.getMonth() + 1).padStart(2, "0");
-    const yy = d.getFullYear();
-    const hh = String(d.getHours()).padStart(2, "0");
-    const mi = String(d.getMinutes()).padStart(2, "0");
-    return `${dd}/${mm}/${yy} ${hh}:${mi}`;
-};
-const toDateISO = (d = new Date()) =>
-    `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
-const toHM = (d = new Date()) =>
-    d.toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit", hour12: false });
-const addDays = (ymd, days) => {
-    const base = parseYMD(ymd);
-    base.setDate(base.getDate() + Number(days || 0));
-    return toDateISO(base);
-};
+/* ===== Helpers (idénticos al patrón) ===== */
+const parseYMD = (s) => { if (!s) return null; const [y, m, d] = String(s).split("-").map(Number); if (!y || !m || !d) return null; return new Date(y, m - 1, d, 0, 0, 0, 0); };
+const fmtDMY = (iso) => { const d = parseYMD(iso); if (!d) return "—"; const dd = String(d.getDate()).padStart(2, "0"); const mm = String(d.getMonth() + 1).padStart(2, "0"); const yy = d.getFullYear(); return `${dd}/${mm}/${yy}`; };
+const fmtDMYHM = (v) => { if (!v) return "—"; const d = v instanceof Date ? v : new Date(v); const dd = String(d.getDate()).padStart(2, "0"); const mm = String(d.getMonth() + 1).padStart(2, "0"); const yy = d.getFullYear(); const hh = String(d.getHours()).padStart(2, "0"); const mi = String(d.getMinutes()).padStart(2, "0"); return `${dd}/${mm}/${yy} ${hh}:${mi}`; };
+const toDateISO = (d = new Date()) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+const toHM = (d = new Date()) => d.toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit", hour12: false });
+const addDays = (ymd, days) => { const b = parseYMD(ymd); b.setDate(b.getDate() + Number(days || 0)); return toDateISO(b); };
 
 /* ===== Constantes del registro ===== */
-const POSICION_ID = "H-ENF-LB";
-const EQUIPO = "ENFRIADOR DE LARVA";
+const POSICION_ID = "H-HM-LB";
+const EQUIPO = "HORNO MULTILEVEL";
 const REGISTRO = "LUBRICACIÓN DE BANDAS";
-const TABLE = "mto_horno_enfriador_lubricacion_bandas";
+const TABLE = "mto_horno_multilevel_lubricacion_bandas";
 
 const YESNO = [{ label: "Sí", value: "SI" }, { label: "No", value: "NO" }];
-// Solo semanal
-const PERIODOS = [{ label: "Semanal", value: "SEMANAL" }];
+const PERIODOS = [{ label: "Semanal", value: "SEMANAL" }]; // fija
 
-/* Checklist SEMANAL (texto exacto de la OM; en la 2 agregamos “Revisar …”) */
+/* Checklist SEMANAL (mismo texto que se usa en Enfriador - Lubricación de Bandas) */
 const Q_SEMANAL = [
     { key: "q1", label: "Revisar y lubricar todas las muñoneras" },
-    { key: "q2", label: "Revisar y verificar el estado, daños o reventaduras" }, // <- palabra agregada: Revisar
+    { key: "q2", label: "Revisar y verificar el estado, daños o reventaduras" },
     { key: "q3", label: "Verificar que todas las muñoneras tengan alemite" },
     { key: "q4", label: "Limpiar los excesos de lubricación" },
     { key: "q5", label: "Revisar estado y nivel del aceite del reductor" },
@@ -93,7 +65,7 @@ const emptyForm = () => ({
 
 const packRow = (r) => ({ ...r, tecnico: r.tecnico ?? "", observaciones: r.observaciones ?? "" });
 
-export default function LubricacionBandasEnfriador() {
+export default function LubricacionBandasHornoMultilevel() {
     const navigate = useNavigate();
     const toast = useRef(null);
 
@@ -107,7 +79,7 @@ export default function LubricacionBandasEnfriador() {
     const [form, setForm] = useState(emptyForm());
 
     const [filtroRevisado, setFiltroRevisado] = useState("all");
-    const { canReview, username } = useCanReview();
+    const { canReview: canR, username: user } = useCanReview(); // compat estable
 
     const showToast = (sev, sum, det, life = 3000) =>
         toast.current?.show({ severity: sev, summary: sum, detail: det, life });
@@ -121,8 +93,7 @@ export default function LubricacionBandasEnfriador() {
           fecha_registro, hora_registro,
           posicion_id, equipo, registro, cantidad, tecnico,
           ejecutado, observaciones, periodicidad,
-          respuesta_q1, respuesta_q2, respuesta_q3, respuesta_q4, respuesta_q5,
-          respuesta_q6, respuesta_q7, respuesta_q8, respuesta_q9,
+          ${Array.from({ length: 15 }, (_, i) => `respuesta_q${i + 1}`).join(", ")},
           ultimo_mantenimiento, proximo_mantenimiento,
           revisado, revisado_por_username, revisado_fecha
         `)
@@ -170,7 +141,20 @@ export default function LubricacionBandasEnfriador() {
 
         try {
             const baseDate = form.fecha_registro || toDateISO();
-            const proximo = form.ejecutado === "NO" ? addDays(baseDate, 7) : addDays(baseDate, 7);
+            const proximo = addDays(baseDate, 7); // semanal y NO → +7d (mismo resultado)
+
+            // mapear q1..q9 y rellenar q10..q15 = null para consistencia con la tabla
+            const answers = Object.fromEntries(
+                Q_SEMANAL.map((q, idx) => [
+                    `respuesta_q${idx + 1}`,
+                    form.ejecutado === "SI" ? (form.items[q.key]?.respuesta || null) : null
+                ])
+            );
+            const padding = Object.fromEntries(
+                Array.from({ length: 15 - Q_SEMANAL.length }, (_, i) => [
+                    `respuesta_q${Q_SEMANAL.length + i + 1}`, null
+                ])
+            );
 
             const payload = {
                 fecha_registro: form.fecha_registro,
@@ -183,15 +167,8 @@ export default function LubricacionBandasEnfriador() {
                 ejecutado: form.ejecutado,
                 observaciones: form.observaciones || null,
                 periodicidad: "SEMANAL",
-                respuesta_q1: form.ejecutado === "SI" ? form.items.q1?.respuesta || null : null,
-                respuesta_q2: form.ejecutado === "SI" ? form.items.q2?.respuesta || null : null,
-                respuesta_q3: form.ejecutado === "SI" ? form.items.q3?.respuesta || null : null,
-                respuesta_q4: form.ejecutado === "SI" ? form.items.q4?.respuesta || null : null,
-                respuesta_q5: form.ejecutado === "SI" ? form.items.q5?.respuesta || null : null,
-                respuesta_q6: form.ejecutado === "SI" ? form.items.q6?.respuesta || null : null,
-                respuesta_q7: form.ejecutado === "SI" ? form.items.q7?.respuesta || null : null,
-                respuesta_q8: form.ejecutado === "SI" ? form.items.q8?.respuesta || null : null,
-                respuesta_q9: form.ejecutado === "SI" ? form.items.q9?.respuesta || null : null,
+                ...answers,
+                ...padding,
                 ultimo_mantenimiento: form.ejecutado === "SI" ? baseDate : null,
                 proximo_mantenimiento: proximo,
             };
@@ -209,19 +186,18 @@ export default function LubricacionBandasEnfriador() {
     };
 
     /* -------- revisado -------- */
-    const { canReview: canRev, username: uname } = useCanReview(); // alias para evitar sombras
     const revisadoTemplate = (row) => {
-        if (!canRev) return <span>{row.revisado ? "Sí" : "No"}</span>;
+        if (!canR) return <span>{row.revisado ? "Sí" : "No"}</span>;
         const onToggle = async (next) => {
             const { error } = await supabase.from(TABLE).update({
                 revisado: next,
-                revisado_por_username: next ? uname : null,
+                revisado_por_username: next ? user : null,
                 revisado_fecha: next ? new Date().toISOString() : null,
             }).eq("id", row.id);
             if (error) { showToast("error", "No se guardó", error.message); return; }
             setRows(prev => prev.map(r => r.id === row.id ? {
                 ...r, revisado: next,
-                revisado_por_username: next ? uname : null,
+                revisado_por_username: next ? user : null,
                 revisado_fecha: next ? new Date().toISOString() : null
             } : r));
             showToast("success", "OK", next ? "Marcado revisado" : "Marcado no revisado");
@@ -238,7 +214,12 @@ export default function LubricacionBandasEnfriador() {
         <div className="flex flex-wrap gap-2 align-items-center justify-content-between">
             <span className="p-input-icon-left">
                 <i className="pi pi-search" />
-                <InputText type="search" value={globalFilter} onInput={(e) => setGlobalFilter(e.target.value)} placeholder="Buscar (H-EL-LB, técnico, notas)" />
+                <InputText
+                    type="search"
+                    value={globalFilter}
+                    onInput={(e) => setGlobalFilter(e.target.value)}
+                    placeholder="Buscar (H-HM-LB, técnico, notas)"
+                />
             </span>
             <div className="flex align-items-center gap-2">
                 <span className="text-sm font-medium">Filtro:</span>
@@ -257,7 +238,8 @@ export default function LubricacionBandasEnfriador() {
     );
 
     const countSiNo = (row, val) =>
-        [1, 2, 3, 4, 5, 6, 7, 8, 9].reduce((acc, i) => acc + (((row[`respuesta_q${i}`] || "") === val) ? 1 : 0), 0);
+        Array.from({ length: 9 }, (_, i) => i + 1)
+            .reduce((acc, i) => acc + (((row[`respuesta_q${i}`] || "") === val) ? 1 : 0), 0);
 
     const exportXlsx = () => {
         if (!rows?.length) { showToast("warn", "Exportación", "No hay datos"); return; }
@@ -278,8 +260,8 @@ export default function LubricacionBandasEnfriador() {
         }));
         const ws = XLSX.utils.json_to_sheet(out);
         const wb = XLSX.utils.book_new();
-        XLSX.utils.book_append_sheet(wb, ws, "Lubricación Bandas");
-        XLSX.writeFile(wb, `Horno_Enfriador_LubricacionBandas_${new Date().toISOString().slice(0, 10)}.xlsx`);
+        XLSX.utils.book_append_sheet(wb, ws, "Lubricación Bandas ML");
+        XLSX.writeFile(wb, `Horno_Multilevel_LubricacionBandas_${new Date().toISOString().slice(0, 10)}.xlsx`);
     };
 
     return (
@@ -287,7 +269,7 @@ export default function LubricacionBandasEnfriador() {
             <Toast ref={toast} />
             <h1 className="flex align-items-center gap-2">
                 <img src={logo2} alt="mosca" className="logo2" />
-                Registro — Lubricación de Bandas (Enfriador de Larva)
+                Registro — Lubricación de Bandas (Horno Multilevel)
             </h1>
 
             <div className="welcome-message">
@@ -336,7 +318,7 @@ export default function LubricacionBandasEnfriador() {
             <Dialog
                 visible={dialogOpen}
                 style={{ width: "72vw", maxWidth: 1100 }}
-                header="Nuevo registro — Lubricación de Bandas"
+                header="Nuevo registro — Lubricación de Bandas (Horno Multilevel)"
                 modal
                 onHide={hideDialog}
                 footer={
@@ -350,7 +332,7 @@ export default function LubricacionBandasEnfriador() {
                     <div className="field col-12 md:col-4">
                         <label className="font-bold">Periodicidad*</label>
                         <Dropdown value={"SEMANAL"} options={PERIODOS} disabled />
-                        <small className="block mt-2">Próximo mantenimiento: +7 días.</small>
+                        <small className="block mt-2">Próximo mantenimiento: <b>+7 días</b>.</small>
                     </div>
 
                     <div className="field col-12 md:col-4">

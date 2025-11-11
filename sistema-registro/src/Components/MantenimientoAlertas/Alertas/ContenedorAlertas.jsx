@@ -61,8 +61,9 @@ const FORM_MAP = {
     "H-EL-SN": "/MantenimientoAlertas/Horno/SistemaNeumatico",
     "H-EL-MR": "/MantenimientoAlertas/Horno/MotorReductor",
     "H-EL-V": "/MantenimientoAlertas/Horno/Vibrador",
-    "H-ENL-MR": "/MantenimientoAlertas/Horno/MotorReductorEnfriador",
-    "H-EL-LB": "/MantenimientoAlertas/Horno/LubricacionBandasEnfriador",
+    "H-ENF-MR": "/MantenimientoAlertas/Horno/MotorReductorEnfriador",
+    "H-ENF-LB": "/MantenimientoAlertas/Horno/LubricacionBandasEnfriador",
+    "H-ENF-V": "/MantenimientoAlertas/Horno/VibradorEnfriador",
 
 };
 

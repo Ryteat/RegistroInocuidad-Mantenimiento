@@ -50,7 +50,14 @@ import MotorReductor from './Components/MantenimientoAlertas/Horno/Registros/Mot
 import Vibrador from './Components/MantenimientoAlertas/Horno/Registros/Vibrador.jsx';
 import MotorReductorEnfriador from './Components/MantenimientoAlertas/Horno/Registros/MotorReductorEnfriador.jsx';
 import LubricacionBandasEnfriador from './Components/MantenimientoAlertas/Horno/Registros/LubricacionBandasEnfriador.jsx';
-
+import VibradorEnfriador from './Components/MantenimientoAlertas/Horno/Registros/VibradorEnfriador.jsx';
+import BandaSalidaGeneral from './Components/MantenimientoAlertas/Horno/Registros/BandaSalidaGeneral.jsx';
+import BandaEntradaGeneral from './Components/MantenimientoAlertas/Horno/Registros/BandaEntradaGeneral.jsx';
+import VibradorHornoMultilevel from './Components/MantenimientoAlertas/Horno/Registros/VibradorHornoMultilevel.jsx';
+import LineaGasGLPHornoMultilevel from "./Components/MantenimientoAlertas/Horno/Registros/LineaGasGLPHornoMultilevel.jsx";
+import TransmisionTurbinaHornoMultilevel from "./Components/MantenimientoAlertas/Horno/Registros/TransmisionTurbinaHornoMultilevel.jsx";
+import LubricacionBandasHornoMultilevel from "./Components/MantenimientoAlertas/Horno/Registros/LubricacionBandasHornoMultilevel.jsx";
+import SelladoraBandaContinuaGeneral from "./Components/MantenimientoAlertas/Horno/Registros/SelladoraBandaContinuaGeneral.jsx";
 
 
 // ⬇️ Horno del módulo de Alertas (MENÚ)
@@ -203,6 +210,15 @@ const router = createBrowserRouter(
             { path: `Horno/Vibrador`, element: <Vibrador /> },
             { path: `Horno/MotorReductorEnfriador`, element: <MotorReductorEnfriador /> },
             { path: `Horno/LubricacionBandasEnfriador`, element: <LubricacionBandasEnfriador /> },
+            { path: `Horno/VibradorEnfriador`, element: <VibradorEnfriador /> },
+            { path: `Horno/BandaSalidaGeneral`, element: <BandaSalidaGeneral /> },
+            { path: `Horno/BandaEntradaGeneral`, element: <BandaEntradaGeneral /> },
+            { path: `Horno/VibradorHornoMultilevel`, element: <VibradorHornoMultilevel /> },
+            { path: `Horno/LineaGasGLPHornoMultilevel`, element: <LineaGasGLPHornoMultilevel /> },
+            { path: `Horno/TransmisionTurbina`, element: <TransmisionTurbinaHornoMultilevel /> },
+            { path: `Horno/LubricacionBandasHornoMultilevel`, element: <LubricacionBandasHornoMultilevel /> },
+            { path: `Horno/SelladoraBandaContinuaGeneral`, element: <SelladoraBandaContinuaGeneral /> },
+
           ],
         },
 

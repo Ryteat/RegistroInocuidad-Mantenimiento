@@ -12,7 +12,16 @@ const ALLOWED_TABLES = new Set([
     "mto_horno_empacadora_motor_reductor",
     "mto_horno_empacadora_vibrador",
     "mto_horno_empacadora_motor_reductor_enfriador",
-    "mto_horno_enfriador_lubricacion_bandas"
+    "mto_horno_enfriador_motor_reductor",
+    "mto_horno_enfriador_lubricacion_bandas",
+    "mto_horno_enfriador_vibrador",
+    "mto_horno_banda_salida_general",
+    "mto_horno_banda_entrada_general",
+    "mto_horno_vibrador_horno_multilevel",
+    "mto_horno_linea_gas_glp_horno_multilevel",
+    "mto_horno_transmision_turbina_horno_multilevel",
+    "mto_horno_lubricacion_bandas_horno_multilevel",
+    "mto_horno_selladora_banda_continua_general"
 ]);
 
 /* ===================== Helpers de fecha SEGUROS ===================== */
@@ -122,6 +131,17 @@ export default function NotificationBell({ navigate }) {
             IN2: "/MantenimientoAlertas/Iluminacion",
             IN3: "/MantenimientoAlertas/CuartosElectricos",
             "H-EL-SN": "/MantenimientoAlertas/Horno/SistemaNeumatico",
+            "H-EL-MR": "/MantenimientoAlertas/Horno/MotorReductor",
+            "H-EL-V": "/MantenimientoAlertas/Horno/Vibrador",
+            "H-ENF-MR": "/MantenimientoAlertas/Horno/MotorReductorEnfriador",
+            "H-ENF-LB": "/MantenimientoAlertas/Horno/LubricacionBandasEnfriador",
+            "H-ENF-V": "/MantenimientoAlertas/Horno/VibradorEnfriador",
+            "H-BS-G": "/MantenimientoAlertas/Horno/BandaSalidaGeneral",
+            "H-BE-G": "/MantenimientoAlertas/Horno/BandaEntradaGeneral",
+            "H-V-HM": "/MantenimientoAlertas/Horno/VibradorHornoMultilevel",
+            "H-HM-TT": "/MantenimientoAlertas/Horno/TransmisionTurbinaHornoMultilevel",
+            "H-HM-LB": "/MantenimientoAlertas/Horno/LubricacionBandasHornoMultilevel",
+            "H-SBC-G": "/MantenimientoAlertas/Horno/SelladoraBandaContinuaGeneral"
         };
         const ruta = map[pos];
         if (ruta) navigate(ruta);

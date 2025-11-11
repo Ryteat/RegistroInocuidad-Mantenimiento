@@ -1,7 +1,7 @@
-// src/Components/MantenimientoAlertas/Horno/Registros/LubricacionBandasEnfriador.jsx
+// src/Components/MantenimientoAlertas/Horno/Registros/VibradorEnfriador.jsx
 import React, { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import supabase from "../../../../supabaseClient.js";
+import supabase from "../../../../supabaseClient";
 import logo2 from "../../../../assets/mosca.png";
 
 import "primereact/resources/themes/lara-light-indigo/theme.css";
@@ -16,14 +16,28 @@ import { InputText } from "primereact/inputtext";
 import { Dropdown } from "primereact/dropdown";
 import { Checkbox } from "primereact/checkbox";
 import * as XLSX from "xlsx";
-import useCanReview from "../../../Inocuidad/Registros/Hooks/useCanReview.js";
+import useCanReview from "../../../Inocuidad/Registros/Hooks/useCanReview";
 
-/* ===== Helpers (idénticos a SistemaNeumatico) ===== */
+// ===== Helpers de fecha “seguros” (DD/MM/AAAA y sin desfases) =====
 const parseYMD = (isoDateStr) => {
     if (!isoDateStr) return null;
     const [y, m, d] = String(isoDateStr).split("-").map(Number);
     if (!y || !m || !d) return null;
     return new Date(y, m - 1, d, 0, 0, 0, 0);
+};
+const toDateISO = (d = new Date()) =>
+    `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+const toHM = (d = new Date()) =>
+    d.toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit", hour12: false });
+const addDays = (ymd, days) => {
+    const base = parseYMD(ymd);
+    base.setDate(base.getDate() + Number(days || 0));
+    return toDateISO(base);
+};
+const addMonths = (ymd, months) => {
+    const base = parseYMD(ymd);
+    base.setMonth(base.getMonth() + Number(months || 0));
+    return toDateISO(base);
 };
 const fmtDMY = (iso) => {
     const d = parseYMD(iso);
@@ -43,37 +57,32 @@ const fmtDMYHM = (isoOrDate) => {
     const mi = String(d.getMinutes()).padStart(2, "0");
     return `${dd}/${mm}/${yy} ${hh}:${mi}`;
 };
-const toDateISO = (d = new Date()) =>
-    `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
-const toHM = (d = new Date()) =>
-    d.toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit", hour12: false });
-const addDays = (ymd, days) => {
-    const base = parseYMD(ymd);
-    base.setDate(base.getDate() + Number(days || 0));
-    return toDateISO(base);
-};
 
-/* ===== Constantes del registro ===== */
-const POSICION_ID = "H-ENF-LB";
+// ===== Constantes del registro =====
+const POSICION_ID = "H-EL-V";
 const EQUIPO = "ENFRIADOR DE LARVA";
-const REGISTRO = "LUBRICACIÓN DE BANDAS";
-const TABLE = "mto_horno_enfriador_lubricacion_bandas";
+const REGISTRO = "VIBRADOR";
+const TABLE = "mto_horno_enfriador_vibrador";
 
 const YESNO = [{ label: "Sí", value: "SI" }, { label: "No", value: "NO" }];
-// Solo semanal
-const PERIODOS = [{ label: "Semanal", value: "SEMANAL" }];
+const PERIODOS = [{ label: "Mensual", value: "MENSUAL" }];
 
-/* Checklist SEMANAL (texto exacto de la OM; en la 2 agregamos “Revisar …”) */
-const Q_SEMANAL = [
-    { key: "q1", label: "Revisar y lubricar todas las muñoneras" },
-    { key: "q2", label: "Revisar y verificar el estado, daños o reventaduras" }, // <- palabra agregada: Revisar
-    { key: "q3", label: "Verificar que todas las muñoneras tengan alemite" },
-    { key: "q4", label: "Limpiar los excesos de lubricación" },
-    { key: "q5", label: "Revisar estado y nivel del aceite del reductor" },
-    { key: "q6", label: "Verificar que no existan fugas" },
-    { key: "q7", label: "Revisar estado de estructura, presencia de reventaduras y sus anclajes" },
-    { key: "q8", label: "Verificar el estado de la banda y sus componentes, pegas o uniones" },
-    { key: "q9", label: "Revisar alineado de la banda" },
+// Preguntas EXACTAS (foto “vibrador mensual”)
+const Q_MENSUAL = [
+    // Sistema eléctrico
+    { key: "q1", label: "Revisar conexiones eléctricas, terminales, cables y tierra física." },
+    { key: "q2", label: "Verificar amperaje y voltaje del electroimán (comparar con especificación de placa)." },
+    { key: "q3", label: "Comprobar la integridad del control electrónico (si aplica)." },
+    // Electromimán y armadura
+    { key: "q4", label: "Inspeccionar bobinas por calentamiento excesivo, desgaste o daño de aislamiento." },
+    { key: "q5", label: "Revisar que el armador móvil no presente suciedad, óxido o desgaste." },
+    { key: "q6", label: "Medir resistencia eléctrica de las bobinas (comparar con manual del fabricante)." },
+    // Resortes / láminas
+    { key: "q7", label: "Revisar desgaste, corrosión o pérdida de elasticidad." },
+    { key: "q8", label: "Cambiar si presentan fisuras o fatiga." },
+    // Estructura y alineación
+    { key: "q9", label: "Asegurar que la bandeja esté nivelada y centrada." },
+    { key: "q10", label: "Verificar que la base no presente desajustes." },
 ];
 
 const emptyForm = () => ({
@@ -86,16 +95,17 @@ const emptyForm = () => ({
     tecnico: "",
     ejecutado: "",
     observaciones: "",
-    periodicidad: "SEMANAL",
-    items: Q_SEMANAL.reduce((a, q) => ({ ...a, [q.key]: { respuesta: "" } }), {}),
+    periodicidad: "MENSUAL",
+    items: Q_MENSUAL.reduce((a, q) => ({ ...a, [q.key]: { respuesta: "" } }), {}),
     fecha_correccion_preview: fmtDMYHM(new Date()),
 });
 
 const packRow = (r) => ({ ...r, tecnico: r.tecnico ?? "", observaciones: r.observaciones ?? "" });
 
-export default function LubricacionBandasEnfriador() {
+export default function VibradorEnfriador() {
     const navigate = useNavigate();
     const toast = useRef(null);
+    const { canReview, username } = useCanReview();
 
     const [rows, setRows] = useState([]);
     const [selected, setSelected] = useState([]);
@@ -107,22 +117,23 @@ export default function LubricacionBandasEnfriador() {
     const [form, setForm] = useState(emptyForm());
 
     const [filtroRevisado, setFiltroRevisado] = useState("all");
-    const { canReview, username } = useCanReview();
 
     const showToast = (sev, sum, det, life = 3000) =>
         toast.current?.show({ severity: sev, summary: sum, detail: det, life });
 
-    /* -------- cargar -------- */
+    // ---- carga ----
     const fetchRows = async () => {
         try {
             setLoading(true);
-            let q = supabase.from(TABLE).select(`
+            let q = supabase
+                .from(TABLE)
+                .select(`
           id, created_at,
           fecha_registro, hora_registro,
           posicion_id, equipo, registro, cantidad, tecnico,
           ejecutado, observaciones, periodicidad,
           respuesta_q1, respuesta_q2, respuesta_q3, respuesta_q4, respuesta_q5,
-          respuesta_q6, respuesta_q7, respuesta_q8, respuesta_q9,
+          respuesta_q6, respuesta_q7, respuesta_q8, respuesta_q9, respuesta_q10,
           ultimo_mantenimiento, proximo_mantenimiento,
           revisado, revisado_por_username, revisado_fecha
         `)
@@ -146,23 +157,26 @@ export default function LubricacionBandasEnfriador() {
 
     const openNew = () => { setForm(emptyForm()); setSubmitted(false); setDialogOpen(true); };
     const hideDialog = () => { setDialogOpen(false); setSubmitted(false); };
-    const onChange = (field, value) => setForm(p => ({ ...p, [field]: value }));
-    const onYesNoChange = (key, value) =>
-        setForm(p => ({ ...p, items: { ...p.items, [key]: { respuesta: value } } }));
+    const onChange = (field, value) => setForm((p) => ({ ...p, [field]: value }));
 
-    /* -------- validación -------- */
+    const onYesNoChange = (key, value) =>
+        setForm((p) => ({ ...p, items: { ...p.items, [key]: { respuesta: value } } }));
+
+    // ---- validación ----
     const validate = () => {
         const errs = [];
         if (!form.tecnico?.trim()) errs.push("El campo Técnico es requerido.");
         if (!form.ejecutado) errs.push("Indique si se va a efectuar el mantenimiento.");
         if (form.ejecutado === "NO" && !form.observaciones.trim()) errs.push("Explique por qué NO se efectuó (Observaciones).");
         if (form.ejecutado === "SI") {
-            Q_SEMANAL.forEach(q => { if (!form.items[q.key]?.respuesta) errs.push(`Responda: ${q.label}`); });
+            Q_MENSUAL.forEach((q) => {
+                if (!form.items[q.key]?.respuesta) errs.push(`Responda: ${q.label}`);
+            });
         }
         return errs;
     };
 
-    /* -------- guardado -------- */
+    // ---- guardado ----
     const save = async () => {
         setSubmitted(true);
         const errs = validate();
@@ -170,7 +184,8 @@ export default function LubricacionBandasEnfriador() {
 
         try {
             const baseDate = form.fecha_registro || toDateISO();
-            const proximo = form.ejecutado === "NO" ? addDays(baseDate, 7) : addDays(baseDate, 7);
+            const proximo =
+                form.ejecutado === "NO" ? addDays(baseDate, 7) : addMonths(baseDate, 1); // Mensual
 
             const payload = {
                 fecha_registro: form.fecha_registro,
@@ -182,7 +197,7 @@ export default function LubricacionBandasEnfriador() {
                 tecnico: form.tecnico,
                 ejecutado: form.ejecutado,
                 observaciones: form.observaciones || null,
-                periodicidad: "SEMANAL",
+                periodicidad: "MENSUAL",
                 respuesta_q1: form.ejecutado === "SI" ? form.items.q1?.respuesta || null : null,
                 respuesta_q2: form.ejecutado === "SI" ? form.items.q2?.respuesta || null : null,
                 respuesta_q3: form.ejecutado === "SI" ? form.items.q3?.respuesta || null : null,
@@ -192,6 +207,7 @@ export default function LubricacionBandasEnfriador() {
                 respuesta_q7: form.ejecutado === "SI" ? form.items.q7?.respuesta || null : null,
                 respuesta_q8: form.ejecutado === "SI" ? form.items.q8?.respuesta || null : null,
                 respuesta_q9: form.ejecutado === "SI" ? form.items.q9?.respuesta || null : null,
+                respuesta_q10: form.ejecutado === "SI" ? form.items.q10?.respuesta || null : null,
                 ultimo_mantenimiento: form.ejecutado === "SI" ? baseDate : null,
                 proximo_mantenimiento: proximo,
             };
@@ -208,22 +224,27 @@ export default function LubricacionBandasEnfriador() {
         }
     };
 
-    /* -------- revisado -------- */
-    const { canReview: canRev, username: uname } = useCanReview(); // alias para evitar sombras
+    // ---- revisado ----
     const revisadoTemplate = (row) => {
-        if (!canRev) return <span>{row.revisado ? "Sí" : "No"}</span>;
+        if (!canReview) return <span>{row.revisado ? "Sí" : "No"}</span>;
         const onToggle = async (next) => {
-            const { error } = await supabase.from(TABLE).update({
-                revisado: next,
-                revisado_por_username: next ? uname : null,
-                revisado_fecha: next ? new Date().toISOString() : null,
-            }).eq("id", row.id);
+            const { error } = await supabase
+                .from(TABLE)
+                .update({
+                    revisado: next,
+                    revisado_por_username: next ? username : null,
+                    revisado_fecha: next ? new Date().toISOString() : null,
+                })
+                .eq("id", row.id);
             if (error) { showToast("error", "No se guardó", error.message); return; }
-            setRows(prev => prev.map(r => r.id === row.id ? {
-                ...r, revisado: next,
-                revisado_por_username: next ? uname : null,
-                revisado_fecha: next ? new Date().toISOString() : null
-            } : r));
+            // optimista
+            setRows((prev) =>
+                prev.map((r) =>
+                    r.id === row.id
+                        ? { ...r, revisado: next, revisado_por_username: next ? username : null, revisado_fecha: next ? new Date().toISOString() : null }
+                        : r
+                )
+            );
             showToast("success", "OK", next ? "Marcado revisado" : "Marcado no revisado");
         };
         return (
@@ -238,7 +259,12 @@ export default function LubricacionBandasEnfriador() {
         <div className="flex flex-wrap gap-2 align-items-center justify-content-between">
             <span className="p-input-icon-left">
                 <i className="pi pi-search" />
-                <InputText type="search" value={globalFilter} onInput={(e) => setGlobalFilter(e.target.value)} placeholder="Buscar (H-EL-LB, técnico, notas)" />
+                <InputText
+                    type="search"
+                    value={globalFilter}
+                    onInput={(e) => setGlobalFilter(e.target.value)}
+                    placeholder="Buscar (ej. H-EL-V, técnico, notas)"
+                />
             </span>
             <div className="flex align-items-center gap-2">
                 <span className="text-sm font-medium">Filtro:</span>
@@ -257,11 +283,11 @@ export default function LubricacionBandasEnfriador() {
     );
 
     const countSiNo = (row, val) =>
-        [1, 2, 3, 4, 5, 6, 7, 8, 9].reduce((acc, i) => acc + (((row[`respuesta_q${i}`] || "") === val) ? 1 : 0), 0);
+        [1, 2, 3, 4, 5, 6, 7, 8, 9, 10].reduce((acc, i) => acc + (((row[`respuesta_q${i}`] || "") === val) ? 1 : 0), 0);
 
     const exportXlsx = () => {
         if (!rows?.length) { showToast("warn", "Exportación", "No hay datos"); return; }
-        const out = rows.map(r => ({
+        const out = rows.map((r) => ({
             posicion: r.posicion_id,
             equipo: r.equipo,
             registro: r.registro ?? "",
@@ -278,8 +304,8 @@ export default function LubricacionBandasEnfriador() {
         }));
         const ws = XLSX.utils.json_to_sheet(out);
         const wb = XLSX.utils.book_new();
-        XLSX.utils.book_append_sheet(wb, ws, "Lubricación Bandas");
-        XLSX.writeFile(wb, `Horno_Enfriador_LubricacionBandas_${new Date().toISOString().slice(0, 10)}.xlsx`);
+        XLSX.utils.book_append_sheet(wb, ws, "Vibrador - Enfriador");
+        XLSX.writeFile(wb, `Horno_Enfriador_Vibrador_${new Date().toISOString().slice(0, 10)}.xlsx`);
     };
 
     return (
@@ -287,7 +313,7 @@ export default function LubricacionBandasEnfriador() {
             <Toast ref={toast} />
             <h1 className="flex align-items-center gap-2">
                 <img src={logo2} alt="mosca" className="logo2" />
-                Registro — Lubricación de Bandas (Enfriador de Larva)
+                Registro — Vibrador (Enfriador de Larva)
             </h1>
 
             <div className="welcome-message">
@@ -336,7 +362,7 @@ export default function LubricacionBandasEnfriador() {
             <Dialog
                 visible={dialogOpen}
                 style={{ width: "72vw", maxWidth: 1100 }}
-                header="Nuevo registro — Lubricación de Bandas"
+                header="Nuevo registro — Vibrador (Enfriador)"
                 modal
                 onHide={hideDialog}
                 footer={
@@ -348,9 +374,9 @@ export default function LubricacionBandasEnfriador() {
             >
                 <div className="p-fluid grid">
                     <div className="field col-12 md:col-4">
-                        <label className="font-bold">Periodicidad*</label>
-                        <Dropdown value={"SEMANAL"} options={PERIODOS} disabled />
-                        <small className="block mt-2">Próximo mantenimiento: +7 días.</small>
+                        <label className="font-bold">Periodicidad</label>
+                        <Dropdown value="MENSUAL" options={PERIODOS} disabled />
+                        <small className="block mt-2">Este registro es <b>mensual</b>; si se marca NO, se reprograma a <b>7 días</b>.</small>
                     </div>
 
                     <div className="field col-12 md:col-4">
@@ -400,9 +426,9 @@ export default function LubricacionBandasEnfriador() {
                     {form.ejecutado === "SI" && (
                         <div className="field col-12">
                             <div style={{ border: "1px solid #d1d5db", borderRadius: 8, padding: 12 }}>
-                                <div style={{ fontWeight: 700, marginBottom: 8 }}>Checklist — SEMANAL</div>
+                                <div style={{ fontWeight: 700, marginBottom: 8 }}>Checklist — MENSUAL</div>
                                 <div className="grid">
-                                    {Q_SEMANAL.map(q => {
+                                    {Q_MENSUAL.map((q) => {
                                         const val = form.items[q.key]?.respuesta || "";
                                         return (
                                             <div key={q.key} className="col-12 md:col-6">
