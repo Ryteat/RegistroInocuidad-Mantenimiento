@@ -12,12 +12,25 @@ export default function MantenimientoAlertas() {
         location.pathname === "/MantenimientoAlertas" ||
         location.pathname.endsWith("/MantenimientoAlertas");
 
+    // Tomamos el departamento que venga del state; si no viene, habilitamos todo por defecto
+    const depState = location.state?.departamento;
+    const fallbackDeps =
+        "Hatchery,Dieta,Horno,Calidad,Cosecha,Mantenimiento,Inocuidad,Gerencia,Visualizar,MantenimientoAlertas";
+    const departamento = depState || fallbackDeps;
+
+    const goMenuPrincipal = () => {
+        navigate("/MenuPrincipal", {
+            state: { departamento },
+            replace: false,
+        });
+    };
+
     const secciones = [
         { titulo: "Infraestructura de Planta", ruta: "/MantenimientoAlertas/Infraestructura" },
-        { titulo: "Horno", ruta: "/MantenimientoAlertas/Horno" },         // (placeholder)
-        { titulo: "Dieta", ruta: "/MantenimientoAlertas/Dieta" },         // (placeholder)
-        { titulo: "Crecimiento", ruta: "/MantenimientoAlertas/Crecimiento" }, // (placeholder)
-        { titulo: "Cosecha", ruta: "/MantenimientoAlertas/Cosecha" },         // (placeholder)
+        { titulo: "Horno", ruta: "/MantenimientoAlertas/Horno" },
+        { titulo: "Dieta", ruta: "/MantenimientoAlertas/Dieta" },
+        { titulo: "Crecimiento", ruta: "/MantenimientoAlertas/Crecimiento" },
+        { titulo: "Cosecha", ruta: "/MantenimientoAlertas/Cosecha" },
     ];
 
     return (
@@ -29,31 +42,47 @@ export default function MantenimientoAlertas() {
                         <h1>Alertas de Mantenimiento</h1>
                     </header>
 
-                    <div className="top-actions">
-                        <button className="boton-grid" onClick={() => navigate("/MantenimientoAlertas/Alertas")}>
-                            Ver Sistema de Alertas
-                        </button>
-                        <button className="boton-grid logout-button" onClick={() => navigate("/", { replace: true })}>
-                            Cerrar sesión
-                        </button>
-                    </div>
-
                     <div className="welcome-message">
-                        <p>Selecciona un área para ver sus registros.</p>
+                        <p>Este es el Menú de Registros del Sistema de Mantenimiento por Áreas.</p>
                     </div>
 
-                    {/* Botonera estilo Inocuidad */}
+                    {/* Botonera principal (áreas) */}
                     <div className="grid-botones">
                         {secciones.map((s, i) => (
-                            <button key={i} className="boton-grid" onClick={() => navigate(s.ruta)}>
+                            <button
+                                key={i}
+                                className="boton-grid cols-2"
+                                onClick={() => navigate(s.ruta, { state: { departamento } })}
+                            >
                                 {s.titulo}
                             </button>
                         ))}
                     </div>
+
+                    {/* ===== Bloque de acciones separado visualmente ===== */}
+                    <div className="acciones-bloque">
+                        <div className="bloque-sep" />
+                        <div className="grid-botones">
+                            <button
+                                className="boton-grid cols-2"
+                                onClick={() => navigate("/MantenimientoAlertas/Alertas")}
+                            >
+                                Ver Sistema de Alertas
+                            </button>
+                            <button className="boton-grid cols-2" onClick={goMenuPrincipal}>
+                                Volver al Menú Principal
+                            </button>
+                            <button
+                                className="boton-grid logout-button cols-2"
+                                onClick={() => navigate("/", { replace: true })}
+                            >
+                                Cerrar sesión
+                            </button>
+                        </div>
+                    </div>
                 </>
             )}
 
-            {/* Aquí se pintan submenús y formularios */}
             <Outlet />
         </div>
     );

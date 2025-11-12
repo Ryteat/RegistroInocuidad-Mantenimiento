@@ -68,7 +68,7 @@ function MenuPrincipal() {
       cols: 1
     },
     {
-      texto: 'Registros Mantenimiento',
+      texto: 'Registros Transporte',
       ruta: '/Mantenimiento',
       departamentos: ['Mantenimiento'],
       cols: 1

@@ -1,145 +1,157 @@
+// src/Components/MantenimientoAlertas/Horno/HornoMA.jsx
 import React from "react";
-import { useNavigate, Outlet, useLocation } from "react-router-dom";
+import { useNavigate, useLocation, Outlet } from "react-router-dom";
 import logo2 from "../../../assets/mosca.png";
-
-// Reutilizamos el mismo CSS de Infraestructura para no crear otro archivo
 import "../InfraestructuraDePlanta/InfraestructuraDePlanta.css";
+
+/** Catálogo de submenús (categorías) y sus registros */
+const CATEGORIES = [
+    {
+        key: "Empacadora",
+        titulo: "Empacadora de Larva",
+        botones: [
+            { titulo: "*H-EL-SN* Sistema Neumático — Empacadora de Larva", ruta: "/MantenimientoAlertas/Horno/SistemaNeumatico" },
+            { titulo: "*H-EL-MR* Motor Reductor — Empacadora de Larva", ruta: "/MantenimientoAlertas/Horno/MotorReductor" },
+            { titulo: "*H-EL-V* Vibrador — Empacadora de Larva", ruta: "/MantenimientoAlertas/Horno/Vibrador" },
+        ],
+    },
+    {
+        key: "Enfriador",
+        titulo: "Enfriador de Larva",
+        botones: [
+            { titulo: "*H-ENF-MR* Motor Reductor — Enfriador de Larva", ruta: "/MantenimientoAlertas/Horno/MotorReductorEnfriador" },
+            { titulo: "*H-ENF-LB* Lubricación de Bandas — Enfriador de Larva", ruta: "/MantenimientoAlertas/Horno/LubricacionBandasEnfriador" },
+            { titulo: "*H-ENF-V* Vibrador — Enfriador de Larva", ruta: "/MantenimientoAlertas/Horno/VibradorEnfriador" },
+        ],
+    },
+    {
+        key: "BandaSalida",
+        titulo: "Banda de Salida",
+        botones: [
+            { titulo: "*H-BS-G* Banda de Salida — General", ruta: "/MantenimientoAlertas/Horno/BandaSalidaGeneral" },
+        ],
+    },
+    {
+        key: "BandaEntrada",
+        titulo: "Banda de Entrada",
+        botones: [
+            { titulo: "*H-BE-G* Banda de Entrada — General", ruta: "/MantenimientoAlertas/Horno/BandaEntradaGeneral" },
+        ],
+    },
+    {
+        key: "Multilevel",
+        titulo: "Horno Multilevel",
+        botones: [
+            { titulo: "*H-HM-V* Horno Multilevel — Vibrador", ruta: "/MantenimientoAlertas/Horno/VibradorHornoMultilevel" },
+            { titulo: "*H-HM-LG* Horno Multilevel — Línea de Gas GLP", ruta: "/MantenimientoAlertas/Horno/LineaGasGLPHornoMultilevel" },
+            { titulo: "*H-HM-TT* Horno Multilevel — Transmisión de Turbina", ruta: "/MantenimientoAlertas/Horno/TransmisionTurbinaHornoMultilevel" },
+            { titulo: "*H-HM-LB* Horno Multilevel — Lubricación de Bandas", ruta: "/MantenimientoAlertas/Horno/LubricacionBandasHornoMultilevel" },
+            { titulo: "*H-HM-SPT* Horno Multilevel — Sensor PT100 (Trimestral)", ruta: "/MantenimientoAlertas/Horno/SensorPT100" },
+        ],
+    },
+    {
+        key: "Selladora",
+        titulo: "Selladora Banda Continua",
+        botones: [
+            { titulo: "*H-SBC-G* Selladora Banda Continua — General", ruta: "/MantenimientoAlertas/Horno/SelladoraBandaContinuaGeneral" },
+        ],
+    },
+];
 
 export default function HornoMA() {
     const navigate = useNavigate();
     const location = useLocation();
-    // Evita pantallas en blanco por variantes de slash
-    const isRootPath =
-        location.pathname === "/MantenimientoAlertas/Horno" ||
-        location.pathname.endsWith("/MantenimientoAlertas/Horno");
 
-    const botones = [
-        {
-            titulo: "*H-EL-SN* Sistema Neumático — Empacadora de Larva ",
-            ruta: "/MantenimientoAlertas/Horno/SistemaNeumatico",
-            cols: 2,
-            className: "boton-grid",
-        },
-        {
-            titulo: "*H-EL-MR* Motor Reductor — Empacadora de Larva ",
-            ruta: "/MantenimientoAlertas/Horno/MotorReductor",
-            cols: 2,
-            className: "boton-grid"
-        },
+    // Raíz del módulo Horno (igual que Inocuidad usa isRootPath)
+    const isRootPath = location.pathname === "/MantenimientoAlertas/Horno";
 
-        {
-            titulo: "*H-EL-V* Vibrador - Empacadora Larva",
-            ruta: "/MantenimientoAlertas/Horno/Vibrador",
-            cols: 2,
-            className: "boton-grid"
-        },
-        {
-            titulo: "*H-ENF-MR* Motor Reductor - Enfriador de Larva ",
-            ruta: "/MantenimientoAlertas/Horno/MotorReductorEnfriador",
-            cols: 2,
-            className: "boton-grid"
-        },
+    // Si estamos en la raíz: mostrar los submenús (categorías)
+    if (isRootPath) {
+        return (
+            <div className="infraestructura-container">
+                <header className="infraestructura-header">
+                    <div className="logo-infraestructura-container">
+                        <img src={logo2} alt="Logo" className="logo2" />
+                    </div>
+                    <h1>Registros de Horno</h1>
+                </header>
 
-        {
-            titulo: "*H-ENF-LB* Lubricación de Bandas - Enfriador de Larva",
-            ruta: "/MantenimientoAlertas/Horno/LubricacionBandasEnfriador",
-            cols: 2,
-            className: "boton-grid"
-        },
-        {
-            titulo: "*H-ENF-V* Vibrador - Enfriador de Larva ",
-            ruta: "/MantenimientoAlertas/Horno/VibradorEnfriador",
-            cols: 2,
-            className: "boton-grid"
-        },
-        {
-            titulo: "*H-BS-G* - Banda de Salida - General",
-            ruta: "/MantenimientoAlertas/Horno/BandaSalidaGeneral",
-            cols: 2,
-            className: "boton-grid oven-button"
-        },
-        {
-            titulo: "*H-BE-G* Banda de Entrada - General ",
-            ruta: "/MantenimientoAlertas/Horno/BandaEntradaGeneral",
-            cols: 2,
-            className: "boton-grid oven-button"
-        },
-        {
-            titulo: "*H-HM-V* Horno Multilevel - Vibrador ",
-            ruta: "/MantenimientoAlertas/Horno/VibradorHornoMultilevel",
-            cols: 2,
-            className: "boton-grid oven-button"
-        },
-        {
-            titulo: "*H-HM-LG* Horno Multilevel - Línea de Gas GLP",
-            ruta: "/MantenimientoAlertas/Horno/LineaGasGLPHornoMultilevel",
-            cols: 2,
-            className: "boton-grid oven-button"
-        },
-        {
-            titulo: "*H-HM-TT* Horno Multilevel - Transmisión de Turbina",
-            ruta: "/MantenimientoAlertas/Horno/TransmisionTurbinaHornoMultilevel",
-            cols: 2,
-            className: "boton-grid oven-button"
-        },
-        {
-            titulo: "*H-HM-LB* Horno Multilevel - Lubricación de Bandas",
-            ruta: "/MantenimientoAlertas/Horno/LubricacionBandasHornoMultilevel",
-            cols: 2,
-            className: "boton-grid oven-button"
-        },
-        {
-            titulo: "*H-SBC-G* Selladora Banda Continua - General",
-            ruta: "/MantenimientoAlertas/Horno/SelladoraBandaContinuaGeneral",
-            cols: 2,
-            className: "boton-grid oven-button"
-        }
+                <div className="welcome-message">
+                    <p>Selecciona un submenú para ver sus registros:</p>
+                </div>
 
-    ];
+                <div className="grid-botones">
+                    {CATEGORIES.map((c) => (
+                        <button
+                            key={c.key}
+                            className="boton-grid oven-button cols-2"
+                            onClick={() => navigate(c.key)} // navegación RELATIVA como en Inocuidad
+                        >
+                            {c.titulo}
+                        </button>
+                    ))}
+
+                    {/* Igual que Inocuidad: volver al anterior (tu Menú Principal queda atrás en el historial) */}
+                    <button
+                        className="boton-grid logout-button cols-2"
+                        onClick={() => navigate(-1)}
+                    >
+                        Volver al Menú de Registros de Mantenimiento
+                    </button>
+                </div>
+
+                <Outlet />
+            </div>
+        );
+    }
+
+    // Vista de categoría: /MantenimientoAlertas/Horno/:cat
+    const pathParts = location.pathname.split("/");
+    const catKey = pathParts[pathParts.length - 1];
+    const category = CATEGORIES.find(
+        (c) => c.key.toLowerCase() === catKey.toLowerCase()
+    );
 
     return (
         <div className="infraestructura-container">
-            {isRootPath && (
-                <>
-                    <header className="infraestructura-header">
-                        <div className="logo-infraestructura-container">
-                            <img src={logo2} alt="Logo" className="logo2" />
-                        </div>
-                        <h1>Horno — Mantenimiento/Alertas</h1>
-                        <p className="welcome-message">Selecciona el registro que deseas abrir.</p>
-                    </header>
+            <header className="infraestructura-header">
+                <div className="logo-infraestructura-container">
+                    <img src={logo2} alt="Logo" className="logo2" />
+                </div>
+                <h1>Horno — {category ? category.titulo : "Categoría"}</h1>
+            </header>
 
-                    <div className="grid-botones">
-                        {botones.map((b, i) => (
+            <div className="grid-botones">
+                {category ? (
+                    <>
+                        {category.botones.map((b, i) => (
                             <button
                                 key={i}
-                                className={`${b.className} cols-${b.cols}`}
+                                className="boton-grid oven-button cols-2"
                                 onClick={() => navigate(b.ruta)}
                             >
                                 {b.titulo}
                             </button>
                         ))}
-                    </div>
 
-                    <div className="grid-botones" style={{ marginTop: 12 }}>
+                        {/* Controles iguales a Inocuidad */}
                         <button
                             className="boton-grid cols-2"
-                            onClick={() => navigate("/MantenimientoAlertas")}
+                            onClick={() => navigate("/MantenimientoAlertas/Horno")}
                         >
-                            Volver al Menú de Mantenimiento Alertas
+                            Volver a Submenús
                         </button>
                         <button
-                            className="boton-grid cols-2"
-                            onClick={() => navigate("/MenuPrincipal")}
+                            className="boton-grid logout-button cols-2"
+                            onClick={() => navigate(-1)}
                         >
                             Volver al Menú Principal
                         </button>
-                        <button className="boton-grid logout-button cols-2" onClick={() => navigate("/")}>
-                            Cerrar sesión
-                        </button>
-                    </div>
-                </>
-            )}
+                    </>
+                ) : (
+                    <div className="boton-grid cols-4">Categoría no encontrada</div>
+                )}
+            </div>
 
             <Outlet />
         </div>

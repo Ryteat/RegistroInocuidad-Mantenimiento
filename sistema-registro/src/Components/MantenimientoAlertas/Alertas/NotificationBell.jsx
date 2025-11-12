@@ -3,7 +3,7 @@ import React, { useEffect, useMemo, useRef, useState } from "react";
 import supabase from "../../../supabaseClient.js";
 import { Button } from "primereact/button";
 
-// Tablas que pueden actualizarse desde la campanita
+// Tablas habilitadas para acciones rápidas
 const ALLOWED_TABLES = new Set([
     "mto_paneles_electrico",
     "mto_iluminacion",
@@ -21,55 +21,35 @@ const ALLOWED_TABLES = new Set([
     "mto_horno_linea_gas_glp_horno_multilevel",
     "mto_horno_transmision_turbina_horno_multilevel",
     "mto_horno_lubricacion_bandas_horno_multilevel",
-    "mto_horno_selladora_banda_continua_general"
+    "mto_horno_selladora_banda_continua_general",
+    "mto_horno_multilevel_sensor_pt100",
 ]);
 
-/* ===================== Helpers de fecha SEGUROS ===================== */
-// Construye Date local a partir de YYYY-MM-DD (evita TZ shift)
-const parseYMD = (isoDateStr) => {
-    if (!isoDateStr) return null;
-    const [y, m, d] = String(isoDateStr).split("-").map(Number);
+/* ===== Helpers de fecha seguros ===== */
+const parseYMD = (s) => {
+    if (!s) return null;
+    const [y, m, d] = String(s).split("-").map(Number);
     if (!y || !m || !d) return null;
     return new Date(y, m - 1, d, 0, 0, 0, 0);
 };
-
-// YYYY-MM-DD desde Date local
 const toDateISO = (d = new Date()) =>
     `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(
         d.getDate()
     ).padStart(2, "0")}`;
-
-// Suma de días robusta para base Date o 'YYYY-MM-DD'
 const addDaysISO = (base, days) => {
-    let d;
-    if (typeof base === "string" && /^\d{4}-\d{2}-\d{2}$/.test(base)) {
-        d = parseYMD(base);
-    } else if (base instanceof Date) {
-        d = new Date(base);
-    } else {
-        d = new Date();
-    }
+    let d =
+        typeof base === "string" ? parseYMD(base) : base instanceof Date ? new Date(base) : new Date();
     d.setHours(0, 0, 0, 0);
     d.setDate(d.getDate() + Number(days || 0));
     return toDateISO(d);
 };
-
-// Suma de años robusta para base Date o 'YYYY-MM-DD'
 const addYearsISO = (base, years) => {
-    let d;
-    if (typeof base === "string" && /^\d{4}-\d{2}-\d{2}$/.test(base)) {
-        d = parseYMD(base);
-    } else if (base instanceof Date) {
-        d = new Date(base);
-    } else {
-        d = new Date();
-    }
+    let d =
+        typeof base === "string" ? parseYMD(base) : base instanceof Date ? new Date(base) : new Date();
     d.setHours(0, 0, 0, 0);
     d.setFullYear(d.getFullYear() + Number(years || 0));
     return toDateISO(d);
 };
-
-// Formato DD/MM/AAAA (para mostrar)
 const fmtDMY = (iso) => {
     const d = parseYMD(iso);
     if (!d) return "—";
@@ -141,13 +121,14 @@ export default function NotificationBell({ navigate }) {
             "H-V-HM": "/MantenimientoAlertas/Horno/VibradorHornoMultilevel",
             "H-HM-TT": "/MantenimientoAlertas/Horno/TransmisionTurbinaHornoMultilevel",
             "H-HM-LB": "/MantenimientoAlertas/Horno/LubricacionBandasHornoMultilevel",
-            "H-SBC-G": "/MantenimientoAlertas/Horno/SelladoraBandaContinuaGeneral"
+            "H-SBC-G": "/MantenimientoAlertas/Horno/SelladoraBandaContinuaGeneral",
+            "H-HM-LG": "/MantenimientoAlertas/Horno/LineaGasGLPHornoMultilevel",
+            "H-HM-SPT": "/MantenimientoAlertas/Horno/SensorPT100",
         };
         const ruta = map[pos];
         if (ruta) navigate(ruta);
     };
 
-    // +7 días (VENCIDO -> posponer una semana)
     const snooze7Days = async (n) => {
         if (n.estado !== "VENCIDO") return;
         if (!ALLOWED_TABLES.has(n.tabla)) return;
@@ -159,22 +140,16 @@ export default function NotificationBell({ navigate }) {
                 .update({ proximo_mantenimiento: next })
                 .eq("id", n.id);
             if (error) throw error;
-
-            // Remueve la tarjeta del panel
-            setItems((prev) =>
-                prev.filter((it) => !(it.id === n.id && it.tabla === n.tabla))
-            );
+            setItems((prev) => prev.filter((it) => !(it.id === n.id && it.tabla === n.tabla)));
         } catch (e) {
             console.error("No se pudo posponer 7 días:", e.message || e);
         }
     };
 
-    // ✔ Completar — lo marca como completado y lo saca del panel
     const markCompleted = async (n) => {
         if (!ALLOWED_TABLES.has(n.tabla)) return;
         const today = toDateISO(new Date());
         try {
-            // Intento ideal: si existe columna 'estado'
             const { error } = await supabase
                 .from(n.tabla)
                 .update({
@@ -185,7 +160,6 @@ export default function NotificationBell({ navigate }) {
                 .eq("id", n.id);
 
             if (error) {
-                // Fallback: sin tocar esquema, empujar próximo mto. lejos
                 const { error: fbErr } = await supabase
                     .from(n.tabla)
                     .update({
@@ -195,11 +169,7 @@ export default function NotificationBell({ navigate }) {
                     .eq("id", n.id);
                 if (fbErr) throw fbErr;
             }
-
-            // Quita del panel inmediatamente
-            setItems((prev) =>
-                prev.filter((it) => !(it.id === n.id && it.tabla === n.tabla))
-            );
+            setItems((prev) => prev.filter((it) => !(it.id === n.id && it.tabla === n.tabla)));
         } catch (e) {
             console.error("No se pudo completar:", e.message || e);
         }
@@ -248,7 +218,7 @@ export default function NotificationBell({ navigate }) {
                 )}
             </button>
 
-            {/* Panel (más ancho y con scroll) */}
+            {/* Panel grande y legible */}
             {open && (
                 <div
                     className="nbell-panel"
@@ -256,7 +226,7 @@ export default function NotificationBell({ navigate }) {
                         position: "absolute",
                         top: 48,
                         right: 0,
-                        width: 640,
+                        width: 768,                // ← más ancho
                         maxWidth: "calc(100vw - 24px)",
                         background: "white",
                         borderRadius: 12,
@@ -275,7 +245,7 @@ export default function NotificationBell({ navigate }) {
                             marginBottom: 8,
                         }}
                     >
-                        <div style={{ fontWeight: 700, fontSize: 16, color: "#111827" }}>
+                        <div style={{ fontWeight: 700, fontSize: 18, color: "#111827" }}>
                             Notificaciones
                         </div>
                         <div style={{ display: "flex", gap: 8 }}>
@@ -311,16 +281,14 @@ export default function NotificationBell({ navigate }) {
                         </div>
                     </div>
 
-                    <div
-                        style={{ height: 1, background: "#e5e7eb", margin: "8px 0 12px" }}
-                    />
+                    <div style={{ height: 1, background: "#e5e7eb", margin: "8px 0 12px" }} />
 
                     <div
                         style={{
                             display: "flex",
                             flexDirection: "column",
                             gap: 12,
-                            maxHeight: 420,
+                            maxHeight: 560,        // ← más alto
                             overflowY: "auto",
                             paddingRight: 4,
                         }}
@@ -345,10 +313,10 @@ export default function NotificationBell({ navigate }) {
                                     background: "#f8fafc",
                                     border: "1px solid #e5e7eb",
                                     borderRadius: 10,
-                                    padding: 12,
+                                    padding: 14,
                                     display: "grid",
                                     gridTemplateColumns: "1fr auto",
-                                    gap: 10,
+                                    gap: 12,
                                     alignItems: "center",
                                 }}
                             >
@@ -356,15 +324,15 @@ export default function NotificationBell({ navigate }) {
                                     <div
                                         style={{
                                             display: "flex",
-                                            gap: 8,
+                                            gap: 10,
                                             alignItems: "center",
-                                            marginBottom: 4,
+                                            marginBottom: 6,
+                                            flexWrap: "wrap",
                                         }}
                                     >
                                         <span
                                             style={{
-                                                background:
-                                                    n.estado === "VENCIDO" ? "#fee2e2" : "#dbeafe",
+                                                background: n.estado === "VENCIDO" ? "#fee2e2" : "#dbeafe",
                                                 color: n.estado === "VENCIDO" ? "#991b1b" : "#1e40af",
                                                 fontSize: 12,
                                                 fontWeight: 700,
@@ -378,23 +346,21 @@ export default function NotificationBell({ navigate }) {
                                             style={{
                                                 fontWeight: 700,
                                                 color: "#111827",
-                                                overflow: "hidden",
-                                                textOverflow: "ellipsis",
-                                                whiteSpace: "nowrap",
+                                                // ← sin recorte: se envuelve y se lee completo
+                                                whiteSpace: "normal",
+                                                wordBreak: "break-word",
+                                                fontSize: 15,
+                                                lineHeight: 1.25,
                                             }}
-                                            title={`${n.posicion_id} — ${n.equipo}`}
                                         >
                                             {n.posicion_id} — {n.equipo}
                                         </div>
                                     </div>
 
-                                    <div style={{ color: "#374151", fontSize: 13, lineHeight: 1.4 }}>
-                                        Fecha objetivo: <b>{fmtDMY(n.proximo_mantenimiento)}</b>
+                                    <div style={{ color: "#374151", fontSize: 14, lineHeight: 1.5 }}>
+                                        <b>Fecha objetivo:</b> {fmtDMY(n.proximo_mantenimiento)}
                                         {n.registro ? (
-                                            <>
-                                                {" "}
-                                                • Registro: <i>{n.registro}</i>
-                                            </>
+                                            <> • <b>Registro:</b> <i>{n.registro}</i></>
                                         ) : null}
                                     </div>
                                 </div>
@@ -409,7 +375,6 @@ export default function NotificationBell({ navigate }) {
                                             outlined
                                         />
                                     )}
-                                    {/* ✔ Completar */}
                                     <Button
                                         icon="pi pi-check"
                                         tooltip="Marcar como completado"

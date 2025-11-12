@@ -1,6 +1,6 @@
 // src/Components/MantenimientoAlertas/Alertas/ContenedorAlertas.jsx
 import React, { useEffect, useRef, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useLocation } from "react-router-dom";
 import supabase from "../../../supabaseClient.js";
 import logo2 from "../../../assets/mosca.png";
 
@@ -16,15 +16,12 @@ import { Dropdown } from "primereact/dropdown";
 import NotificationBell from "./NotificationBell.jsx";
 
 /* ================== Helpers de fecha — SEGUROS ================== */
-// Construye Date local a partir de YYYY-MM-DD (sin desfases por TZ)
 const parseYMD = (isoDateStr) => {
     if (!isoDateStr) return null;
     const [y, m, d] = String(isoDateStr).split("-").map(Number);
     if (!y || !m || !d) return null;
     return new Date(y, m - 1, d, 0, 0, 0, 0);
 };
-
-// Muestra DD/MM/AAAA para columnas DATE
 const fmtDMY = (iso) => {
     const d = parseYMD(iso);
     if (!d) return "—";
@@ -33,22 +30,20 @@ const fmtDMY = (iso) => {
     const yy = d.getFullYear();
     return `${dd}/${mm}/${yy}`;
 };
-
-// Semana ISO a partir de YYYY-MM-DD (sin usar Date con la cadena original)
 const semanaIso = (isoStr) => {
     const d = parseYMD(isoStr);
     if (!d) return { semana: "—", anio: "" };
-
-    // Cálculo clásico de semana ISO (usando UTC para estabilidad)
     const target = new Date(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()));
-    // Jueves de la semana actual
-    const dayNr = (target.getUTCDay() + 6) % 7; // 0..6 (lunes=0)
+    const dayNr = (target.getUTCDay() + 6) % 7;
     target.setUTCDate(target.getUTCDate() - dayNr + 3);
     const firstThursday = new Date(Date.UTC(target.getUTCFullYear(), 0, 4));
     const week =
         1 +
         Math.round(
-            ((target.getTime() - firstThursday.getTime()) / 86400000 - 3 + ((firstThursday.getUTCDay() + 6) % 7)) / 7
+            ((target.getTime() - firstThursday.getTime()) / 86400000 -
+                3 +
+                ((firstThursday.getUTCDay() + 6) % 7)) /
+            7
         );
     return { semana: String(week).padStart(2, "0"), anio: target.getUTCFullYear() };
 };
@@ -64,12 +59,26 @@ const FORM_MAP = {
     "H-ENF-MR": "/MantenimientoAlertas/Horno/MotorReductorEnfriador",
     "H-ENF-LB": "/MantenimientoAlertas/Horno/LubricacionBandasEnfriador",
     "H-ENF-V": "/MantenimientoAlertas/Horno/VibradorEnfriador",
-
+    "H-BS-G": "/MantenimientoAlertas/Horno/BandaSalidaGeneral",
+    "H-BE-G": "/MantenimientoAlertas/Horno/BandaEntradaGeneral",
+    "H-V-HM": "/MantenimientoAlertas/Horno/VibradorHornoMultilevel",
+    "H-HM-LG": "/MantenimientoAlertas/Horno/LineaGasGLPHornoMultilevel",
+    "H-HM-TT": "/MantenimientoAlertas/Horno/TransmisionTurbinaHornoMultilevel",
+    "H-HM-LB": "/MantenimientoAlertas/Horno/LubricacionBandasHornoMultilevel",
+    "H-SBC-G": "/MantenimientoAlertas/Horno/SelladoraBandaContinuaGeneral",
+    "H-HM-SPT": "/MantenimientoAlertas/Horno/SensorPT100",
 };
 
 export default function ContenedorAlertas() {
     const toast = useRef(null);
     const navigate = useNavigate();
+    const location = useLocation();
+
+    // Trae el departamento; si no viene, habilita todos por defecto
+    const depState = location.state?.departamento;
+    const departamento =
+        depState ||
+        "Hatchery,Dieta,Horno,Calidad,Cosecha,Mantenimiento,Inocuidad,Gerencia,Visualizar,MantenimientoAlertas";
 
     const [rows, setRows] = useState([]);
     const [loading, setLoading] = useState(false);
@@ -101,7 +110,6 @@ export default function ContenedorAlertas() {
             const { data, error } = await q;
             if (error) throw error;
 
-            // Completar semana/año si la vista no los trae
             const mapped = (data || []).map((r) => {
                 if (!r.proximo_mantenimiento) return r;
                 if (r.semana_proximo && r.anio_proximo) return r;
@@ -118,7 +126,10 @@ export default function ContenedorAlertas() {
         }
     };
 
-    useEffect(() => { fetchRows(); }, [periodo]);
+    useEffect(() => {
+        fetchRows();
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [periodo]);
 
     // Debounce de buscador
     useEffect(() => {
@@ -152,7 +163,10 @@ export default function ContenedorAlertas() {
             <Toast ref={toast} />
 
             {/* Encabezado + campanita a la derecha */}
-            <div className="flex align-items-center justify-content-center" style={{ gap: 12, position: "relative" }}>
+            <div
+                className="flex align-items-center justify-content-center"
+                style={{ gap: 12, position: "relative" }}
+            >
                 <h1 className="m-0 flex align-items-center" style={{ gap: 12 }}>
                     <img src={logo2} alt="mosca" className="logo2" />
                     <span>Alertas de Mantenimiento</span>
@@ -162,23 +176,55 @@ export default function ContenedorAlertas() {
                 </span>
             </div>
 
-            {/* Acciones superiores (sin +Nuevo aquí) */}
-            <div className="flex justify-content-center gap-2 mt-3 mb-3">
-                <Button
-                    label="Volver al Menú de Registros"
-                    icon="pi pi-arrow-left"
-                    onClick={() => navigate("/MantenimientoAlertas")}
-                />
-                <Button
-                    label="Cerrar sesión"
-                    icon="pi pi-sign-out"
-                    severity="danger"
-                    onClick={() => navigate("/", { replace: true })}
-                />
+            {/* Acciones superiores — CENTRADAS (wrapper grid) */}
+            <div style={{ display: "grid", placeItems: "center", margin: "14px 0" }}>
+                <div
+                    style={{
+                        display: "flex",
+                        gap: 12,
+                        flexWrap: "wrap",
+                        justifyContent: "center",
+                        alignItems: "center",
+                        width: "100%",
+                        maxWidth: 900,
+                    }}
+                >
+                    {/* ← Volver al Menú de Registros (SIN cambios) */}
+                    <Button
+                        label="Menú de Registros"
+                        icon="pi pi-arrow-left"
+                        onClick={() => navigate("/MantenimientoAlertas")}
+                        style={{ width: 280, height: 44 }}
+                    />
+                    {/* ⌂ Volver al Menú Principal (reenviando departamento) */}
+                    <Button
+                        label="⌂ Volver al Menú Principal"
+                        icon="pi pi-home"
+                        className="p-button-secondary"
+                        onClick={() =>
+                            navigate("/MenuPrincipal", {
+                                state: { departamento },
+                                replace: false,
+                            })
+                        }
+                        style={{ width: 280, height: 44 }}
+                    />
+                    {/* Cerrar sesión */}
+                    <Button
+                        label="Cerrar sesión"
+                        icon="pi pi-sign-out"
+                        severity="danger"
+                        onClick={() => navigate("/", { replace: true })}
+                        style={{ width: 280, height: 44 }}
+                    />
+                </div>
             </div>
 
             {/* Controles */}
-            <div className="flex flex-wrap gap-2 align-items-center justify-content-between" style={{ marginBottom: 12 }}>
+            <div
+                className="flex flex-wrap gap-2 align-items-center justify-content-between"
+                style={{ marginBottom: 12 }}
+            >
                 <div className="flex gap-2 align-items-center" style={{ flex: 1, minWidth: 280 }}>
                     <span className="p-input-icon-left" style={{ width: "100%" }}>
                         <i className="pi pi-search" />
@@ -217,11 +263,19 @@ export default function ContenedorAlertas() {
                 loading={loading}
                 globalFilter={globalFilter}
                 globalFilterFields={[
-                    "posicion_id", "equipo", "registro", "periodicidad",
-                    "estado", "ultimo_mantenimiento", "proximo_mantenimiento",
+                    "posicion_id",
+                    "equipo",
+                    "registro",
+                    "periodicidad",
+                    "estado",
+                    "ultimo_mantenimiento",
+                    "proximo_mantenimiento",
                 ]}
-                paginator rows={10} rowsPerPageOptions={[5, 10, 25]}
-                dataKey="id" showGridlines
+                paginator
+                rows={10}
+                rowsPerPageOptions={[5, 10, 25]}
+                dataKey="id"
+                showGridlines
                 paginatorTemplate="FirstPageLink PrevPageLink PageLinks NextPageLink LastPageLink CurrentPageReport RowsPerPageDropdown"
                 currentPageReportTemplate="Mostrando del {first} al {last} de {totalRecords} Registros"
                 emptyMessage="No hay registros para mostrar"
@@ -230,7 +284,6 @@ export default function ContenedorAlertas() {
                 <Column field="equipo" header="Equipo" sortable />
                 <Column field="registro" header="Registro" />
                 <Column field="periodicidad" header="Periodicidad" />
-                {/* 👇 Fechas con formateo seguro */}
                 <Column header="Último Mantenimiento" body={(r) => fmtDMY(r.ultimo_mantenimiento)} sortable />
                 <Column header="Próximo Mantenimiento" body={(r) => fmtDMY(r.proximo_mantenimiento)} sortable />
                 <Column header="Semana" body={semanaBody} />

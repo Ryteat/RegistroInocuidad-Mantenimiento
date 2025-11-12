@@ -58,7 +58,7 @@ import LineaGasGLPHornoMultilevel from "./Components/MantenimientoAlertas/Horno/
 import TransmisionTurbinaHornoMultilevel from "./Components/MantenimientoAlertas/Horno/Registros/TransmisionTurbinaHornoMultilevel.jsx";
 import LubricacionBandasHornoMultilevel from "./Components/MantenimientoAlertas/Horno/Registros/LubricacionBandasHornoMultilevel.jsx";
 import SelladoraBandaContinuaGeneral from "./Components/MantenimientoAlertas/Horno/Registros/SelladoraBandaContinuaGeneral.jsx";
-
+import SensorPT100 from "./Components/MantenimientoAlertas/Horno/Registros/SensorPT100.jsx";
 
 // ⬇️ Horno del módulo de Alertas (MENÚ)
 import HornoMA from './Components/MantenimientoAlertas/Horno/HornoMA.jsx';
@@ -218,6 +218,9 @@ const router = createBrowserRouter(
             { path: `Horno/TransmisionTurbina`, element: <TransmisionTurbinaHornoMultilevel /> },
             { path: `Horno/LubricacionBandasHornoMultilevel`, element: <LubricacionBandasHornoMultilevel /> },
             { path: `Horno/SelladoraBandaContinuaGeneral`, element: <SelladoraBandaContinuaGeneral /> },
+            { path: `Horno/SensorPT100`, element: <SensorPT100 /> },
+            { path: `Horno`, element: <HornoMA /> },
+            { path: `Horno/:cat`, element: <HornoMA /> },
 
           ],
         },

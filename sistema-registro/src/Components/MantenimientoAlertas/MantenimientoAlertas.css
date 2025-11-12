@@ -1,44 +1,13 @@
-/* src/Components/MantenimientoAlertas/MantenimientoAlertas.css */
-.mantenimientoAlertas-container {
-    padding: 12px;
+/* Bloque de acciones separado del listado de áreas */
+.acciones-bloque {
+    margin-top: 10px;
 }
 
-.header-alertas {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    gap: 12px;
-}
-
-.top-actions {
-    display: flex;
-    gap: 12px;
-    justify-content: center;
-    margin: 12px 0;
-    flex-wrap: wrap;
-}
-
-.grid-botones {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
-    gap: 12px;
-}
-
-.boton-grid {
-    padding: 14px 16px;
+/* Línea separadora suave y centrada (tipo <hr/>) */
+.bloque-sep {
+    width: clamp(280px, 80%, 760px);
+    height: 1px;
+    background: rgba(0, 0, 0, 0.08);
+    margin: 18px auto 14px;
     border-radius: 8px;
-    border: 1px solid #e5e7eb;
-}
-
-.logout-button {
-    background: #fee2e2;
-}
-
-.logo2 {
-    height: 36px;
-}
-
-.welcome-message {
-    text-align: center;
-    margin: 8px 0 16px;
 }

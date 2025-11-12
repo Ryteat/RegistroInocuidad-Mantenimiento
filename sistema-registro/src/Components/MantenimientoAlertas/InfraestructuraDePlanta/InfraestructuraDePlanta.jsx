@@ -36,11 +36,9 @@ function InfraestructuraDePlanta() {
 
                     <div className="grid-botones" style={{ marginTop: 12 }}>
                         <button className="boton-grid cols-2" onClick={() => navigate("/MantenimientoAlertas")}>
-                            Volver al Menu de Mantenimiento Alertas
+                            Volver al Menú de Registros de Mantenimiento
                         </button>
-                        <button className="boton-grid cols-2" onClick={() => navigate("/MenuPrincipal")}>
-                            Volver al Menú Principal
-                        </button>
+
                         <button className="boton-grid logout-button cols-2" onClick={() => navigate("/")}>
                             Cerrar sesión
                         </button>
