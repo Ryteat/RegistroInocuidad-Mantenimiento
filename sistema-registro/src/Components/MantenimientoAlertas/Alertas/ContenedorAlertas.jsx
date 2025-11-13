@@ -67,6 +67,8 @@ const FORM_MAP = {
     "H-HM-LB": "/MantenimientoAlertas/Horno/LubricacionBandasHornoMultilevel",
     "H-SBC-G": "/MantenimientoAlertas/Horno/SelladoraBandaContinuaGeneral",
     "H-HM-SPT": "/MantenimientoAlertas/Horno/SensorPT100",
+    "H-HM-TT": "/MantenimientoAlertas/Horno/TransmisionTurbinaHornoMultilevel",
+    "D-BSG-G": "/MantenimientoAlertas/Dieta/BombaSumergibleGeneral",
 };
 
 export default function ContenedorAlertas() {

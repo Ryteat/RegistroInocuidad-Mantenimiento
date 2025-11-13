@@ -23,6 +23,9 @@ const ALLOWED_TABLES = new Set([
     "mto_horno_lubricacion_bandas_horno_multilevel",
     "mto_horno_selladora_banda_continua_general",
     "mto_horno_multilevel_sensor_pt100",
+    "mto_dieta_bomba_sumergible_general",
+    "mto_dieta_mezcladora_general",
+
 ]);
 
 /* ===== Helpers de fecha seguros ===== */
@@ -124,6 +127,9 @@ export default function NotificationBell({ navigate }) {
             "H-SBC-G": "/MantenimientoAlertas/Horno/SelladoraBandaContinuaGeneral",
             "H-HM-LG": "/MantenimientoAlertas/Horno/LineaGasGLPHornoMultilevel",
             "H-HM-SPT": "/MantenimientoAlertas/Horno/SensorPT100",
+            "H-HM-TT": "/MantenimientoAlertas/Horno/TransmisionTurbinaHornoMultilevel",
+            "D-BSG-G": "/MantenimientoAlertas/Dieta/BombaSumergibleGeneral",
+            "D-MEZ-G": "/MantenimientoAlertas/Dieta/MezcladoraGeneral",
         };
         const ruta = map[pos];
         if (ruta) navigate(ruta);

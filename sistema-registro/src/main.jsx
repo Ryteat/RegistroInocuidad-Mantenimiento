@@ -41,11 +41,14 @@ import PagesLimpiezaTanqueAgua from "./pages/Inocuidad/Registros/PagesLimpiezaTa
 // --- Mantenimiento / Alertas ---
 import PagesMantenimientoAlertas from './pages/MantenimientoAlertas/PagesMantenimientoAlertas.jsx';
 import MantenimientoAlertas from './Components/MantenimientoAlertas/MantenimientoAlertas.jsx';
+import ContenedorAlertas from './Components/MantenimientoAlertas/Alertas/ContenedorAlertas.jsx';
+
+//Infra de planta ;)
 import InfraestructuraDePlanta from './Components/MantenimientoAlertas/InfraestructuraDePlanta/InfraestructuraDePlanta.jsx';
 import PanelElectrico from './Components/MantenimientoAlertas/InfraestructuraDePlanta/Registros/PanelElectrico.jsx';
 import Iluminacion from './Components/MantenimientoAlertas/InfraestructuraDePlanta/Registros/Iluminacion.jsx';
 import CuartosElectricos from './Components/MantenimientoAlertas/InfraestructuraDePlanta/Registros/CuartosElectricos.jsx';
-import ContenedorAlertas from './Components/MantenimientoAlertas/Alertas/ContenedorAlertas.jsx';
+//Horno alertas imports
 import MotorReductor from './Components/MantenimientoAlertas/Horno/Registros/MotorReductor.jsx';
 import Vibrador from './Components/MantenimientoAlertas/Horno/Registros/Vibrador.jsx';
 import MotorReductorEnfriador from './Components/MantenimientoAlertas/Horno/Registros/MotorReductorEnfriador.jsx';
@@ -59,6 +62,11 @@ import TransmisionTurbinaHornoMultilevel from "./Components/MantenimientoAlertas
 import LubricacionBandasHornoMultilevel from "./Components/MantenimientoAlertas/Horno/Registros/LubricacionBandasHornoMultilevel.jsx";
 import SelladoraBandaContinuaGeneral from "./Components/MantenimientoAlertas/Horno/Registros/SelladoraBandaContinuaGeneral.jsx";
 import SensorPT100 from "./Components/MantenimientoAlertas/Horno/Registros/SensorPT100.jsx";
+
+// Dieta alertas imports
+import DietaMA from './Components/MantenimientoAlertas/Dieta/DietaMA.jsx';
+import BombaSumergibleGeneral from './Components/MantenimientoAlertas/Dieta/Registros/BombaSumergibleGeneral.jsx';
+import MezcladoraGeneral from "./Components/MantenimientoAlertas/Dieta/Registros/MezcladoraGeneral.jsx";
 
 // ⬇️ Horno del módulo de Alertas (MENÚ)
 import HornoMA from './Components/MantenimientoAlertas/Horno/HornoMA.jsx';
@@ -221,6 +229,13 @@ const router = createBrowserRouter(
             { path: `Horno/SensorPT100`, element: <SensorPT100 /> },
             { path: `Horno`, element: <HornoMA /> },
             { path: `Horno/:cat`, element: <HornoMA /> },
+
+            //Dieta con alertas mi gente
+            { path: `Dieta`, element: <DietaMA /> },
+            { path: `Dieta/BombaSumergibleGeneral`, element: <BombaSumergibleGeneral /> },
+            { path: `Dieta/:cat`, element: <DietaMA /> },
+
+            { path: `Dieta/MezcladoraGeneral`, element: <MezcladoraGeneral /> }
 
           ],
         },
