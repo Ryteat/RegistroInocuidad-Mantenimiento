@@ -25,10 +25,12 @@ const CATEGORIES = [
     },
     {
         key: "Bandas",
-        titulo: "Bandas Transportadoras",
+        titulo: "Bandas",
         botones: [
-            // Ejemplo futuro:
-            // { titulo: "*D-BAN-G* Bandas — General", ruta: "/MantenimientoAlertas/Dieta/BandasGeneral" },
+            {
+                titulo: "*D-BS-G* Bandas — Lubricacion",
+                ruta: "/MantenimientoAlertas/Dieta/BandasLubricacion",
+            },
         ],
     },
     {
@@ -45,16 +47,9 @@ const CATEGORIES = [
         key: "ContenedorCascara",
         titulo: "Contenedor de Cáscaras",
         botones: [
-
-        ],
-    },
-    {
-        key: "ContenedorCascara",
-        titulo: "Contenedor de Cáscaras",
-        botones: [
             {
                 titulo: "*D-CC-G* Contenedor de Cáscaras — General",
-                ruta: "/MantenimientoAlertas/Dieta/ContenedorCascaraGeneral",
+                ruta: "/MantenimientoAlertas/Dieta/ContenedoresCascaraGeneral",
             },
         ],
     },

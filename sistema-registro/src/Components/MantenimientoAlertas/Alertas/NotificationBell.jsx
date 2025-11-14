@@ -25,6 +25,8 @@ const ALLOWED_TABLES = new Set([
     "mto_horno_multilevel_sensor_pt100",
     "mto_dieta_bomba_sumergible_general",
     "mto_dieta_mezcladora_general",
+    "mto_dieta_bandas_lubricacion",
+    "mto_dieta_contenedores_cascara_general",
 
 ]);
 
@@ -110,9 +112,12 @@ export default function NotificationBell({ navigate }) {
 
     const goToForm = (pos) => {
         const map = {
+            //Infraestructura de Planta JV
+
             IN1: "/MantenimientoAlertas/PanelElectrico",
             IN2: "/MantenimientoAlertas/Iluminacion",
             IN3: "/MantenimientoAlertas/CuartosElectricos",
+            //Horno JV
             "H-EL-SN": "/MantenimientoAlertas/Horno/SistemaNeumatico",
             "H-EL-MR": "/MantenimientoAlertas/Horno/MotorReductor",
             "H-EL-V": "/MantenimientoAlertas/Horno/Vibrador",
@@ -127,9 +132,12 @@ export default function NotificationBell({ navigate }) {
             "H-SBC-G": "/MantenimientoAlertas/Horno/SelladoraBandaContinuaGeneral",
             "H-HM-LG": "/MantenimientoAlertas/Horno/LineaGasGLPHornoMultilevel",
             "H-HM-SPT": "/MantenimientoAlertas/Horno/SensorPT100",
-            "H-HM-TT": "/MantenimientoAlertas/Horno/TransmisionTurbinaHornoMultilevel",
+
+            //Dieta JV
             "D-BSG-G": "/MantenimientoAlertas/Dieta/BombaSumergibleGeneral",
             "D-MEZ-G": "/MantenimientoAlertas/Dieta/MezcladoraGeneral",
+            "D-B-L": "/MantenimientoAlertas/Dieta/BandasLubricacion",
+            "D-CC-G": "/MantenimientoAlertas/Dieta/ContenedoresCascaraGeneral",
         };
         const ruta = map[pos];
         if (ruta) navigate(ruta);
@@ -170,7 +178,7 @@ export default function NotificationBell({ navigate }) {
                     .from(n.tabla)
                     .update({
                         ultimo_mantenimiento: today,
-                        proximo_mantenimiento: addYearsISO(today, 100),
+                        proximo_mantenimiento: addYearsISO(today, 100), // evitar alerta futuras poniendole 100 años jeje 
                     })
                     .eq("id", n.id);
                 if (fbErr) throw fbErr;

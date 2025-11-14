@@ -4,7 +4,7 @@ import { useNavigate, useLocation, Outlet } from "react-router-dom";
 import logo2 from "../../../assets/mosca.png";
 import "../InfraestructuraDePlanta/InfraestructuraDePlanta.css";
 
-/** Catálogo de submenús (categorías) y sus registros */
+//Es el menu segun el Equipo y dentro de cada van los REGISTROS JV
 const CATEGORIES = [
     {
         key: "Empacadora",
@@ -62,10 +62,10 @@ export default function HornoMA() {
     const navigate = useNavigate();
     const location = useLocation();
 
-    // Raíz del módulo Horno (igual que Inocuidad usa isRootPath)
+    // Raíz del módulo Horno JV
     const isRootPath = location.pathname === "/MantenimientoAlertas/Horno";
 
-    // Si estamos en la raíz: mostrar los submenús (categorías)
+    // Si estamos en la raíz: mostrar los submenús (categorías) JV
     if (isRootPath) {
         return (
             <div className="infraestructura-container">
@@ -85,13 +85,12 @@ export default function HornoMA() {
                         <button
                             key={c.key}
                             className="boton-grid oven-button cols-2"
-                            onClick={() => navigate(c.key)} // navegación RELATIVA como en Inocuidad
+                            onClick={() => navigate(c.key)}
                         >
                             {c.titulo}
                         </button>
                     ))}
 
-                    {/* Igual que Inocuidad: volver al anterior (tu Menú Principal queda atrás en el historial) */}
                     <button
                         className="boton-grid logout-button cols-2"
                         onClick={() => navigate(-1)}
@@ -105,20 +104,23 @@ export default function HornoMA() {
         );
     }
 
-    // Vista de categoría: /MantenimientoAlertas/Horno/:cat
+    // Vista de categoría: /MantenimientoAlertas/Horno/:cat JV
     const pathParts = location.pathname.split("/");
     const catKey = pathParts[pathParts.length - 1];
     const category = CATEGORIES.find(
         (c) => c.key.toLowerCase() === catKey.toLowerCase()
     );
-
+    //Vista de Horno Multilevel JV
     return (
         <div className="infraestructura-container">
             <header className="infraestructura-header">
                 <div className="logo-infraestructura-container">
                     <img src={logo2} alt="Logo" className="logo2" />
                 </div>
-                <h1>Horno — {category ? category.titulo : "Categoría"}</h1>
+                <h1>Horno - {category ? category.titulo : "Categoría"}</h1>
+                <div className="welcome-message">
+                    <p>Estos son los registros que pertenecen a esta categoría de Horno Multilevel:</p>
+                </div>
             </header>
 
             <div className="grid-botones">
@@ -134,18 +136,11 @@ export default function HornoMA() {
                             </button>
                         ))}
 
-                        {/* Controles iguales a Inocuidad */}
-                        <button
-                            className="boton-grid cols-2"
-                            onClick={() => navigate("/MantenimientoAlertas/Horno")}
-                        >
-                            Volver a Submenús
-                        </button>
                         <button
                             className="boton-grid logout-button cols-2"
                             onClick={() => navigate(-1)}
                         >
-                            Volver al Menú Principal
+                            Volver al Menú de Horno
                         </button>
                     </>
                 ) : (

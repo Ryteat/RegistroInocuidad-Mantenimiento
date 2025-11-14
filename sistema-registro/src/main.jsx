@@ -67,6 +67,8 @@ import SensorPT100 from "./Components/MantenimientoAlertas/Horno/Registros/Senso
 import DietaMA from './Components/MantenimientoAlertas/Dieta/DietaMA.jsx';
 import BombaSumergibleGeneral from './Components/MantenimientoAlertas/Dieta/Registros/BombaSumergibleGeneral.jsx';
 import MezcladoraGeneral from "./Components/MantenimientoAlertas/Dieta/Registros/MezcladoraGeneral.jsx";
+import BandasLubricacion from "./Components/MantenimientoAlertas/Dieta/Registros/BandasLubricacion.jsx";
+import ContenedoresCascaraGeneral from './Components/MantenimientoAlertas/Dieta/Registros/ContenedoresCascaraGeneral.jsx';
 
 // ⬇️ Horno del módulo de Alertas (MENÚ)
 import HornoMA from './Components/MantenimientoAlertas/Horno/HornoMA.jsx';
@@ -168,6 +170,7 @@ const router = createBrowserRouter(
             { path: `ControlInventarioCascaraPila`, element: <ControlInventarioCascaraPila /> },
             { path: `ControlRendimientoDietaySiembra`, element: <ControlRendimientoDietaySiembra /> },
             { path: `ControlMovimientosCajasProceso`, element: <ControlMovimientosCajasProceso /> },
+
           ],
         },
 
@@ -234,8 +237,11 @@ const router = createBrowserRouter(
             { path: `Dieta`, element: <DietaMA /> },
             { path: `Dieta/BombaSumergibleGeneral`, element: <BombaSumergibleGeneral /> },
             { path: `Dieta/:cat`, element: <DietaMA /> },
+            { path: `Dieta/MezcladoraGeneral`, element: <MezcladoraGeneral /> },
+            { path: `Dieta/BandasLubricacion`, element: <BandasLubricacion /> },
+            { path: `Dieta/ContenedoresCascaraGeneral`, element: <ContenedoresCascaraGeneral /> },
 
-            { path: `Dieta/MezcladoraGeneral`, element: <MezcladoraGeneral /> }
+
 
           ],
         },

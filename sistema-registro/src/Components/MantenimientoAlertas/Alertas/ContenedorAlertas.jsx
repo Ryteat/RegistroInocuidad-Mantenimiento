@@ -22,6 +22,7 @@ const parseYMD = (isoDateStr) => {
     if (!y || !m || !d) return null;
     return new Date(y, m - 1, d, 0, 0, 0, 0);
 };
+
 const fmtDMY = (iso) => {
     const d = parseYMD(iso);
     if (!d) return "—";
@@ -30,6 +31,7 @@ const fmtDMY = (iso) => {
     const yy = d.getFullYear();
     return `${dd}/${mm}/${yy}`;
 };
+
 const semanaIso = (isoStr) => {
     const d = parseYMD(isoStr);
     if (!d) return { semana: "—", anio: "" };
@@ -42,10 +44,34 @@ const semanaIso = (isoStr) => {
         Math.round(
             ((target.getTime() - firstThursday.getTime()) / 86400000 -
                 3 +
-                ((firstThursday.getUTCDay() + 6) % 7)) /
-            7
+                ((firstThursday.getUTCDay() + 6) % 7)) / 7
         );
     return { semana: String(week).padStart(2, "0"), anio: target.getUTCFullYear() };
+};
+
+/* ========== Detectar si el registro es "COMPLETADO" por los +100 años ========== */
+const computeEstadoAndCompletion = (row) => {
+    const { proximo_mantenimiento, estado } = row;
+
+    if (!proximo_mantenimiento) {
+        return { estadoVisual: estado || "OK", completado: false };
+    }
+
+    const d = parseYMD(proximo_mantenimiento);
+    if (!d) return { estadoVisual: estado || "OK", completado: false };
+
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    const diffDays = Math.floor((d.getTime() - today.getTime()) / 86400000);
+    const diffYears = diffDays / 365;
+
+    // Si está muuuy lejos (50+ años) lo tomamos como COMPLETADO
+    if (diffYears >= 50) {
+        return { estadoVisual: "COMPLETADO", completado: true };
+    }
+
+    return { estadoVisual: estado || "OK", completado: false };
 };
 
 /* ================== Rutas de formularios ================== */
@@ -53,22 +79,30 @@ const FORM_MAP = {
     IN1: "/MantenimientoAlertas/PanelElectrico",
     IN2: "/MantenimientoAlertas/Iluminacion",
     IN3: "/MantenimientoAlertas/CuartosElectricos",
+
     "H-EL-SN": "/MantenimientoAlertas/Horno/SistemaNeumatico",
     "H-EL-MR": "/MantenimientoAlertas/Horno/MotorReductor",
     "H-EL-V": "/MantenimientoAlertas/Horno/Vibrador",
+
     "H-ENF-MR": "/MantenimientoAlertas/Horno/MotorReductorEnfriador",
     "H-ENF-LB": "/MantenimientoAlertas/Horno/LubricacionBandasEnfriador",
     "H-ENF-V": "/MantenimientoAlertas/Horno/VibradorEnfriador",
+
     "H-BS-G": "/MantenimientoAlertas/Horno/BandaSalidaGeneral",
     "H-BE-G": "/MantenimientoAlertas/Horno/BandaEntradaGeneral",
+
     "H-V-HM": "/MantenimientoAlertas/Horno/VibradorHornoMultilevel",
     "H-HM-LG": "/MantenimientoAlertas/Horno/LineaGasGLPHornoMultilevel",
     "H-HM-TT": "/MantenimientoAlertas/Horno/TransmisionTurbinaHornoMultilevel",
     "H-HM-LB": "/MantenimientoAlertas/Horno/LubricacionBandasHornoMultilevel",
     "H-SBC-G": "/MantenimientoAlertas/Horno/SelladoraBandaContinuaGeneral",
     "H-HM-SPT": "/MantenimientoAlertas/Horno/SensorPT100",
-    "H-HM-TT": "/MantenimientoAlertas/Horno/TransmisionTurbinaHornoMultilevel",
-    "D-BSG-G": "/MantenimientoAlertas/Dieta/BombaSumergibleGeneral",
+
+    // Dieta
+    "D-BS-G": "/MantenimientoAlertas/Dieta/BombaSumergibleGeneral",
+    "D-M-G": "/MantenimientoAlertas/Dieta/MezcladoraGeneral",
+    "D-B-L": "/MantenimientoAlertas/Dieta/BandasLubricacion",
+    "D-CC-G": "/MantenimientoAlertas/Dieta/ContenedoresCascaraGeneral",
 };
 
 export default function ContenedorAlertas() {
@@ -76,7 +110,6 @@ export default function ContenedorAlertas() {
     const navigate = useNavigate();
     const location = useLocation();
 
-    // Trae el departamento; si no viene, habilita todos por defecto
     const depState = location.state?.departamento;
     const departamento =
         depState ||
@@ -85,11 +118,8 @@ export default function ContenedorAlertas() {
     const [rows, setRows] = useState([]);
     const [loading, setLoading] = useState(false);
 
-    // Buscador con debounce simple
     const [searchInput, setSearchInput] = useState("");
     const [globalFilter, setGlobalFilter] = useState("");
-
-    // Filtro por periodicidad
     const [periodo, setPeriodo] = useState("todos");
 
     const showToast = (severity, summary, detail, life = 3000) =>
@@ -113,10 +143,20 @@ export default function ContenedorAlertas() {
             if (error) throw error;
 
             const mapped = (data || []).map((r) => {
-                if (!r.proximo_mantenimiento) return r;
-                if (r.semana_proximo && r.anio_proximo) return r;
-                const { semana, anio } = semanaIso(r.proximo_mantenimiento);
-                return { ...r, semana_proximo: semana, anio_proximo: anio };
+                let row = r;
+
+                if (row.proximo_mantenimiento && (!row.semana_proximo || !row.anio_proximo)) {
+                    const { semana, anio } = semanaIso(row.proximo_mantenimiento);
+                    row = { ...row, semana_proximo: semana, anio_proximo: anio };
+                }
+
+                const { estadoVisual, completado } = computeEstadoAndCompletion(row);
+
+                return {
+                    ...row,
+                    estado_visual: estadoVisual,
+                    completado,
+                };
             });
 
             setRows(mapped);
@@ -133,14 +173,56 @@ export default function ContenedorAlertas() {
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [periodo]);
 
-    // Debounce de buscador
     useEffect(() => {
         const t = setTimeout(() => setGlobalFilter(searchInput), 220);
         return () => clearTimeout(t);
     }, [searchInput]);
 
-    const semanaBody = (r) =>
-        r.proximo_mantenimiento ? `${r.semana_proximo} año ${r.anio_proximo}` : "—";
+    // 👇 Semana: si está completado, no mostramos nada
+    const semanaBody = (r) => {
+        if (r.completado) return "—";
+        return r.proximo_mantenimiento
+            ? `${r.semana_proximo} año ${r.anio_proximo}`
+            : "—";
+    };
+
+    // 👇 Próximo mantenimiento: si está completado, lo ocultamos
+    const proximoBody = (r) => {
+        if (r.completado) return "—";
+        return fmtDMY(r.proximo_mantenimiento);
+    };
+
+    const estadoBody = (r) => {
+        const estado = r.estado_visual || r.estado || "OK";
+
+        const baseStyle = {
+            padding: "4px 10px",
+            borderRadius: "999px",
+            fontSize: "0.75rem",
+            fontWeight: 600,
+            display: "inline-block",
+        };
+
+        let bg = "#e5e7eb";
+        let color = "#111827";
+
+        if (estado === "VENCIDO") {
+            bg = "#fee2e2";
+            color = "#b91c1c";
+        } else if (estado === "PROX7") {
+            bg = "#fef3c7";
+            color = "#92400e";
+        } else if (estado === "COMPLETADO") {
+            bg = "#bbf7d0"; // verde claro
+            color = "#065f46";
+        }
+
+        return (
+            <span style={{ ...baseStyle, backgroundColor: bg, color }}>
+                {estado}
+            </span>
+        );
+    };
 
     const accionesBody = (r) => (
         <div className="flex gap-2">
@@ -151,7 +233,11 @@ export default function ContenedorAlertas() {
                 onClick={() => {
                     const ruta = FORM_MAP[r.posicion_id];
                     if (!ruta) {
-                        showToast("warn", "Sin formulario", `Aún no hay formulario para ${r.posicion_id}`);
+                        showToast(
+                            "warn",
+                            "Sin formulario",
+                            `Aún no hay formulario para ${r.posicion_id}`
+                        );
                         return;
                     }
                     navigate(ruta);
@@ -164,7 +250,6 @@ export default function ContenedorAlertas() {
         <div className="controlrendcosechayfrass-container">
             <Toast ref={toast} />
 
-            {/* Encabezado + campanita a la derecha */}
             <div
                 className="flex align-items-center justify-content-center"
                 style={{ gap: 12, position: "relative" }}
@@ -178,8 +263,13 @@ export default function ContenedorAlertas() {
                 </span>
             </div>
 
-            {/* Acciones superiores — CENTRADAS (wrapper grid) */}
-            <div style={{ display: "grid", placeItems: "center", margin: "14px 0" }}>
+            <div
+                style={{
+                    display: "grid",
+                    placeItems: "center",
+                    margin: "14px 0",
+                }}
+            >
                 <div
                     style={{
                         display: "flex",
@@ -191,14 +281,12 @@ export default function ContenedorAlertas() {
                         maxWidth: 900,
                     }}
                 >
-                    {/* ← Volver al Menú de Registros (SIN cambios) */}
                     <Button
                         label="Menú de Registros"
                         icon="pi pi-arrow-left"
                         onClick={() => navigate("/MantenimientoAlertas")}
                         style={{ width: 280, height: 44 }}
                     />
-                    {/* ⌂ Volver al Menú Principal (reenviando departamento) */}
                     <Button
                         label="⌂ Volver al Menú Principal"
                         icon="pi pi-home"
@@ -211,7 +299,6 @@ export default function ContenedorAlertas() {
                         }
                         style={{ width: 280, height: 44 }}
                     />
-                    {/* Cerrar sesión */}
                     <Button
                         label="Cerrar sesión"
                         icon="pi pi-sign-out"
@@ -222,7 +309,6 @@ export default function ContenedorAlertas() {
                 </div>
             </div>
 
-            {/* Controles */}
             <div
                 className="flex flex-wrap gap-2 align-items-center justify-content-between"
                 style={{ marginBottom: 12 }}
@@ -269,6 +355,7 @@ export default function ContenedorAlertas() {
                     "equipo",
                     "registro",
                     "periodicidad",
+                    "estado_visual",
                     "estado",
                     "ultimo_mantenimiento",
                     "proximo_mantenimiento",
@@ -286,10 +373,14 @@ export default function ContenedorAlertas() {
                 <Column field="equipo" header="Equipo" sortable />
                 <Column field="registro" header="Registro" />
                 <Column field="periodicidad" header="Periodicidad" />
-                <Column header="Último Mantenimiento" body={(r) => fmtDMY(r.ultimo_mantenimiento)} sortable />
-                <Column header="Próximo Mantenimiento" body={(r) => fmtDMY(r.proximo_mantenimiento)} sortable />
+                <Column
+                    header="Último Mantenimiento"
+                    body={(r) => fmtDMY(r.ultimo_mantenimiento)}
+                    sortable
+                />
+                <Column header="Próximo Mantenimiento" body={proximoBody} sortable />
                 <Column header="Semana" body={semanaBody} />
-                <Column field="estado" header="Estado" />
+                <Column header="Estado" body={estadoBody} />
                 <Column header="Acciones" body={accionesBody} style={{ width: "10rem" }} />
             </DataTable>
         </div>
