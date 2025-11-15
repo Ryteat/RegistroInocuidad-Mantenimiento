@@ -103,6 +103,20 @@ const FORM_MAP = {
     "D-M-G": "/MantenimientoAlertas/Dieta/MezcladoraGeneral",
     "D-B-L": "/MantenimientoAlertas/Dieta/BandasLubricacion",
     "D-CC-G": "/MantenimientoAlertas/Dieta/ContenedoresCascaraGeneral",
+
+    // Crecimiento
+    "CRE-EY-G": "/MantenimientoAlertas/Crecimiento/ExtractoresInyectoresGeneral",
+    "CRE-P-G": "/MantenimientoAlertas/Crecimiento/PanelesGeneral",
+    "CRE-CC-G": "/MantenimientoAlertas/Crecimiento/CadenasConveyorGeneral",
+    "CRE-C-RS": "/MantenimientoAlertas/Crecimiento/CarroRS",
+    "CRE-C-AS": "/MantenimientoAlertas/Crecimiento/CarroAS",
+
+    //Cosecha JV
+    "COS-T-REM": "/MantenimientoAlertas/Cosecha/TamizRevisionEstructuraMalla",
+    "COS-T-M": "/MantenimientoAlertas/Cosecha/TamizMotor",
+    "COS-PC-G": "/MantenimientoAlertas/Cosecha/PanelControlGeneral",
+
+
 };
 
 export default function ContenedorAlertas() {

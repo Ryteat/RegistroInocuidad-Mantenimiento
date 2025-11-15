@@ -70,6 +70,18 @@ import MezcladoraGeneral from "./Components/MantenimientoAlertas/Dieta/Registros
 import BandasLubricacion from "./Components/MantenimientoAlertas/Dieta/Registros/BandasLubricacion.jsx";
 import ContenedoresCascaraGeneral from './Components/MantenimientoAlertas/Dieta/Registros/ContenedoresCascaraGeneral.jsx';
 
+//Crecimiento imports 
+import CrecimientoMA from "./Components/MantenimientoAlertas/Crecimiento/CrecimientoMA.jsx";
+import ExtractoresInyectoresGeneral from "./Components/MantenimientoAlertas/Crecimiento/Registros/ExtractoresInyectoresGeneral.jsx";
+import PanelesGeneral from "./Components/MantenimientoAlertas/Crecimiento/Registros/PanelesGeneral.jsx";
+import CadenasConveyorGeneral from "./Components/MantenimientoAlertas/Crecimiento/Registros/CadenasConveyorGeneral.jsx";
+import CarroRS from "./Components/MantenimientoAlertas/Crecimiento/Registros/CarroRS.jsx";
+import CarroAS from "./Components/MantenimientoAlertas/Crecimiento/Registros/CarroAS.jsx";
+
+//Cosecha imports JV
+import CosechaMA from "./Components/MantenimientoAlertas/Cosecha/CosechaMA.jsx";
+import PanelControlGeneral from "./Components/MantenimientoAlertas/Cosecha/Registros/PanelControlGeneral.jsx";
+
 // ⬇️ Horno del módulo de Alertas (MENÚ)
 import HornoMA from './Components/MantenimientoAlertas/Horno/HornoMA.jsx';
 
@@ -226,14 +238,14 @@ const router = createBrowserRouter(
             { path: `Horno/BandaEntradaGeneral`, element: <BandaEntradaGeneral /> },
             { path: `Horno/VibradorHornoMultilevel`, element: <VibradorHornoMultilevel /> },
             { path: `Horno/LineaGasGLPHornoMultilevel`, element: <LineaGasGLPHornoMultilevel /> },
-            { path: `Horno/TransmisionTurbina`, element: <TransmisionTurbinaHornoMultilevel /> },
+            { path: `Horno/TransmisionTurbinaHornoMultilevel`, element: <TransmisionTurbinaHornoMultilevel /> },
             { path: `Horno/LubricacionBandasHornoMultilevel`, element: <LubricacionBandasHornoMultilevel /> },
             { path: `Horno/SelladoraBandaContinuaGeneral`, element: <SelladoraBandaContinuaGeneral /> },
             { path: `Horno/SensorPT100`, element: <SensorPT100 /> },
             { path: `Horno`, element: <HornoMA /> },
             { path: `Horno/:cat`, element: <HornoMA /> },
 
-            //Dieta con alertas mi gente
+            //Dieta con alertas mi gente JV
             { path: `Dieta`, element: <DietaMA /> },
             { path: `Dieta/BombaSumergibleGeneral`, element: <BombaSumergibleGeneral /> },
             { path: `Dieta/:cat`, element: <DietaMA /> },
@@ -241,7 +253,21 @@ const router = createBrowserRouter(
             { path: `Dieta/BandasLubricacion`, element: <BandasLubricacion /> },
             { path: `Dieta/ContenedoresCascaraGeneral`, element: <ContenedoresCascaraGeneral /> },
 
+            //Crecimiento JV
+            { path: `Crecimiento`, element: <CrecimientoMA /> },
+            { path: `Crecimiento/ExtractoresInyectoresGeneral`, element: <ExtractoresInyectoresGeneral /> },
+            { path: "Crecimiento/:cat", element: <CrecimientoMA /> },
+            { path: `Crecimiento/PanelesGeneral`, element: <PanelesGeneral /> },
+            { path: `Crecimiento/CadenasConveyorGeneral`, element: <CadenasConveyorGeneral /> },
+            { path: `Crecimiento/CarroRS`, element: <CarroRS /> },
+            { path: `Crecimiento/CarroAS`, element: <CarroAS /> },
 
+            //Cosecha JV
+
+            { path: `Cosecha`, element: <CosechaMA /> },
+
+            { path: `Cosecha/PanelControlGeneral`, element: <PanelControlGeneral /> },
+            { path: "Cosecha/:cat", element: <CosechaMA /> },
 
           ],
         },

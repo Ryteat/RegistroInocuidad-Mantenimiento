@@ -27,6 +27,13 @@ const ALLOWED_TABLES = new Set([
     "mto_dieta_mezcladora_general",
     "mto_dieta_bandas_lubricacion",
     "mto_dieta_contenedores_cascara_general",
+    "mto_crecimiento_extractores_inyectores_general",
+    "mto_crecimiento_paneles_general",
+    "mto_crecimiento_cadenas_conveyor_general",
+    "mto_crecimiento_registros_carro_rs",
+    "mto_crecimiento_registros_carro_as",
+
+    "mto_cosecha_panel_control_general",
 
 ]);
 
@@ -138,6 +145,16 @@ export default function NotificationBell({ navigate }) {
             "D-MEZ-G": "/MantenimientoAlertas/Dieta/MezcladoraGeneral",
             "D-B-L": "/MantenimientoAlertas/Dieta/BandasLubricacion",
             "D-CC-G": "/MantenimientoAlertas/Dieta/ContenedoresCascaraGeneral",
+
+            // Crecimiento
+            "CRE-EY-G": "/MantenimientoAlertas/Crecimiento/ExtractoresInyectoresGeneral",
+            "CRE-P-G": "/MantenimientoAlertas/Crecimiento/PanelesGeneral",
+            "CRE-CC-G": "/MantenimientoAlertas/Crecimiento/CadenasConveyorGeneral",
+            "CRE-C-RS": "/MantenimientoAlertas/Crecimiento/CarroRS",
+            "CRE-C-AS": "/MantenimientoAlertas/Crecimiento/CarroAS",
+
+            //Cosecha JV
+            "COS-PC-G": "/MantenimientoAlertas/Cosecha/PanelControlGeneral",
         };
         const ruta = map[pos];
         if (ruta) navigate(ruta);

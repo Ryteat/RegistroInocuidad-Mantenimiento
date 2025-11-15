@@ -42,11 +42,11 @@ const CATEGORIES = [
         key: "Multilevel",
         titulo: "Horno Multilevel",
         botones: [
-            { titulo: "*H-HM-V* Horno Multilevel — Vibrador", ruta: "/MantenimientoAlertas/Horno/VibradorHornoMultilevel" },
-            { titulo: "*H-HM-LG* Horno Multilevel — Línea de Gas GLP", ruta: "/MantenimientoAlertas/Horno/LineaGasGLPHornoMultilevel" },
-            { titulo: "*H-HM-TT* Horno Multilevel — Transmisión de Turbina", ruta: "/MantenimientoAlertas/Horno/TransmisionTurbinaHornoMultilevel" },
-            { titulo: "*H-HM-LB* Horno Multilevel — Lubricación de Bandas", ruta: "/MantenimientoAlertas/Horno/LubricacionBandasHornoMultilevel" },
-            { titulo: "*H-HM-SPT* Horno Multilevel — Sensor PT100 (Trimestral)", ruta: "/MantenimientoAlertas/Horno/SensorPT100" },
+            { titulo: "*H-HM-V* Horno Multilevel - Vibrador", ruta: "/MantenimientoAlertas/Horno/VibradorHornoMultilevel" },
+            { titulo: "*H-HM-LG* Horno Multilevel - Línea de Gas GLP", ruta: "/MantenimientoAlertas/Horno/LineaGasGLPHornoMultilevel" },
+            { titulo: "*H-HM-TT* Horno Multilevel - Transmisión de Turbina", ruta: "/MantenimientoAlertas/Horno/TransmisionTurbinaHornoMultilevel" },
+            { titulo: "*H-HM-LB* Horno Multilevel - Lubricación de Bandas", ruta: "/MantenimientoAlertas/Horno/LubricacionBandasHornoMultilevel" },
+            { titulo: "*H-HM-SPT* Horno Multilevel - Sensor PT100", ruta: "/MantenimientoAlertas/Horno/SensorPT100" },
         ],
     },
     {
@@ -119,7 +119,7 @@ export default function HornoMA() {
                 </div>
                 <h1>Horno - {category ? category.titulo : "Categoría"}</h1>
                 <div className="welcome-message">
-                    <p>Estos son los registros que pertenecen a esta categoría de Horno Multilevel:</p>
+                    <p>Estos son los registros que pertenecen a esta categoría de Horno:</p>
                 </div>
             </header>
 
