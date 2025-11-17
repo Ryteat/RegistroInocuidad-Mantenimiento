@@ -32,7 +32,8 @@ const ALLOWED_TABLES = new Set([
     "mto_crecimiento_cadenas_conveyor_general",
     "mto_crecimiento_registros_carro_rs",
     "mto_crecimiento_registros_carro_as",
-
+    "mto_cosecha_tamiz_revision_estructura_malla",
+    "mto_cosecha_tamiz_motor",
     "mto_cosecha_panel_control_general",
 
 ]);
@@ -155,6 +156,8 @@ export default function NotificationBell({ navigate }) {
 
             //Cosecha JV
             "COS-PC-G": "/MantenimientoAlertas/Cosecha/PanelControlGeneral",
+            "COS-T-M": "/MantenimientoAlertas/Cosecha/TamizMotor",
+            "COS-T-REM": "/MantenimientoAlertas/Cosecha/TamizRevisionEstructuraMalla",
         };
         const ruta = map[pos];
         if (ruta) navigate(ruta);

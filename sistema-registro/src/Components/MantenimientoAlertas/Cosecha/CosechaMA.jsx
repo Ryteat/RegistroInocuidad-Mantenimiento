@@ -18,11 +18,11 @@ const CATEGORIES = [
         botones: [
             {
                 titulo:
-                    "COS-T-REM Tamiz — Revisión de estructura y malla",
+                    "COS-T-REM Tamiz - Revisión de Estructura y Malla",
                 ruta: "/MantenimientoAlertas/Cosecha/TamizRevisionEstructuraMalla",
             },
             {
-                titulo: "COS-T-M Tamiz — Motor",
+                titulo: "COS-T-M Tamiz - Motor",
                 ruta: "/MantenimientoAlertas/Cosecha/TamizMotor",
             },
         ],
@@ -32,7 +32,7 @@ const CATEGORIES = [
         titulo: "Panel de Control",
         botones: [
             {
-                titulo: "COS-PC-G Panel de Control — General",
+                titulo: "COS-PC-G Panel de Control - General",
                 ruta: "/MantenimientoAlertas/Cosecha/PanelControlGeneral",
             },
         ],
@@ -114,14 +114,7 @@ export default function CosechaMA() {
                             </button>
                         ))}
 
-                        <button
-                            className="boton-grid cols-2"
-                            onClick={() =>
-                                navigate("/MantenimientoAlertas/Cosecha")
-                            }
-                        >
-                            Volver a Submenús
-                        </button>
+
                         <button
                             className="boton-grid logout-button cols-2"
                             onClick={() => navigate(-1)}

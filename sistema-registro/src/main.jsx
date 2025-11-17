@@ -81,6 +81,8 @@ import CarroAS from "./Components/MantenimientoAlertas/Crecimiento/Registros/Car
 //Cosecha imports JV
 import CosechaMA from "./Components/MantenimientoAlertas/Cosecha/CosechaMA.jsx";
 import PanelControlGeneral from "./Components/MantenimientoAlertas/Cosecha/Registros/PanelControlGeneral.jsx";
+import TamizMotor from './Components/MantenimientoAlertas/Cosecha/Registros/TamizMotor.jsx';
+import TamizRevisionEstructuraMalla from './Components/MantenimientoAlertas/Cosecha/Registros/TamizRevisionEstructuraMalla.jsx';
 
 // ⬇️ Horno del módulo de Alertas (MENÚ)
 import HornoMA from './Components/MantenimientoAlertas/Horno/HornoMA.jsx';
@@ -226,8 +228,9 @@ const router = createBrowserRouter(
             { path: `Iluminacion`, element: <Iluminacion /> },
             { path: `CuartosElectricos`, element: <CuartosElectricos /> },
 
-            // Horno (módulo de Alertas) — usa HornoMA
+            // los path del sistema de alertas de Horno JV
             { path: `Horno`, element: <HornoMA /> },
+            { path: `Horno/:cat`, element: <HornoMA /> },
             { path: `Horno/SistemaNeumatico`, element: <SistemaNeumatico /> },
             { path: `Horno/MotorReductor`, element: <MotorReductor /> },
             { path: `Horno/Vibrador`, element: <Vibrador /> },
@@ -243,9 +246,9 @@ const router = createBrowserRouter(
             { path: `Horno/SelladoraBandaContinuaGeneral`, element: <SelladoraBandaContinuaGeneral /> },
             { path: `Horno/SensorPT100`, element: <SensorPT100 /> },
             { path: `Horno`, element: <HornoMA /> },
-            { path: `Horno/:cat`, element: <HornoMA /> },
 
-            //Dieta con alertas mi gente JV
+
+            //los path del sistema de alertas de Dieta JV
             { path: `Dieta`, element: <DietaMA /> },
             { path: `Dieta/BombaSumergibleGeneral`, element: <BombaSumergibleGeneral /> },
             { path: `Dieta/:cat`, element: <DietaMA /> },
@@ -253,7 +256,7 @@ const router = createBrowserRouter(
             { path: `Dieta/BandasLubricacion`, element: <BandasLubricacion /> },
             { path: `Dieta/ContenedoresCascaraGeneral`, element: <ContenedoresCascaraGeneral /> },
 
-            //Crecimiento JV
+            //Los path del sistema de alertas de Crecimiento JV
             { path: `Crecimiento`, element: <CrecimientoMA /> },
             { path: `Crecimiento/ExtractoresInyectoresGeneral`, element: <ExtractoresInyectoresGeneral /> },
             { path: "Crecimiento/:cat", element: <CrecimientoMA /> },
@@ -262,12 +265,13 @@ const router = createBrowserRouter(
             { path: `Crecimiento/CarroRS`, element: <CarroRS /> },
             { path: `Crecimiento/CarroAS`, element: <CarroAS /> },
 
-            //Cosecha JV
+            //Los path del sistema de alertas de Cosecha JV
 
             { path: `Cosecha`, element: <CosechaMA /> },
-
-            { path: `Cosecha/PanelControlGeneral`, element: <PanelControlGeneral /> },
             { path: "Cosecha/:cat", element: <CosechaMA /> },
+            { path: `Cosecha/PanelControlGeneral`, element: <PanelControlGeneral /> },
+            { path: `Cosecha/TamizMotor`, element: <TamizMotor /> },
+            { path: `Cosecha/TamizRevisionEstructuraMalla`, element: <TamizRevisionEstructuraMalla /> },
 
           ],
         },

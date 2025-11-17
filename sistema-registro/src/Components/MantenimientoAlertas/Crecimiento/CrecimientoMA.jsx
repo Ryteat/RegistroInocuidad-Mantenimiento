@@ -129,12 +129,6 @@ export default function CrecimientoMA() {
                         ))}
 
                         <button
-                            className="boton-grid cols-2"
-                            onClick={() => navigate("/MantenimientoAlertas/Crecimiento")}
-                        >
-                            Volver a Submenús
-                        </button>
-                        <button
                             className="boton-grid logout-button cols-2"
                             onClick={() => navigate(-1)}
                         >

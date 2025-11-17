@@ -117,6 +117,7 @@ const FORM_MAP = {
     "COS-PC-G": "/MantenimientoAlertas/Cosecha/PanelControlGeneral",
 
 
+
 };
 
 export default function ContenedorAlertas() {
