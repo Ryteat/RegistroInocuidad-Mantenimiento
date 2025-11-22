@@ -59,7 +59,7 @@ const fmtDMYHM = (isoOrDate) => {
 };
 
 // ===== Constantes del registro =====
-const POSICION_ID = "H-EL-V";
+const POSICION_ID = "H-ENF-V";
 const EQUIPO = "ENFRIADOR DE LARVA";
 const REGISTRO = "VIBRADOR";
 const TABLE = "mto_horno_enfriador_vibrador";

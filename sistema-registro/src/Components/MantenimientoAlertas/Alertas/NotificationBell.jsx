@@ -1,44 +1,17 @@
 // src/Components/MantenimientoAlertas/Alertas/NotificationBell.jsx
-import React, { useEffect, useMemo, useRef, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import supabase from "../../../supabaseClient.js";
+
+import "primereact/resources/themes/lara-light-indigo/theme.css";
+import "primeicons/primeicons.css";
+import { Toast } from "primereact/toast";
+import { Dialog } from "primereact/dialog";
 import { Button } from "primereact/button";
 
-// Tablas habilitadas para acciones rápidas
-const ALLOWED_TABLES = new Set([
-    "mto_paneles_electrico",
-    "mto_iluminacion",
-    "mto_cuartos_electricos",
-    "mto_horno_empacadora_sistema_neumatico",
-    "mto_horno_empacadora_motor_reductor",
-    "mto_horno_empacadora_vibrador",
-    "mto_horno_empacadora_motor_reductor_enfriador",
-    "mto_horno_enfriador_motor_reductor",
-    "mto_horno_enfriador_lubricacion_bandas",
-    "mto_horno_enfriador_vibrador",
-    "mto_horno_banda_salida_general",
-    "mto_horno_banda_entrada_general",
-    "mto_horno_vibrador_horno_multilevel",
-    "mto_horno_linea_gas_glp_horno_multilevel",
-    "mto_horno_transmision_turbina_horno_multilevel",
-    "mto_horno_lubricacion_bandas_horno_multilevel",
-    "mto_horno_selladora_banda_continua_general",
-    "mto_horno_multilevel_sensor_pt100",
-    "mto_dieta_bomba_sumergible_general",
-    "mto_dieta_mezcladora_general",
-    "mto_dieta_bandas_lubricacion",
-    "mto_dieta_contenedores_cascara_general",
-    "mto_crecimiento_extractores_inyectores_general",
-    "mto_crecimiento_paneles_general",
-    "mto_crecimiento_cadenas_conveyor_general",
-    "mto_crecimiento_registros_carro_rs",
-    "mto_crecimiento_registros_carro_as",
-    "mto_cosecha_tamiz_revision_estructura_malla",
-    "mto_cosecha_tamiz_motor",
-    "mto_cosecha_panel_control_general",
+import "./NotificationBell.css";
 
-]);
-
-/* ===== Helpers de fecha seguros ===== */
+/* === Helpers básicos de fecha === */
 const parseYMD = (s) => {
     if (!s) return null;
     const [y, m, d] = String(s).split("-").map(Number);
@@ -49,20 +22,6 @@ const toDateISO = (d = new Date()) =>
     `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(
         d.getDate()
     ).padStart(2, "0")}`;
-const addDaysISO = (base, days) => {
-    let d =
-        typeof base === "string" ? parseYMD(base) : base instanceof Date ? new Date(base) : new Date();
-    d.setHours(0, 0, 0, 0);
-    d.setDate(d.getDate() + Number(days || 0));
-    return toDateISO(d);
-};
-const addYearsISO = (base, years) => {
-    let d =
-        typeof base === "string" ? parseYMD(base) : base instanceof Date ? new Date(base) : new Date();
-    d.setHours(0, 0, 0, 0);
-    d.setFullYear(d.getFullYear() + Number(years || 0));
-    return toDateISO(d);
-};
 const fmtDMY = (iso) => {
     const d = parseYMD(iso);
     if (!d) return "—";
@@ -71,364 +30,502 @@ const fmtDMY = (iso) => {
     const yy = d.getFullYear();
     return `${dd}/${mm}/${yy}`;
 };
+const addDays = (ymd, days) => {
+    const b = parseYMD(ymd);
+    b.setDate(b.getDate() + Number(days || 0));
+    return toDateISO(b);
+};
+const addMonths = (ymd, months) => {
+    const b = parseYMD(ymd);
+    b.setMonth(b.getMonth() + Number(months || 0));
+    return toDateISO(b);
+};
 
-export default function NotificationBell({ navigate }) {
-    const [open, setOpen] = useState(false);
+/** Devuelve la siguiente fecha según periodicidad */
+const nextDateByPeriodicidad = (periodicidad, baseDate) => {
+    switch ((periodicidad || "").toUpperCase()) {
+        case "SEMANAL":
+            return addDays(baseDate, 7);
+        case "BIMENSUAL":
+        case "BIMESTRAL":
+            return addMonths(baseDate, 2);
+        case "MENSUAL":
+            return addMonths(baseDate, 1);
+        case "TRIMESTRAL":
+            return addMonths(baseDate, 3);
+        case "SEMESTRAL":
+            return addMonths(baseDate, 6);
+        case "ANUAL":
+            return addMonths(baseDate, 12);
+        default:
+            return addDays(baseDate, 7);
+    }
+};
+
+/**
+ * IMPORTANTE:
+ * Ajusta / extiende esta lista con TODAS las tablas que quieres que aparezcan
+ * en la campanita. Debe coincidir con las tablas que están en vw_alertas_unificado.
+ */
+const ALLOWED_TABLES = [
+    // Infraestructura
+    "mto_paneles_electrico",
+    "mto_iluminacion",
+    "mto_cuartos_electricos",
+    // Horno - Empacadora
+    "mto_horno_empacadora_sistema_neumatico",
+    "mto_horno_empacadora_motor_reductor",
+    "mto_horno_empacadora_vibrador",
+    // Horno - Enfriador
+    "mto_horno_enfriador_motor_reductor",
+    "mto_horno_enfriador_lubricacion_bandas",
+    "mto_horno_enfriador_vibrador",
+    // Horno - Multilevel
+    "mto_horno_multilevel_vibrador",
+    "mto_horno_linea_gas_glp_horno_multilevel",
+    "mto_horno_multilevel_sensor_pt100",
+    // Dieta
+    "mto_dieta_bomba_sumergible_general",
+    "mto_dieta_mezcladora_general",
+    "mto_dieta_bandas_lubricacion",
+    "mto_dieta_contenedores_cascara_general",
+    // Crecimiento
+    "mto_crecimiento_extractores_inyectores_general",
+    "mto_crecimiento_paneles_general",
+    "mto_crecimiento_cadenas_conveyor_general",
+    "mto_crecimiento_carro_rs",
+    "mto_crecimiento_carro_as",
+    // Cosecha
+    "mto_cosecha_panel_control_general",
+    "mto_cosecha_tamiz_motor",
+];
+
+/**
+ * FORM_MAP:
+ * Mapear POSICION_ID base → ruta del formulario.
+ * Usa el ID base (sin el -01/-02) para que funcione con cantidades.
+ */
+const FORM_MAP = {
+    // Crecimiento
+    "CRE-EY-G": "/MantenimientoAlertas/Crecimiento/ExtractoresInyectoresGeneral",
+    "CRE-P-G": "/MantenimientoAlertas/Crecimiento/PanelesGeneral",
+    "CRE-CC-G": "/MantenimientoAlertas/Crecimiento/CadenasConveyorGeneral",
+    "CRE-C-RS": "/MantenimientoAlertas/Crecimiento/CarroRS",
+    "CRE-C-AS": "/MantenimientoAlertas/Crecimiento/CarroAS",
+
+    // Cosecha
+    "COS-PC-G": "/MantenimientoAlertas/Cosecha/PanelControlGeneral",
+    "COS-T-M": "/MantenimientoAlertas/Cosecha/TamizMotor",
+    // "COS-T-REM": "/MantenimientoAlertas/Cosecha/TamizRevisionEstructuraMalla",
+};
+
+/** Recorta un POSICION_ID con consecutivo, ej. COS-T-M-02 → COS-T-M */
+const getBasePosicionId = (posicion_id = "") =>
+    posicion_id.split("-").slice(0, 3).join("-");
+
+export default function NotificationBell() {
+    const navigate = useNavigate();
+    const toast = useRef(null);
+
+    const [alerts, setAlerts] = useState([]);
     const [loading, setLoading] = useState(false);
-    const [items, setItems] = useState([]);
-    const anchorRef = useRef(null);
 
-    const dangerCount = useMemo(
-        () => items.filter((i) => i.estado === "VENCIDO").length,
-        [items]
-    );
+    const [pendingEdit, setPendingEdit] = useState(null);
+    const [showHasNoDialog, setShowHasNoDialog] = useState(false);
 
-    const load = async () => {
+    const [panelOpen, setPanelOpen] = useState(false);
+
+    const showToast = (sev, sum, det, life = 3000) =>
+        toast.current?.show({ severity: sev, summary: sum, detail: det, life });
+
+    const fetchAlerts = async () => {
         try {
             setLoading(true);
             const { data, error } = await supabase
                 .from("vw_alertas_unificado")
                 .select(
-                    "tabla,id,posicion_id,equipo,registro,estado,proximo_mantenimiento"
+                    `
+          tabla,
+          id,
+          posicion_id,
+          equipo,
+          registro,
+          periodicidad,
+          ultimo_mantenimiento,
+          proximo_mantenimiento,
+          estado
+        `
                 )
-                .in("estado", ["VENCIDO", "PROX7"])
-                .order("estado", { ascending: true });
+                .in("tabla", ALLOWED_TABLES)
+                .order("estado", { ascending: true })
+                .order("proximo_mantenimiento", { ascending: true });
+
             if (error) throw error;
-            setItems(data || []);
+            setAlerts(data || []);
+        } catch (e) {
+            console.error(e);
+            showToast("error", "Error", "No se pudieron cargar las alertas");
         } finally {
             setLoading(false);
         }
     };
 
     useEffect(() => {
-        if (open) load();
-    }, [open]);
+        fetchAlerts();
+    }, []);
 
-    useEffect(() => {
-        const onDocClick = (e) => {
-            if (!open) return;
-            if (
-                anchorRef.current &&
-                !anchorRef.current.contains(e.target) &&
-                !e.target.closest?.(".nbell-panel")
-            )
-                setOpen(false);
+    /** Marca registro como completado y crea el nuevo ciclo automático */
+    const completeAndCreateNextCycle = async (tabla, rowFromDb) => {
+        const today = toDateISO();
+        const baseDate = rowFromDb.fecha_registro || today;
+        const nextDate = nextDateByPeriodicidad(rowFromDb.periodicidad, baseDate);
+
+        // 1) Marcar el actual como COMPLETADO
+        const { error: updError } = await supabase
+            .from(tabla)
+            .update({
+                completado: true,
+                fecha_completado: today,
+            })
+            .eq("id", rowFromDb.id);
+
+        if (updError) throw updError;
+
+        // 2) Crear el siguiente registro de mantenimiento (todo pendiente)
+        const nuevoPayload = {
+            fecha_registro: today,
+            hora_registro: null,
+            posicion_id: rowFromDb.posicion_id,
+            equipo: rowFromDb.equipo,
+            registro: rowFromDb.registro,
+            cantidad: rowFromDb.cantidad,
+            tecnico: null,
+            ejecutado: "NO",
+            observaciones:
+                "Registro creado automáticamente. Pendiente de mantenimiento.",
+            periodicidad: rowFromDb.periodicidad,
+            ...Object.fromEntries(
+                Array.from({ length: 14 }, (_, i) => [`respuesta_q${i + 1}`, null])
+            ),
+            ultimo_mantenimiento: null,
+            proximo_mantenimiento: nextDate,
+            completado: false,
+            fecha_completado: null,
         };
-        document.addEventListener("mousedown", onDocClick);
-        return () => document.removeEventListener("mousedown", onDocClick);
-    }, [open]);
 
-    const goToForm = (pos) => {
-        const map = {
-            //Infraestructura de Planta JV
+        const { error: insError } = await supabase
+            .from(tabla)
+            .insert([nuevoPayload]);
 
-            IN1: "/MantenimientoAlertas/PanelElectrico",
-            IN2: "/MantenimientoAlertas/Iluminacion",
-            IN3: "/MantenimientoAlertas/CuartosElectricos",
-            //Horno JV
-            "H-EL-SN": "/MantenimientoAlertas/Horno/SistemaNeumatico",
-            "H-EL-MR": "/MantenimientoAlertas/Horno/MotorReductor",
-            "H-EL-V": "/MantenimientoAlertas/Horno/Vibrador",
-            "H-ENF-MR": "/MantenimientoAlertas/Horno/MotorReductorEnfriador",
-            "H-ENF-LB": "/MantenimientoAlertas/Horno/LubricacionBandasEnfriador",
-            "H-ENF-V": "/MantenimientoAlertas/Horno/VibradorEnfriador",
-            "H-BS-G": "/MantenimientoAlertas/Horno/BandaSalidaGeneral",
-            "H-BE-G": "/MantenimientoAlertas/Horno/BandaEntradaGeneral",
-            "H-V-HM": "/MantenimientoAlertas/Horno/VibradorHornoMultilevel",
-            "H-HM-TT": "/MantenimientoAlertas/Horno/TransmisionTurbinaHornoMultilevel",
-            "H-HM-LB": "/MantenimientoAlertas/Horno/LubricacionBandasHornoMultilevel",
-            "H-SBC-G": "/MantenimientoAlertas/Horno/SelladoraBandaContinuaGeneral",
-            "H-HM-LG": "/MantenimientoAlertas/Horno/LineaGasGLPHornoMultilevel",
-            "H-HM-SPT": "/MantenimientoAlertas/Horno/SensorPT100",
-
-            //Dieta JV
-            "D-BSG-G": "/MantenimientoAlertas/Dieta/BombaSumergibleGeneral",
-            "D-MEZ-G": "/MantenimientoAlertas/Dieta/MezcladoraGeneral",
-            "D-B-L": "/MantenimientoAlertas/Dieta/BandasLubricacion",
-            "D-CC-G": "/MantenimientoAlertas/Dieta/ContenedoresCascaraGeneral",
-
-            // Crecimiento
-            "CRE-EY-G": "/MantenimientoAlertas/Crecimiento/ExtractoresInyectoresGeneral",
-            "CRE-P-G": "/MantenimientoAlertas/Crecimiento/PanelesGeneral",
-            "CRE-CC-G": "/MantenimientoAlertas/Crecimiento/CadenasConveyorGeneral",
-            "CRE-C-RS": "/MantenimientoAlertas/Crecimiento/CarroRS",
-            "CRE-C-AS": "/MantenimientoAlertas/Crecimiento/CarroAS",
-
-            //Cosecha JV
-            "COS-PC-G": "/MantenimientoAlertas/Cosecha/PanelControlGeneral",
-            "COS-T-M": "/MantenimientoAlertas/Cosecha/TamizMotor",
-            "COS-T-REM": "/MantenimientoAlertas/Cosecha/TamizRevisionEstructuraMalla",
-        };
-        const ruta = map[pos];
-        if (ruta) navigate(ruta);
+        if (insError) throw insError;
     };
 
-    const snooze7Days = async (n) => {
-        if (n.estado !== "VENCIDO") return;
-        if (!ALLOWED_TABLES.has(n.tabla)) return;
+    const handleSnooze7d = async (alerta) => {
         try {
-            const today = toDateISO(new Date());
-            const next = addDaysISO(today, 7);
+            if (alerta.estado !== "VENCIDO") return;
+
+            const base = toDateISO();
+            const next = addDays(base, 7);
+
             const { error } = await supabase
-                .from(n.tabla)
+                .from(alerta.tabla)
                 .update({ proximo_mantenimiento: next })
-                .eq("id", n.id);
+                .eq("id", alerta.id);
+
             if (error) throw error;
-            setItems((prev) => prev.filter((it) => !(it.id === n.id && it.tabla === n.tabla)));
+
+            showToast(
+                "success",
+                "+7 días",
+                "Se reprogramó el próximo mantenimiento."
+            );
+            await fetchAlerts();
         } catch (e) {
-            console.error("No se pudo posponer 7 días:", e.message || e);
+            console.error(e);
+            showToast("error", "Error", "No se pudo reprogramar");
         }
     };
 
-    const markCompleted = async (n) => {
-        if (!ALLOWED_TABLES.has(n.tabla)) return;
-        const today = toDateISO(new Date());
+    /** Validar NO + bloquear completar + mostrar dialog si hay problemas */
+    const handleComplete = async (alerta) => {
         try {
-            const { error } = await supabase
-                .from(n.tabla)
-                .update({
-                    estado: "COMPLETADO",
-                    ultimo_mantenimiento: today,
-                    proximo_mantenimiento: null,
-                })
-                .eq("id", n.id);
+            const { data, error } = await supabase
+                .from(alerta.tabla)
+                .select(
+                    `
+          id,
+          posicion_id,
+          equipo,
+          registro,
+          cantidad,
+          periodicidad,
+          fecha_registro,
+          ejecutado,
+          ${Array.from({ length: 14 }, (_, i) => `respuesta_q${i + 1}`).join(
+                        ", "
+                    )}
+        `
+                )
+                .eq("id", alerta.id)
+                .maybeSingle();
 
-            if (error) {
-                const { error: fbErr } = await supabase
-                    .from(n.tabla)
-                    .update({
-                        ultimo_mantenimiento: today,
-                        proximo_mantenimiento: addYearsISO(today, 100), // evitar alerta futuras poniendole 100 años jeje 
-                    })
-                    .eq("id", n.id);
-                if (fbErr) throw fbErr;
+            if (error || !data) {
+                showToast(
+                    "error",
+                    "Error",
+                    "No se pudo leer el registro para validar."
+                );
+                return;
             }
-            setItems((prev) => prev.filter((it) => !(it.id === n.id && it.tabla === n.tabla)));
+
+            const respuestas = Array.from(
+                { length: 14 },
+                (_, i) => data[`respuesta_q${i + 1}`]
+            );
+            const tieneNo = respuestas.some((v) => v === "NO");
+
+            if (data.ejecutado !== "SI" || tieneNo) {
+                setPendingEdit({
+                    tabla: alerta.tabla,
+                    id: alerta.id,
+                    posicion_id: alerta.posicion_id,
+                });
+                setShowHasNoDialog(true);
+                return;
+            }
+
+            await completeAndCreateNextCycle(alerta.tabla, data);
+
+            showToast(
+                "success",
+                "Completado",
+                "Se marcó como COMPLETADO y se creó el nuevo registro de mantenimiento."
+            );
+            await fetchAlerts();
         } catch (e) {
-            console.error("No se pudo completar:", e.message || e);
+            console.error(e);
+            showToast("error", "Error", "No se pudo completar el registro.");
         }
     };
+
+    const goToRegistro = () => {
+        if (!pendingEdit) {
+            setShowHasNoDialog(false);
+            return;
+        }
+        const baseId = getBasePosicionId(pendingEdit.posicion_id);
+        const ruta = FORM_MAP[baseId];
+
+        if (!ruta) {
+            showToast(
+                "warn",
+                "Ruta no configurada",
+                `No hay ruta mapeada para el ID base ${baseId}.`
+            );
+            setShowHasNoDialog(false);
+            return;
+        }
+
+        navigate(ruta, {
+            state: { focusId: pendingEdit.id },
+        });
+        setShowHasNoDialog(false);
+    };
+
+    const colorByEstado = (estado) => {
+        switch (estado) {
+            case "VENCIDO":
+                return "#fee2e2";
+            case "PROX7":
+                return "#fef3c7";
+            case "COMPLETADO":
+                return "#dcfce7";
+            default:
+                return "#e0f2fe";
+        }
+    };
+
+    const badgeCount = alerts.filter(
+        (a) => a.estado === "VENCIDO" || a.estado === "PROX7"
+    ).length;
 
     return (
-        <div ref={anchorRef} style={{ position: "relative" }}>
-            {/* Botón campana */}
-            <button
-                onClick={() => setOpen((o) => !o)}
-                title="Notificaciones"
-                style={{
-                    position: "relative",
-                    width: 40,
-                    height: 40,
-                    borderRadius: "999px",
-                    border: "none",
-                    background: "#f1f5f9",
-                    cursor: "pointer",
-                    display: "grid",
-                    placeItems: "center",
-                    boxShadow: "0 1px 2px rgba(0,0,0,.08)",
-                }}
-            >
-                <i className="pi pi-bell" style={{ fontSize: 18 }} />
-                {!!items.length && (
-                    <span
-                        style={{
-                            position: "absolute",
-                            top: -2,
-                            right: -2,
-                            background: dangerCount ? "#dc2626" : "#64748b",
-                            color: "white",
-                            borderRadius: 999,
-                            fontSize: 11,
-                            minWidth: 18,
-                            height: 18,
-                            padding: "0 6px",
-                            display: "grid",
-                            placeItems: "center",
-                            border: "2px solid white",
-                        }}
-                    >
-                        {items.length}
-                    </span>
-                )}
-            </button>
+        <>
+            <Toast ref={toast} />
 
-            {/* Panel grande y legible */}
-            {open && (
-                <div
-                    className="nbell-panel"
-                    style={{
-                        position: "absolute",
-                        top: 48,
-                        right: 0,
-                        width: 768,                // ← más ancho
-                        maxWidth: "calc(100vw - 24px)",
-                        background: "white",
-                        borderRadius: 12,
-                        boxShadow: "0 10px 30px rgba(0,0,0,.12)",
-                        border: "1px solid #e5e7eb",
-                        padding: 16,
-                        zIndex: 50,
-                    }}
+            {/* Campanita + panel abajo */}
+            <div className="notification-bell-wrapper">
+                <button
+                    className="notification-bell-button"
+                    onClick={() => setPanelOpen((v) => !v)}
                 >
-                    {/* Header */}
-                    <div
-                        style={{
-                            display: "flex",
-                            alignItems: "center",
-                            justifyContent: "space-between",
-                            marginBottom: 8,
-                        }}
-                    >
-                        <div style={{ fontWeight: 700, fontSize: 18, color: "#111827" }}>
-                            Notificaciones
-                        </div>
-                        <div style={{ display: "flex", gap: 8 }}>
-                            <button
-                                onClick={load}
-                                title="Actualizar"
-                                style={{
-                                    border: "none",
-                                    background: "transparent",
-                                    cursor: "pointer",
-                                    padding: 6,
-                                    borderRadius: 8,
-                                }}
-                            >
-                                <i
-                                    className={`pi ${loading ? "pi-spin pi-spinner" : "pi-refresh"}`}
-                                    style={{ fontSize: 16 }}
-                                />
-                            </button>
-                            <button
-                                onClick={() => setOpen(false)}
-                                title="Cerrar"
-                                style={{
-                                    border: "none",
-                                    background: "transparent",
-                                    cursor: "pointer",
-                                    padding: 6,
-                                    borderRadius: 8,
-                                }}
-                            >
-                                <i className="pi pi-times" style={{ fontSize: 16 }} />
-                            </button>
-                        </div>
+                    <i className="pi pi-bell" />
+                    {badgeCount > 0 && (
+                        <span className="notification-bell-badge">
+                            {badgeCount}
+                        </span>
+                    )}
+                </button>
+            </div>
+
+            {panelOpen && (
+                <div className="notification-bell-panel">
+                    <div className="notification-bell-header">
+                        <span>Alertas de mantenimiento</span>
+                        <button
+                            className="notification-bell-close"
+                            onClick={() => setPanelOpen(false)}
+                        >
+                            <i className="pi pi-times" />
+                        </button>
                     </div>
 
-                    <div style={{ height: 1, background: "#e5e7eb", margin: "8px 0 12px" }} />
-
-                    <div
-                        style={{
-                            display: "flex",
-                            flexDirection: "column",
-                            gap: 12,
-                            maxHeight: 560,        // ← más alto
-                            overflowY: "auto",
-                            paddingRight: 4,
-                        }}
-                    >
-                        {!items.length && !loading && (
-                            <div
-                                style={{
-                                    color: "#6b7280",
-                                    fontSize: 14,
-                                    textAlign: "center",
-                                    padding: "12px 0",
-                                }}
-                            >
-                                Sin notificaciones pendientes.
-                            </div>
+                    <div className="notification-bell-panel-scroll">
+                        {loading && <p>Cargando alertas...</p>}
+                        {!loading && !alerts.length && (
+                            <p>No hay alertas pendientes.</p>
                         )}
 
-                        {items.map((n) => (
-                            <div
-                                key={`${n.tabla}-${n.id}`}
-                                style={{
-                                    background: "#f8fafc",
-                                    border: "1px solid #e5e7eb",
-                                    borderRadius: 10,
-                                    padding: 14,
-                                    display: "grid",
-                                    gridTemplateColumns: "1fr auto",
-                                    gap: 12,
-                                    alignItems: "center",
-                                }}
-                            >
-                                <div style={{ minWidth: 0 }}>
-                                    <div
-                                        style={{
-                                            display: "flex",
-                                            gap: 10,
-                                            alignItems: "center",
-                                            marginBottom: 6,
-                                            flexWrap: "wrap",
-                                        }}
-                                    >
+                        {!loading &&
+                            alerts.map((a) => (
+                                <div
+                                    key={`${a.tabla}-${a.id}`}
+                                    className="notification-card"
+                                    style={{
+                                        backgroundColor: colorByEstado(a.estado),
+                                    }}
+                                >
+                                    <div className="flex justify-content-between align-items-center mb-2">
+                                        <div>
+                                            <strong>{a.posicion_id}</strong>
+                                            <div
+                                                style={{ fontSize: "0.85rem" }}
+                                            >
+                                                {a.equipo} — {a.registro} (
+                                                {a.periodicidad || "—"})
+                                            </div>
+                                        </div>
                                         <span
                                             style={{
-                                                background: n.estado === "VENCIDO" ? "#fee2e2" : "#dbeafe",
-                                                color: n.estado === "VENCIDO" ? "#991b1b" : "#1e40af",
-                                                fontSize: 12,
+                                                fontSize: "0.75rem",
                                                 fontWeight: 700,
-                                                padding: "4px 8px",
+                                                padding: "2px 6px",
                                                 borderRadius: 999,
+                                                background:
+                                                    a.estado === "VENCIDO"
+                                                        ? "#b91c1c"
+                                                        : a.estado === "PROX7"
+                                                            ? "#d97706"
+                                                            : a.estado ===
+                                                                "COMPLETADO"
+                                                                ? "#15803d"
+                                                                : "#0369a1",
+                                                color: "white",
                                             }}
                                         >
-                                            {n.estado}
+                                            {a.estado}
                                         </span>
-                                        <div
-                                            style={{
-                                                fontWeight: 700,
-                                                color: "#111827",
-                                                // ← sin recorte: se envuelve y se lee completo
-                                                whiteSpace: "normal",
-                                                wordBreak: "break-word",
-                                                fontSize: 15,
-                                                lineHeight: 1.25,
-                                            }}
-                                        >
-                                            {n.posicion_id} — {n.equipo}
+                                    </div>
+
+                                    <div
+                                        style={{
+                                            fontSize: "0.85rem",
+                                            marginBottom: 8,
+                                        }}
+                                    >
+                                        <div>
+                                            <b>Último:</b>{" "}
+                                            {fmtDMY(a.ultimo_mantenimiento)}
+                                        </div>
+                                        <div>
+                                            <b>Próximo:</b>{" "}
+                                            {fmtDMY(a.proximo_mantenimiento)}
                                         </div>
                                     </div>
 
-                                    <div style={{ color: "#374151", fontSize: 14, lineHeight: 1.5 }}>
-                                        <b>Fecha objetivo:</b> {fmtDMY(n.proximo_mantenimiento)}
-                                        {n.registro ? (
-                                            <> • <b>Registro:</b> <i>{n.registro}</i></>
-                                        ) : null}
+                                    <div className="flex gap-2">
+                                        <Button
+                                            label="Abrir formulario"
+                                            icon="pi pi-external-link"
+                                            text
+                                            onClick={() => {
+                                                const baseId =
+                                                    getBasePosicionId(
+                                                        a.posicion_id
+                                                    );
+                                                const ruta = FORM_MAP[baseId];
+                                                if (!ruta) {
+                                                    showToast(
+                                                        "warn",
+                                                        "Ruta no configurada",
+                                                        `No hay ruta mapeada para el ID base ${baseId}.`
+                                                    );
+                                                    return;
+                                                }
+                                                navigate(ruta, {
+                                                    state: { focusId: a.id },
+                                                });
+                                            }}
+                                        />
+                                        <Button
+                                            label="Completar"
+                                            icon="pi pi-check"
+                                            text
+                                            onClick={() => handleComplete(a)}
+                                        />
+                                        {a.estado === "VENCIDO" && (
+                                            <Button
+                                                label="+7 días"
+                                                icon="pi pi-clock"
+                                                text
+                                                onClick={() =>
+                                                    handleSnooze7d(a)
+                                                }
+                                            />
+                                        )}
                                     </div>
                                 </div>
-
-                                <div style={{ display: "flex", gap: 8 }}>
-                                    {n.estado === "VENCIDO" && (
-                                        <Button
-                                            icon="pi pi-plus"
-                                            tooltip="Posponer 7 días"
-                                            onClick={() => snooze7Days(n)}
-                                            size="small"
-                                            outlined
-                                        />
-                                    )}
-                                    <Button
-                                        icon="pi pi-check"
-                                        tooltip="Marcar como completado"
-                                        onClick={() => markCompleted(n)}
-                                        size="small"
-                                        severity="success"
-                                        outlined
-                                    />
-                                    <Button
-                                        label="Abrir"
-                                        icon="pi pi-external-link"
-                                        onClick={() => goToForm(n.posicion_id)}
-                                        size="small"
-                                    />
-                                </div>
-                            </div>
-                        ))}
+                            ))}
                     </div>
                 </div>
             )}
-        </div>
+
+            {/* Dialog cuando hay NO o no ejecutado */}
+            <Dialog
+                visible={showHasNoDialog}
+                onHide={() => setShowHasNoDialog(false)}
+                header="Registro con puntos pendientes"
+                style={{ width: "40vw", maxWidth: 600 }}
+                modal
+            >
+                <p>
+                    Este registro tiene respuestas en <b>NO</b> o no ha sido
+                    ejecutado. Debe corregir el registro antes de marcarlo como{" "}
+                    <b>Completado</b>.
+                </p>
+
+                {pendingEdit && (
+                    <>
+                        <p className="mt-3">
+                            <b>ID:</b> {pendingEdit.posicion_id}
+                        </p>
+
+                        <div className="flex justify-content-end gap-2 mt-4">
+                            <Button
+                                label="Cerrar"
+                                icon="pi pi-times"
+                                outlined
+                                onClick={() => setShowHasNoDialog(false)}
+                            />
+                            <Button
+                                label="Ir al registro"
+                                icon="pi pi-external-link"
+                                onClick={goToRegistro}
+                            />
+                        </div>
+                    </>
+                )}
+            </Dialog>
+        </>
     );
 }

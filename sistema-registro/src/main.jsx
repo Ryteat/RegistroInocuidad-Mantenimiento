@@ -43,6 +43,7 @@ import PagesMantenimientoAlertas from './pages/MantenimientoAlertas/PagesManteni
 import MantenimientoAlertas from './Components/MantenimientoAlertas/MantenimientoAlertas.jsx';
 import ContenedorAlertas from './Components/MantenimientoAlertas/Alertas/ContenedorAlertas.jsx';
 
+
 //Infra de planta ;)
 import InfraestructuraDePlanta from './Components/MantenimientoAlertas/InfraestructuraDePlanta/InfraestructuraDePlanta.jsx';
 import PanelElectrico from './Components/MantenimientoAlertas/InfraestructuraDePlanta/Registros/PanelElectrico.jsx';
@@ -222,7 +223,8 @@ const router = createBrowserRouter(
 
             { path: `Alertas`, element: <ContenedorAlertas /> },
 
-            // Infraestructura
+            // los path del sistema de alertas de Infraestructura de Planta JV
+
             { path: `Infraestructura`, element: <InfraestructuraDePlanta /> },
             { path: `PanelElectrico`, element: <PanelElectrico /> },
             { path: `Iluminacion`, element: <Iluminacion /> },
@@ -275,6 +277,7 @@ const router = createBrowserRouter(
 
           ],
         },
+
 
 
         // Horno

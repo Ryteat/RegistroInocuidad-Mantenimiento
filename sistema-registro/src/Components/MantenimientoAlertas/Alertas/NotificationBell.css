@@ -1,0 +1,149 @@
+/* Contenedor general de la campanita */
+.notification-bell-wrapper {
+    position: fixed;
+    /* siempre flotando */
+    bottom: 24px;
+    right: 24px;
+    z-index: 5000;
+    /* por encima de tablas/paneles */
+}
+
+/* Botón redondo de la campana */
+.notification-bell-button {
+    width: 48px;
+    height: 48px;
+    border-radius: 999px;
+    border: none;
+    outline: none;
+    cursor: pointer;
+    background: #3b82f6;
+    color: #ffffff;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+    position: relative;
+    transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+
+.notification-bell-button:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 6px 16px rgba(0, 0, 0, 0.25);
+}
+
+/* Badge con cantidad de alertas */
+.notification-bell-badge {
+    position: absolute;
+    top: -4px;
+    right: -4px;
+    min-width: 18px;
+    height: 18px;
+    border-radius: 999px;
+    background: #ef4444;
+    color: #ffffff;
+    font-size: 10px;
+    font-weight: 700;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border: 2px solid #ffffff;
+}
+
+/* Panel que se abre al presionar la campanita */
+.notification-bell-panel {
+    position: fixed;
+    bottom: 84px;
+    /* un poco arriba del botón */
+    right: 24px;
+    width: 340px;
+    max-height: 60vh;
+    background: #ffffff;
+    border-radius: 12px;
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.25);
+    padding: 12px 0;
+    /* dejamos espacio para el scroll interno */
+    z-index: 5001;
+    /* mayor que el wrapper */
+    font-size: 0.85rem;
+}
+
+/* Header del panel */
+.notification-bell-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin: 0 0.75rem 8px 0.75rem;
+    font-weight: 600;
+}
+
+.notification-bell-close {
+    border: none;
+    background: transparent;
+    cursor: pointer;
+    color: #6b7280;
+}
+
+.notification-bell-close:hover {
+    color: #111827;
+}
+
+/* Contenido interno del panel (zona scrolleable) */
+.notification-bell-panel p {
+    margin: 0.5rem 1rem;
+    font-size: 0.85rem;
+    color: #4b5563;
+}
+
+.notification-bell-panel-scroll {
+    max-height: calc(60vh - 40px);
+    /* resta header */
+    overflow-y: auto;
+}
+
+/* Scrollbar fino */
+.notification-bell-panel-scroll::-webkit-scrollbar {
+    width: 6px;
+}
+
+.notification-bell-panel-scroll::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+.notification-bell-panel-scroll::-webkit-scrollbar-thumb {
+    background: #cbd5f5;
+    border-radius: 999px;
+}
+
+/* Tarjeta individual de notificación */
+.notification-card {
+    margin: 0.35rem 0.75rem 0.6rem 0.75rem;
+    padding: 0.6rem 0.75rem;
+    border-radius: 10px;
+    border: 1px solid #e5e7eb;
+    font-size: 0.85rem;
+}
+
+/* Ajuste de botones dentro de la tarjeta */
+.notification-card .p-button {
+    font-size: 0.75rem;
+    padding: 0.25rem 0.5rem;
+}
+
+.notification-card .p-button .p-button-icon {
+    font-size: 0.65rem;
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+    .notification-bell-wrapper {
+        bottom: 16px;
+        right: 16px;
+    }
+
+    .notification-bell-panel {
+        right: 8px;
+        left: 8px;
+        width: auto;
+        max-width: none;
+    }
+}

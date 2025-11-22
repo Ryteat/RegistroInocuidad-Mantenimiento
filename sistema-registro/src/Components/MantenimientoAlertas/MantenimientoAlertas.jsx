@@ -46,6 +46,7 @@ export default function MantenimientoAlertas() {
                         <p>Este es el Menú de Registros del Sistema de Mantenimiento por Áreas.</p>
                     </div>
 
+
                     {/* Botonera principal (áreas) */}
                     <div className="grid-botones">
                         {secciones.map((s, i) => (

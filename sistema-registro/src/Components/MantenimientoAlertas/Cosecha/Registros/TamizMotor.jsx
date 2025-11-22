@@ -18,7 +18,7 @@ import { Checkbox } from "primereact/checkbox";
 import * as XLSX from "xlsx";
 import useCanReview from "../../../Inocuidad/Registros/Hooks/useCanReview.js";
 
-/* ===== Helpers de fecha (mismo patrón que el resto) ===== */
+/* ===== Helpers de fecha ===== */
 const parseYMD = (s) => {
     if (!s) return null;
     const [y, m, d] = String(s).split("-").map(Number);
@@ -65,7 +65,7 @@ const addMonths = (ymd, months) => {
 };
 
 /* ===== Constantes de este registro (COS-T-M) ===== */
-const POSICION_ID = "COS-T-M";
+const POSICION_ID_BASE = "COS-T-M";
 const EQUIPO = "TAMIZ";
 const REGISTRO = "MOTOR";
 const TABLE = "mto_cosecha_tamiz_motor";
@@ -80,7 +80,14 @@ const PERIODOS = [
     { label: "Semestral", value: "SEMESTRAL" },
 ];
 
-/* ===== Preguntas TRIMESTRAL (texto literal) ===== */
+// Tamiz Motor tiene 3 cantidades
+const CANTIDAD_OPTIONS = [
+    { label: "1", value: 1 },
+    { label: "2", value: 2 },
+    { label: "3", value: 3 },
+];
+
+/* ===== Preguntas TRIMESTRAL ===== */
 const Q_TRIMESTRAL = [
     { key: "q1", label: "Revisar y verificar estado general del motor, limpieza" },
     { key: "q2", label: "Revisar y verificar estado general del motor, pintura" },
@@ -119,7 +126,7 @@ const Q_TRIMESTRAL = [
     },
 ];
 
-/* ===== Preguntas SEMESTRAL (texto literal) ===== */
+/* ===== Preguntas SEMESTRAL ===== */
 const Q_SEMESTRAL = [
     { key: "q1", label: "Desarme el motor, no dañe el bobinado" },
     { key: "q2", label: "Lavar, secar y barnizar el bobinado" },
@@ -138,10 +145,10 @@ const getQuestionsFor = (periodicidad) => {
 const emptyForm = () => ({
     fecha_registro: toDateISO(),
     hora_registro: toHM(),
-    posicion_id: POSICION_ID,
+    posicion_id: POSICION_ID_BASE,
     equipo: EQUIPO,
     registro: REGISTRO,
-    cantidad: "",
+    cantidad: null,
     tecnico: "",
     ejecutado: "",
     observaciones: "",
@@ -163,11 +170,18 @@ export default function TamizMotor() {
     const [selected, setSelected] = useState([]);
     const [globalFilter, setGlobalFilter] = useState("");
     const [loading, setLoading] = useState(false);
+
     const [dialogOpen, setDialogOpen] = useState(false);
     const [submitted, setSubmitted] = useState(false);
     const [form, setForm] = useState(emptyForm());
+    const [editingId, setEditingId] = useState(null);
+
     const [filtroRevisado, setFiltroRevisado] = useState("all");
     const { canReview, username } = useCanReview();
+
+    // Dialog de VER
+    const [viewDialogOpen, setViewDialogOpen] = useState(false);
+    const [viewRecord, setViewRecord] = useState(null);
 
     const showToast = (sev, sum, det, life = 3000) =>
         toast.current?.show({ severity: sev, summary: sum, detail: det, life });
@@ -214,13 +228,49 @@ export default function TamizMotor() {
 
     const openNew = () => {
         setForm(emptyForm());
+        setEditingId(null);
         setSubmitted(false);
         setDialogOpen(true);
+    };
+
+    const openEdit = (row) => {
+        // reconstruir items desde respuesta_q#
+        const baseQuestions = getQuestionsFor(row.periodicidad);
+        const items = {};
+        baseQuestions.forEach((q, idx) => {
+            const col = `respuesta_q${idx + 1}`;
+            items[q.key] = { respuesta: row[col] || "" };
+        });
+
+        setForm({
+            fecha_registro: row.fecha_registro || toDateISO(),
+            hora_registro: row.hora_registro || toHM(),
+            posicion_id: row.posicion_id || POSICION_ID_BASE,
+            equipo: row.equipo || EQUIPO,
+            registro: row.registro || REGISTRO,
+            cantidad: row.cantidad ? Number(row.cantidad) : null,
+            tecnico: row.tecnico || "",
+            ejecutado: row.ejecutado || "",
+            observaciones: row.observaciones || "",
+            periodicidad: row.periodicidad || "",
+            items,
+            fecha_correccion_preview: fmtDMYHM(row.created_at),
+        });
+
+        setEditingId(row.id);
+        setSubmitted(false);
+        setDialogOpen(true);
+    };
+
+    const openView = (row) => {
+        setViewRecord(row);
+        setViewDialogOpen(true);
     };
 
     const hideDialog = () => {
         setDialogOpen(false);
         setSubmitted(false);
+        setEditingId(null);
     };
 
     const onChange = (field, value) =>
@@ -247,6 +297,7 @@ export default function TamizMotor() {
     const validate = () => {
         const errs = [];
         if (!form.periodicidad) errs.push("Seleccione la periodicidad.");
+        if (!form.cantidad) errs.push("Seleccione la cantidad.");
         if (!form.tecnico?.trim())
             errs.push("El campo Técnico es requerido.");
         if (!form.ejecutado)
@@ -276,7 +327,6 @@ export default function TamizMotor() {
 
             let proximo;
             if (form.ejecutado === "NO") {
-                // fallback corto cuando NO se ejecuta
                 proximo = addDays(baseDate, 7);
             } else if (form.periodicidad === "TRIMESTRAL") {
                 proximo = addMonths(baseDate, 3);
@@ -286,15 +336,17 @@ export default function TamizMotor() {
                 proximo = addDays(baseDate, 7);
             }
 
+            const cantidadNum = Number(form.cantidad);
+            const sufijo = String(cantidadNum).padStart(2, "0");
+            const posicionCompleta = `${POSICION_ID_BASE}-${sufijo}`;
+
             const payload = {
                 fecha_registro: form.fecha_registro,
                 hora_registro: form.hora_registro,
-                posicion_id: POSICION_ID,
+                posicion_id: posicionCompleta,
                 equipo: EQUIPO,
                 registro: REGISTRO,
-                cantidad: form.cantidad
-                    ? Number(String(form.cantidad).replace(/\D/g, ""))
-                    : null,
+                cantidad: cantidadNum || null,
                 tecnico: form.tecnico,
                 ejecutado: form.ejecutado,
                 observaciones: form.observaciones || null,
@@ -311,11 +363,24 @@ export default function TamizMotor() {
                 proximo_mantenimiento: proximo,
             };
 
-            const { error } = await supabase.from(TABLE).insert([payload]);
+            let error;
+            if (editingId) {
+                ({ error } = await supabase
+                    .from(TABLE)
+                    .update(payload)
+                    .eq("id", editingId));
+            } else {
+                ({ error } = await supabase.from(TABLE).insert([payload]));
+            }
             if (error) throw error;
 
-            showToast("success", "Éxito", "Registro guardado");
+            showToast(
+                "success",
+                "Éxito",
+                editingId ? "Registro actualizado" : "Registro guardado"
+            );
             setDialogOpen(false);
+            setEditingId(null);
             await fetchRows();
         } catch (e) {
             console.error(e);
@@ -417,6 +482,7 @@ export default function TamizMotor() {
             equipo: r.equipo,
             registro: r.registro ?? "",
             periodicidad: r.periodicidad ?? "",
+            cantidad: r.cantidad ?? "",
             ultimo_mantenimiento: fmtDMY(r.ultimo_mantenimiento),
             proximo_mantenimiento: fmtDMY(r.proximo_mantenimiento),
             tecnico: r.tecnico ?? "",
@@ -440,6 +506,25 @@ export default function TamizMotor() {
 
     const activeQuestions = getQuestionsFor(form.periodicidad);
 
+    const accionesTemplate = (row) => (
+        <div className="flex gap-2">
+            <Button
+                label="Ver"
+                icon="pi pi-eye"
+                text
+                onClick={() => openView(row)}
+            />
+            <Button
+                label="Editar"
+                icon="pi pi-pencil"
+                text
+                onClick={() => openEdit(row)}
+            />
+        </div>
+    );
+
+    const viewQuestionsForRow = (row) => getQuestionsFor(row.periodicidad || "");
+
     return (
         <div className="controlrendcosechayfrass-container">
             <Toast ref={toast} />
@@ -450,7 +535,7 @@ export default function TamizMotor() {
 
             <div className="welcome-message">
                 <p>
-                    <b>Posición (ID):</b> {POSICION_ID} &nbsp; | &nbsp;{" "}
+                    <b>Posición base (ID):</b> {POSICION_ID_BASE} &nbsp; | &nbsp;{" "}
                     <b>Equipo:</b> {EQUIPO} &nbsp; | &nbsp;
                     <b>Registro:</b> {REGISTRO}
                 </p>
@@ -505,6 +590,7 @@ export default function TamizMotor() {
                 <Column field="posicion_id" header="Posición" sortable />
                 <Column field="equipo" header="Equipo" sortable />
                 <Column field="registro" header="Registro" />
+                <Column field="cantidad" header="Cant." sortable />
                 <Column field="periodicidad" header="Periodicidad" />
                 <Column
                     header="Último Mto."
@@ -527,12 +613,23 @@ export default function TamizMotor() {
                     body={revisadoTemplate}
                     style={{ width: "10rem", textAlign: "center" }}
                 />
+                <Column
+                    header="Acciones"
+                    body={accionesTemplate}
+                    exportable={false}
+                    style={{ width: "14rem" }}
+                />
             </DataTable>
 
+            {/* Dialog NUEVO / EDITAR */}
             <Dialog
                 visible={dialogOpen}
                 style={{ width: "72vw", maxWidth: 1100 }}
-                header="Nuevo registro — Tamiz (Motor)"
+                header={
+                    editingId
+                        ? "Editar registro — Tamiz (Motor)"
+                        : "Nuevo registro — Tamiz (Motor)"
+                }
                 modal
                 onHide={hideDialog}
                 footer={
@@ -589,12 +686,12 @@ export default function TamizMotor() {
                     </div>
 
                     <div className="field col-6 md:col-3">
-                        <label className="font-bold">Posición (ID)</label>
-                        <InputText value={form.posicion_id} disabled />
+                        <label className="font-bold">Posición base</label>
+                        <InputText value={POSICION_ID_BASE} disabled />
                     </div>
                     <div className="field col-6 md:col-3">
                         <label className="font-bold">Equipo</label>
-                        <InputText value={form.equipo} disabled />
+                        <InputText value={EQUIPO} disabled />
                     </div>
 
                     <div className="field col-6 md:col-3">
@@ -613,18 +710,17 @@ export default function TamizMotor() {
                         />
                     </div>
                     <div className="field col-6 md:col-3">
-                        <label className="font-bold">Cantidad (referencia)</label>
-                        <InputText
+                        <label className="font-bold">
+                            Cantidad* (Tamiz 1–3){" "}
+                            {submitted && !form.cantidad && (
+                                <small className="p-error"> Requerido</small>
+                            )}
+                        </label>
+                        <Dropdown
                             value={form.cantidad}
-                            onChange={(e) =>
-                                onChange(
-                                    "cantidad",
-                                    e.target.value
-                                        ? e.target.value.replace(/\D/g, "")
-                                        : ""
-                                )
-                            }
-                            placeholder="Ej. 1"
+                            options={CANTIDAD_OPTIONS}
+                            onChange={(e) => onChange("cantidad", e.value)}
+                            placeholder="Seleccione"
                         />
                     </div>
 
@@ -738,6 +834,76 @@ export default function TamizMotor() {
                         />
                     </div>
                 </div>
+            </Dialog>
+
+            {/* Dialog VER */}
+            <Dialog
+                visible={viewDialogOpen}
+                onHide={() => setViewDialogOpen(false)}
+                header="Detalle del registro"
+                style={{ width: "60vw", maxWidth: 900 }}
+                modal
+            >
+                {!viewRecord ? (
+                    <p>No hay datos para mostrar.</p>
+                ) : (
+                    <>
+                        <p>
+                            <b>ID:</b> {viewRecord.posicion_id} &nbsp; | &nbsp;
+                            <b>Equipo:</b> {viewRecord.equipo} &nbsp; | &nbsp;
+                            <b>Registro:</b> {viewRecord.registro} &nbsp; | &nbsp;
+                            <b>Periodicidad:</b> {viewRecord.periodicidad}
+                        </p>
+                        <p>
+                            <b>Fecha intervención:</b>{" "}
+                            {fmtDMY(viewRecord.fecha_registro)} &nbsp; | &nbsp;
+                            <b>Hora:</b> {viewRecord.hora_registro || "—"}
+                        </p>
+                        <p>
+                            <b>Técnico:</b> {viewRecord.tecnico || "—"}
+                        </p>
+
+                        <hr />
+
+                        <div className="grid">
+                            {viewQuestionsForRow(viewRecord).map((q, idx) => {
+                                const col = `respuesta_q${idx + 1}`;
+                                const val = viewRecord[col] || "—";
+                                return (
+                                    <div
+                                        key={q.key}
+                                        className="col-12 md:col-6"
+                                        style={{ marginBottom: 8 }}
+                                    >
+                                        <div
+                                            style={{
+                                                fontSize: "0.85rem",
+                                                fontWeight: 600,
+                                            }}
+                                        >
+                                            {q.label}
+                                        </div>
+                                        <div
+                                            style={{
+                                                marginTop: 2,
+                                                fontSize: "0.85rem",
+                                            }}
+                                        >
+                                            Respuesta:{" "}
+                                            <b>{val === "SI" || val === "NO" ? val : "—"}</b>
+                                        </div>
+                                    </div>
+                                );
+                            })}
+                        </div>
+
+                        <hr />
+                        <p>
+                            <b>Observaciones:</b>{" "}
+                            {viewRecord.observaciones || "—"}
+                        </p>
+                    </>
+                )}
             </Dialog>
         </div>
     );
