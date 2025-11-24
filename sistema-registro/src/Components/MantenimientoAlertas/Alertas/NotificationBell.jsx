@@ -35,32 +35,6 @@ const addDays = (ymd, days) => {
     b.setDate(b.getDate() + Number(days || 0));
     return toDateISO(b);
 };
-const addMonths = (ymd, months) => {
-    const b = parseYMD(ymd);
-    b.setMonth(b.getMonth() + Number(months || 0));
-    return toDateISO(b);
-};
-
-/** Devuelve la siguiente fecha según periodicidad */
-const nextDateByPeriodicidad = (periodicidad, baseDate) => {
-    switch ((periodicidad || "").toUpperCase()) {
-        case "SEMANAL":
-            return addDays(baseDate, 7);
-        case "BIMENSUAL":
-        case "BIMESTRAL":
-            return addMonths(baseDate, 2);
-        case "MENSUAL":
-            return addMonths(baseDate, 1);
-        case "TRIMESTRAL":
-            return addMonths(baseDate, 3);
-        case "SEMESTRAL":
-            return addMonths(baseDate, 6);
-        case "ANUAL":
-            return addMonths(baseDate, 12);
-        default:
-            return addDays(baseDate, 7);
-    }
-};
 
 /**
  * IMPORTANTE:
@@ -107,9 +81,11 @@ const ALLOWED_TABLES = [
  */
 const FORM_MAP = {
     // Crecimiento
-    "CRE-EY-G": "/MantenimientoAlertas/Crecimiento/ExtractoresInyectoresGeneral",
+    "CRE-EY-G":
+        "/MantenimientoAlertas/Crecimiento/ExtractoresInyectoresGeneral",
     "CRE-P-G": "/MantenimientoAlertas/Crecimiento/PanelesGeneral",
-    "CRE-CC-G": "/MantenimientoAlertas/Crecimiento/CadenasConveyorGeneral",
+    "CRE-CC-G":
+        "/MantenimientoAlertas/Crecimiento/CadenasConveyorGeneral",
     "CRE-C-RS": "/MantenimientoAlertas/Crecimiento/CarroRS",
     "CRE-C-AS": "/MantenimientoAlertas/Crecimiento/CarroAS",
 
@@ -135,6 +111,10 @@ export default function NotificationBell() {
 
     const [panelOpen, setPanelOpen] = useState(false);
 
+    // Dialog de "registro completado, crea uno nuevo"
+    const [showCompletedDialog, setShowCompletedDialog] = useState(false);
+    const [completedAlert, setCompletedAlert] = useState(null);
+
     const showToast = (sev, sum, det, life = 3000) =>
         toast.current?.show({ severity: sev, summary: sum, detail: det, life });
 
@@ -153,7 +133,9 @@ export default function NotificationBell() {
           periodicidad,
           ultimo_mantenimiento,
           proximo_mantenimiento,
-          estado
+          estado,
+          completado,
+          pendiente_nuevo
         `
                 )
                 .in("tabla", ALLOWED_TABLES)
@@ -161,10 +143,34 @@ export default function NotificationBell() {
                 .order("proximo_mantenimiento", { ascending: true });
 
             if (error) throw error;
-            setAlerts(data || []);
+
+            // 🔴 En la campanita NO queremos ver OK
+            // Solo VENCIDO, PROX7 y COMPLETADO que sigan pendientes de crear nuevo mantenimiento.
+            const filtered = (data || []).filter((a) => {
+                if (a.estado === "VENCIDO" || a.estado === "PROX7") {
+                    return true;
+                }
+                if (
+                    a.estado === "COMPLETADO" &&
+                    (a.pendiente_nuevo === true ||
+                        a.pendiente_nuevo === null ||
+                        a.pendiente_nuevo === undefined)
+                ) {
+                    // COMPLETADO aún marcado como pendiente_nuevo (el trigger se encargará de ponerlo en false
+                    // cuando se inserte un nuevo mantenimiento de la misma posición)
+                    return true;
+                }
+                return false;
+            });
+
+            setAlerts(filtered);
         } catch (e) {
             console.error(e);
-            showToast("error", "Error", "No se pudieron cargar las alertas");
+            showToast(
+                "error",
+                "Error",
+                "No se pudieron cargar las alertas"
+            );
         } finally {
             setLoading(false);
         }
@@ -173,52 +179,6 @@ export default function NotificationBell() {
     useEffect(() => {
         fetchAlerts();
     }, []);
-
-    /** Marca registro como completado y crea el nuevo ciclo automático */
-    const completeAndCreateNextCycle = async (tabla, rowFromDb) => {
-        const today = toDateISO();
-        const baseDate = rowFromDb.fecha_registro || today;
-        const nextDate = nextDateByPeriodicidad(rowFromDb.periodicidad, baseDate);
-
-        // 1) Marcar el actual como COMPLETADO
-        const { error: updError } = await supabase
-            .from(tabla)
-            .update({
-                completado: true,
-                fecha_completado: today,
-            })
-            .eq("id", rowFromDb.id);
-
-        if (updError) throw updError;
-
-        // 2) Crear el siguiente registro de mantenimiento (todo pendiente)
-        const nuevoPayload = {
-            fecha_registro: today,
-            hora_registro: null,
-            posicion_id: rowFromDb.posicion_id,
-            equipo: rowFromDb.equipo,
-            registro: rowFromDb.registro,
-            cantidad: rowFromDb.cantidad,
-            tecnico: null,
-            ejecutado: "NO",
-            observaciones:
-                "Registro creado automáticamente. Pendiente de mantenimiento.",
-            periodicidad: rowFromDb.periodicidad,
-            ...Object.fromEntries(
-                Array.from({ length: 14 }, (_, i) => [`respuesta_q${i + 1}`, null])
-            ),
-            ultimo_mantenimiento: null,
-            proximo_mantenimiento: nextDate,
-            completado: false,
-            fecha_completado: null,
-        };
-
-        const { error: insError } = await supabase
-            .from(tabla)
-            .insert([nuevoPayload]);
-
-        if (insError) throw insError;
-    };
 
     const handleSnooze7d = async (alerta) => {
         try {
@@ -246,7 +206,12 @@ export default function NotificationBell() {
         }
     };
 
-    /** Validar NO + bloquear completar + mostrar dialog si hay problemas */
+    /** Validar NO + bloquear completar + mostrar dialog si hay problemas.
+     *
+     * Si todo está en "SI" y ejecutado = "SI", marcamos el registro como COMPLETADO
+     * (pendiente de crear un nuevo mantenimiento) y mostramos el diálogo
+     * que obliga al técnico a ir a crear el registro nuevo.
+     */
     const handleComplete = async (alerta) => {
         try {
             const { data, error } = await supabase
@@ -261,6 +226,8 @@ export default function NotificationBell() {
           periodicidad,
           fecha_registro,
           ejecutado,
+          completado,
+          pendiente_nuevo,
           ${Array.from({ length: 14 }, (_, i) => `respuesta_q${i + 1}`).join(
                         ", "
                     )}
@@ -285,6 +252,7 @@ export default function NotificationBell() {
             const tieneNo = respuestas.some((v) => v === "NO");
 
             if (data.ejecutado !== "SI" || tieneNo) {
+                // Tiene NO o no se ejecutó → no se puede marcar como completado todavía
                 setPendingEdit({
                     tabla: alerta.tabla,
                     id: alerta.id,
@@ -294,17 +262,39 @@ export default function NotificationBell() {
                 return;
             }
 
-            await completeAndCreateNextCycle(alerta.tabla, data);
+            // Todo en SI y ejecutado = SI → marcamos como COMPLETADO (pendiente_nuevo = true)
+            const today = toDateISO();
+            const { error: updError } = await supabase
+                .from(alerta.tabla)
+                .update({
+                    completado: true,
+                    pendiente_nuevo: true,
+                    fecha_completado: today,
+                })
+                .eq("id", alerta.id);
+
+            if (updError) throw updError;
+
+            setCompletedAlert({
+                ...alerta,
+                fecha_completado: today,
+            });
+            setShowCompletedDialog(true);
 
             showToast(
                 "success",
                 "Completado",
-                "Se marcó como COMPLETADO y se creó el nuevo registro de mantenimiento."
+                "Se marcó el registro como COMPLETADO. Debes crear un registro nuevo de mantenimiento."
             );
+
             await fetchAlerts();
         } catch (e) {
             console.error(e);
-            showToast("error", "Error", "No se pudo completar el registro.");
+            showToast(
+                "error",
+                "Error",
+                "No se pudo completar el registro."
+            );
         }
     };
 
@@ -332,6 +322,32 @@ export default function NotificationBell() {
         setShowHasNoDialog(false);
     };
 
+    /** Ir a crear el registro nuevo de mantenimiento */
+    const goToCrearNuevo = () => {
+        if (!completedAlert) {
+            setShowCompletedDialog(false);
+            return;
+        }
+
+        const baseId = getBasePosicionId(completedAlert.posicion_id);
+        const ruta = FORM_MAP[baseId];
+
+        if (!ruta) {
+            showToast(
+                "warn",
+                "Ruta no configurada",
+                `No hay ruta mapeada para el ID base ${baseId}.`
+            );
+            setShowCompletedDialog(false);
+            return;
+        }
+
+        // Lo enviamos al formulario del registro (Tamiz Motor en este caso).
+        // El técnico deberá crear el nuevo mantenimiento manualmente.
+        navigate(ruta);
+        setShowCompletedDialog(false);
+    };
+
     const colorByEstado = (estado) => {
         switch (estado) {
             case "VENCIDO":
@@ -339,21 +355,24 @@ export default function NotificationBell() {
             case "PROX7":
                 return "#fef3c7";
             case "COMPLETADO":
-                return "#dcfce7";
+                return "#dcfce7"; // verde claro
             default:
                 return "#e0f2fe";
         }
     };
 
     const badgeCount = alerts.filter(
-        (a) => a.estado === "VENCIDO" || a.estado === "PROX7"
+        (a) =>
+            a.estado === "VENCIDO" ||
+            a.estado === "PROX7" ||
+            a.estado === "COMPLETADO"
     ).length;
 
     return (
         <>
             <Toast ref={toast} />
 
-            {/* Campanita + panel abajo */}
+            {/* Campanita + panel */}
             <div className="notification-bell-wrapper">
                 <button
                     className="notification-bell-button"
@@ -392,7 +411,9 @@ export default function NotificationBell() {
                                     key={`${a.tabla}-${a.id}`}
                                     className="notification-card"
                                     style={{
-                                        backgroundColor: colorByEstado(a.estado),
+                                        backgroundColor: colorByEstado(
+                                            a.estado
+                                        ),
                                     }}
                                 >
                                     <div className="flex justify-content-between align-items-center mb-2">
@@ -525,6 +546,37 @@ export default function NotificationBell() {
                         </div>
                     </>
                 )}
+            </Dialog>
+
+            {/* Dialog cuando el registro ya está COMPLETADO y debe crear uno nuevo */}
+            <Dialog
+                visible={showCompletedDialog}
+                // 👇 No dejamos cerrarlo con la X ni con ESC, para "obligar" a ir a crear el nuevo registro
+                onHide={() => { }}
+                header="Registro completado"
+                style={{ width: "40vw", maxWidth: 600 }}
+                modal
+                closable={false}
+            >
+                <p>
+                    Has completado este registro. Para mantener la continuidad
+                    del mantenimiento de este equipo, debes crear un{" "}
+                    <b>registro nuevo de mantenimiento</b>.
+                </p>
+
+                {completedAlert && (
+                    <p className="mt-3">
+                        <b>ID:</b> {completedAlert.posicion_id}
+                    </p>
+                )}
+
+                <div className="flex justify-content-end gap-2 mt-4">
+                    <Button
+                        label="Crear registro nuevo"
+                        icon="pi pi-plus"
+                        onClick={goToCrearNuevo}
+                    />
+                </div>
             </Dialog>
         </>
     );

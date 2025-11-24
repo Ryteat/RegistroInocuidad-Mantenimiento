@@ -324,54 +324,100 @@ export default function TamizMotor() {
 
         try {
             const baseDate = form.fecha_registro || toDateISO();
-
-            let proximo;
-            if (form.ejecutado === "NO") {
-                proximo = addDays(baseDate, 7);
-            } else if (form.periodicidad === "TRIMESTRAL") {
-                proximo = addMonths(baseDate, 3);
-            } else if (form.periodicidad === "SEMESTRAL") {
-                proximo = addMonths(baseDate, 6);
-            } else {
-                proximo = addDays(baseDate, 7);
-            }
-
             const cantidadNum = Number(form.cantidad);
             const sufijo = String(cantidadNum).padStart(2, "0");
             const posicionCompleta = `${POSICION_ID_BASE}-${sufijo}`;
 
-            const payload = {
+            const respuestasPayload = Object.fromEntries(
+                Array.from({ length: 14 }, (_, i) => [
+                    `respuesta_q${i + 1}`,
+                    form.ejecutado === "SI"
+                        ? form.items[`q${i + 1}`]?.respuesta || null
+                        : null,
+                ])
+            );
+
+            const basePayload = {
                 fecha_registro: form.fecha_registro,
                 hora_registro: form.hora_registro,
                 posicion_id: posicionCompleta,
                 equipo: EQUIPO,
                 registro: REGISTRO,
-                cantidad: cantidadNum || null,
+                cantidad: Number.isNaN(cantidadNum) ? null : cantidadNum,
                 tecnico: form.tecnico,
                 ejecutado: form.ejecutado,
                 observaciones: form.observaciones || null,
                 periodicidad: form.periodicidad,
-                ...Object.fromEntries(
-                    Array.from({ length: 14 }, (_, i) => [
-                        `respuesta_q${i + 1}`,
-                        form.ejecutado === "SI"
-                            ? form.items[`q${i + 1}`]?.respuesta || null
-                            : null,
-                    ])
-                ),
-                ultimo_mantenimiento: form.ejecutado === "SI" ? baseDate : null,
-                proximo_mantenimiento: proximo,
+                ...respuestasPayload,
             };
 
             let error;
+
             if (editingId) {
+                // 🔵 EDICIÓN:
+                // Si el técnico deja ejecutado = "SI" y todas las respuestas en "SI"
+                // marcamos este ciclo como COMPLETADO y pendiente de crear uno nuevo.
+                let updatePayload = { ...basePayload };
+
+                if (form.ejecutado === "SI") {
+                    updatePayload = {
+                        ...updatePayload,
+                        ultimo_mantenimiento: baseDate,
+                        completado: true,
+                        pendiente_nuevo: true,
+                        fecha_completado: toDateISO(),
+                        // No tocamos proximo_mantenimiento aquí:
+                        // la vista usará "completado" para marcarlo como COMPLETADO.
+                    };
+                } else {
+                    // Si NO se ejecutó, lo reprogramamos a 7 días y limpiamos flags
+                    updatePayload = {
+                        ...updatePayload,
+                        ultimo_mantenimiento: null,
+                        proximo_mantenimiento: addDays(baseDate, 7),
+                        completado: false,
+                        pendiente_nuevo: false,
+                        fecha_completado: null,
+                    };
+                }
+
                 ({ error } = await supabase
                     .from(TABLE)
-                    .update(payload)
+                    .update(updatePayload)
                     .eq("id", editingId));
             } else {
-                ({ error } = await supabase.from(TABLE).insert([payload]));
+                // 🟢 NUEVO REGISTRO:
+                // Es un ciclo nuevo, NO debe arrancar ya como completado.
+                let ultimo = null;
+                let proximo = null;
+
+                if (form.ejecutado === "NO") {
+                    proximo = addDays(baseDate, 7);
+                } else if (form.periodicidad === "TRIMESTRAL") {
+                    ultimo = baseDate;
+                    proximo = addMonths(baseDate, 3);
+                } else if (form.periodicidad === "SEMESTRAL") {
+                    ultimo = baseDate;
+                    proximo = addMonths(baseDate, 6);
+                } else {
+                    ultimo = baseDate;
+                    proximo = addDays(baseDate, 7);
+                }
+
+                const insertPayload = {
+                    ...basePayload,
+                    ultimo_mantenimiento: ultimo,
+                    proximo_mantenimiento: proximo,
+                    completado: false,
+                    pendiente_nuevo: false,
+                    fecha_completado: null,
+                };
+
+                ({ error } = await supabase
+                    .from(TABLE)
+                    .insert([insertPayload]));
             }
+
             if (error) throw error;
 
             showToast(
@@ -523,7 +569,8 @@ export default function TamizMotor() {
         </div>
     );
 
-    const viewQuestionsForRow = (row) => getQuestionsFor(row.periodicidad || "");
+    const viewQuestionsForRow = (row) =>
+        getQuestionsFor(row.periodicidad || "");
 
     return (
         <div className="controlrendcosechayfrass-container">
@@ -545,7 +592,10 @@ export default function TamizMotor() {
                 <button onClick={() => navigate(-1)} className="return-button">
                     Volver
                 </button>
-                <button onClick={() => navigate(-2)} className="menu-button">
+                <button
+                    onClick={() => navigate(-2)}
+                    className="menu-button"
+                >
                     Menú principal
                 </button>
             </div>
@@ -640,7 +690,11 @@ export default function TamizMotor() {
                             outlined
                             onClick={hideDialog}
                         />
-                        <Button label="Guardar" icon="pi pi-check" onClick={save} />
+                        <Button
+                            label="Guardar"
+                            icon="pi pi-check"
+                            onClick={save}
+                        />
                     </div>
                 }
             >
@@ -660,7 +714,8 @@ export default function TamizMotor() {
                         />
                         <small className="block mt-2">
                             <b>Trimestral</b>: +3 meses &nbsp; | &nbsp;
-                            <b>Semestral</b>: +6 meses (si NO ejecutado: +7 días).
+                            <b>Semestral</b>: +6 meses (si NO ejecutado: +7
+                            días).
                         </small>
                     </div>
 
@@ -743,9 +798,13 @@ export default function TamizMotor() {
                         <div className="field col-12">
                             <label className="font-bold">
                                 Observaciones (obligatorio si NO){" "}
-                                {submitted && !form.observaciones.trim() && (
-                                    <small className="p-error"> Requerido</small>
-                                )}
+                                {submitted &&
+                                    !form.observaciones.trim() && (
+                                        <small className="p-error">
+                                            {" "}
+                                            Requerido
+                                        </small>
+                                    )}
                             </label>
                             <InputText
                                 value={form.observaciones}
@@ -771,12 +830,17 @@ export default function TamizMotor() {
                                 }}
                             >
                                 <div
-                                    style={{ fontWeight: 700, marginBottom: 8 }}
-                                >{`Checklist — ${form.periodicidad || ""}`}</div>
+                                    style={{
+                                        fontWeight: 700,
+                                        marginBottom: 8,
+                                    }}
+                                >{`Checklist — ${form.periodicidad || ""
+                                    }`}</div>
                                 <div className="grid">
                                     {activeQuestions.map((q) => {
                                         const val =
-                                            form.items[q.key]?.respuesta || "";
+                                            form.items[q.key]?.respuesta ||
+                                            "";
                                         return (
                                             <div
                                                 key={q.key}
@@ -851,7 +915,8 @@ export default function TamizMotor() {
                         <p>
                             <b>ID:</b> {viewRecord.posicion_id} &nbsp; | &nbsp;
                             <b>Equipo:</b> {viewRecord.equipo} &nbsp; | &nbsp;
-                            <b>Registro:</b> {viewRecord.registro} &nbsp; | &nbsp;
+                            <b>Registro:</b> {viewRecord.registro} &nbsp; |
+                            &nbsp;
                             <b>Periodicidad:</b> {viewRecord.periodicidad}
                         </p>
                         <p>
@@ -866,35 +931,42 @@ export default function TamizMotor() {
                         <hr />
 
                         <div className="grid">
-                            {viewQuestionsForRow(viewRecord).map((q, idx) => {
-                                const col = `respuesta_q${idx + 1}`;
-                                const val = viewRecord[col] || "—";
-                                return (
-                                    <div
-                                        key={q.key}
-                                        className="col-12 md:col-6"
-                                        style={{ marginBottom: 8 }}
-                                    >
+                            {viewQuestionsForRow(viewRecord).map(
+                                (q, idx) => {
+                                    const col = `respuesta_q${idx + 1}`;
+                                    const val = viewRecord[col] || "—";
+                                    return (
                                         <div
-                                            style={{
-                                                fontSize: "0.85rem",
-                                                fontWeight: 600,
-                                            }}
+                                            key={q.key}
+                                            className="col-12 md:col-6"
+                                            style={{ marginBottom: 8 }}
                                         >
-                                            {q.label}
+                                            <div
+                                                style={{
+                                                    fontSize: "0.85rem",
+                                                    fontWeight: 600,
+                                                }}
+                                            >
+                                                {q.label}
+                                            </div>
+                                            <div
+                                                style={{
+                                                    marginTop: 2,
+                                                    fontSize: "0.85rem",
+                                                }}
+                                            >
+                                                Respuesta:{" "}
+                                                <b>
+                                                    {val === "SI" ||
+                                                        val === "NO"
+                                                        ? val
+                                                        : "—"}
+                                                </b>
+                                            </div>
                                         </div>
-                                        <div
-                                            style={{
-                                                marginTop: 2,
-                                                fontSize: "0.85rem",
-                                            }}
-                                        >
-                                            Respuesta:{" "}
-                                            <b>{val === "SI" || val === "NO" ? val : "—"}</b>
-                                        </div>
-                                    </div>
-                                );
-                            })}
+                                    );
+                                }
+                            )}
                         </div>
 
                         <hr />

@@ -44,34 +44,10 @@ const semanaIso = (isoStr) => {
         Math.round(
             ((target.getTime() - firstThursday.getTime()) / 86400000 -
                 3 +
-                ((firstThursday.getUTCDay() + 6) % 7)) / 7
+                ((firstThursday.getUTCDay() + 6) % 7)) /
+            7
         );
     return { semana: String(week).padStart(2, "0"), anio: target.getUTCFullYear() };
-};
-
-/* ========== Detectar si el registro es "COMPLETADO" por los +100 años ========== */
-const computeEstadoAndCompletion = (row) => {
-    const { proximo_mantenimiento, estado } = row;
-
-    if (!proximo_mantenimiento) {
-        return { estadoVisual: estado || "OK", completado: false };
-    }
-
-    const d = parseYMD(proximo_mantenimiento);
-    if (!d) return { estadoVisual: estado || "OK", completado: false };
-
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-
-    const diffDays = Math.floor((d.getTime() - today.getTime()) / 86400000);
-    const diffYears = diffDays / 365;
-
-    // Si está muuuy lejos (50+ años) lo tomamos como COMPLETADO
-    if (diffYears >= 50) {
-        return { estadoVisual: "COMPLETADO", completado: true };
-    }
-
-    return { estadoVisual: estado || "OK", completado: false };
 };
 
 /* ================== Rutas de formularios ================== */
@@ -111,13 +87,10 @@ const FORM_MAP = {
     "CRE-C-RS": "/MantenimientoAlertas/Crecimiento/CarroRS",
     "CRE-C-AS": "/MantenimientoAlertas/Crecimiento/CarroAS",
 
-    //Cosecha JV
+    // Cosecha JV
     "COS-T-REM": "/MantenimientoAlertas/Cosecha/TamizRevisionEstructuraMalla",
     "COS-T-M": "/MantenimientoAlertas/Cosecha/TamizMotor",
     "COS-PC-G": "/MantenimientoAlertas/Cosecha/PanelControlGeneral",
-
-
-
 };
 
 export default function ContenedorAlertas() {
@@ -146,9 +119,19 @@ export default function ContenedorAlertas() {
             let q = supabase
                 .from("vw_alertas_unificado")
                 .select(`
-          tabla, id, posicion_id, equipo, registro, periodicidad,
-          ultimo_mantenimiento, proximo_mantenimiento,
-          semana_proximo, anio_proximo, estado
+          tabla,
+          id,
+          posicion_id,
+          equipo,
+          registro,
+          periodicidad,
+          ultimo_mantenimiento,
+          proximo_mantenimiento,
+          semana_proximo,
+          anio_proximo,
+          estado,
+          completado,
+          pendiente_nuevo
         `)
                 .order("posicion_id", { ascending: true });
 
@@ -165,12 +148,13 @@ export default function ContenedorAlertas() {
                     row = { ...row, semana_proximo: semana, anio_proximo: anio };
                 }
 
-                const { estadoVisual, completado } = computeEstadoAndCompletion(row);
+                // Marcar completado también desde el estado de la vista
+                const completadoFlag = row.completado === true || row.estado === "COMPLETADO";
 
                 return {
                     ...row,
-                    estado_visual: estadoVisual,
-                    completado,
+                    completado: completadoFlag,
+                    estado_visual: row.estado || "OK",
                 };
             });
 
@@ -195,15 +179,25 @@ export default function ContenedorAlertas() {
 
     // 👇 Semana: si está completado, no mostramos nada
     const semanaBody = (r) => {
-        if (r.completado) return "—";
+        const esCompletado =
+            r.completado === true ||
+            r.estado_visual === "COMPLETADO" ||
+            r.estado === "COMPLETADO";
+
+        if (esCompletado) return "—";
         return r.proximo_mantenimiento
             ? `${r.semana_proximo} año ${r.anio_proximo}`
             : "—";
     };
 
-    // 👇 Próximo mantenimiento: si está completado, lo ocultamos
+    // 👇 Próximo mantenimiento: si está completado, lo ocultamos (TU CAMBIO)
     const proximoBody = (r) => {
-        if (r.completado) return "—";
+        const esCompletado =
+            r.completado === true ||
+            r.estado_visual === "COMPLETADO" ||
+            r.estado === "COMPLETADO";
+
+        if (esCompletado) return "—";
         return fmtDMY(r.proximo_mantenimiento);
     };
 
