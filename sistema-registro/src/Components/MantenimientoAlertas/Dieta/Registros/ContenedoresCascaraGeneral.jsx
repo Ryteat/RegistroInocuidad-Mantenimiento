@@ -18,7 +18,7 @@ import { Checkbox } from "primereact/checkbox";
 import * as XLSX from "xlsx";
 import useCanReview from "../../../Inocuidad/Registros/Hooks/useCanReview.js";
 
-/* ===== Helpers de fecha (mismo patrón que el resto) ===== */
+/* ===== Helpers de fecha ===== */
 const parseYMD = (s) => {
     if (!s) return null;
     const [y, m, d] = String(s).split("-").map(Number);
@@ -60,7 +60,7 @@ const addDays = (ymd, days) => {
 };
 
 /* ===== Constantes de este registro (D-CC-G) ===== */
-const POSICION_ID = "D-CC-G";
+const POSICION_ID_BASE = "D-CC-G";
 const EQUIPO = "CONTENEDORES DE CÁSCARA";
 const REGISTRO = "GENERAL";
 const TABLE = "mto_dieta_contenedores_cascara_general";
@@ -70,24 +70,27 @@ const YESNO = [
     { label: "No", value: "NO" },
 ];
 
-// Solo tiene periodicidad SEMANAL
+// Solo periodicidad SEMANAL
 const PERIODOS = [{ label: "Semanal", value: "SEMANAL" }];
 
-/* ===== Preguntas SEMANAL (texto literal de la OM) ===== */
+// Cantidad 01 / 02
+const CANTIDAD_OPTIONS = [
+    { label: "01", value: 1 },
+    { label: "02", value: 2 },
+];
+
+/* ===== Preguntas SEMANAL ===== */
 const Q_SEMANAL = [
-    // MUÑONERAS
     { key: "q1", label: "Revisar y lubricar todas las muñoneras" },
     { key: "q2", label: "Revisar y verificar el estado, daños o reventaduras" },
     { key: "q3", label: "Verificar que todas las muñoneras tengan alemite" },
     { key: "q4", label: "Limpiar los excesos de lubricación" },
-    // ESTRUCTURA
     {
         key: "q5",
         label:
             "Revisar estado de la estructura, presencia de reventaduras y sus anclajes, repare si es necesario",
     },
     { key: "q6", label: "Revisión del timón, repare si es necesario" },
-    // LUBRICACIÓN
     {
         key: "q7",
         label: "Lubricar las guías de desplazamiento de la compuerta",
@@ -95,13 +98,15 @@ const Q_SEMANAL = [
     { key: "q8", label: "Lubricar el piñón y la cremallera." },
 ];
 
+const getQuestions = () => Q_SEMANAL;
+
 const emptyForm = () => ({
     fecha_registro: toDateISO(),
     hora_registro: toHM(),
-    posicion_id: POSICION_ID,
+    posicion_id: POSICION_ID_BASE,
     equipo: EQUIPO,
     registro: REGISTRO,
-    cantidad: "",
+    cantidad: null,
     tecnico: "",
     ejecutado: "",
     observaciones: "",
@@ -123,11 +128,18 @@ export default function ContenedoresCascaraGeneral() {
     const [selected, setSelected] = useState([]);
     const [globalFilter, setGlobalFilter] = useState("");
     const [loading, setLoading] = useState(false);
+
     const [dialogOpen, setDialogOpen] = useState(false);
     const [submitted, setSubmitted] = useState(false);
     const [form, setForm] = useState(emptyForm());
+    const [editingId, setEditingId] = useState(null);
+
     const [filtroRevisado, setFiltroRevisado] = useState("all");
     const { canReview, username } = useCanReview();
+
+    // Dialog VER
+    const [viewDialogOpen, setViewDialogOpen] = useState(false);
+    const [viewRecord, setViewRecord] = useState(null);
 
     const showToast = (sev, sum, det, life = 3000) =>
         toast.current?.show({ severity: sev, summary: sum, detail: det, life });
@@ -147,7 +159,8 @@ export default function ContenedoresCascaraGeneral() {
                         ", "
                     )},
           ultimo_mantenimiento, proximo_mantenimiento,
-          revisado, revisado_por_username, revisado_fecha
+          revisado, revisado_por_username, revisado_fecha,
+          completado, pendiente_nuevo, fecha_completado
         `
                 )
                 .order("fecha_registro", { ascending: false })
@@ -174,13 +187,49 @@ export default function ContenedoresCascaraGeneral() {
 
     const openNew = () => {
         setForm(emptyForm());
+        setEditingId(null);
         setSubmitted(false);
         setDialogOpen(true);
+    };
+
+    const openEdit = (row) => {
+        // mapear respuestas q1..q8
+        const baseQuestions = getQuestions();
+        const items = {};
+        baseQuestions.forEach((q, idx) => {
+            const col = `respuesta_q${idx + 1}`;
+            items[q.key] = { respuesta: row[col] || "" };
+        });
+
+        setForm({
+            fecha_registro: row.fecha_registro || toDateISO(),
+            hora_registro: row.hora_registro || toHM(),
+            posicion_id: POSICION_ID_BASE,
+            equipo: row.equipo || EQUIPO,
+            registro: row.registro || REGISTRO,
+            cantidad: row.cantidad ? Number(row.cantidad) : null,
+            tecnico: row.tecnico || "",
+            ejecutado: row.ejecutado || "",
+            observaciones: row.observaciones || "",
+            periodicidad: row.periodicidad || "",
+            items,
+            fecha_correccion_preview: fmtDMYHM(row.created_at),
+        });
+
+        setEditingId(row.id);
+        setSubmitted(false);
+        setDialogOpen(true);
+    };
+
+    const openView = (row) => {
+        setViewRecord(row);
+        setViewDialogOpen(true);
     };
 
     const hideDialog = () => {
         setDialogOpen(false);
         setSubmitted(false);
+        setEditingId(null);
     };
 
     const onChange = (field, value) =>
@@ -190,8 +239,7 @@ export default function ContenedoresCascaraGeneral() {
         }));
 
     const onPeriodoChange = (value) => {
-        // siempre SEMANAL, pero dejamos el patrón igual
-        const base = Q_SEMANAL;
+        const base = getQuestions();
         const items = base.reduce(
             (acc, q) => ({ ...acc, [q.key]: { respuesta: "" } }),
             {}
@@ -208,6 +256,7 @@ export default function ContenedoresCascaraGeneral() {
     const validate = () => {
         const errs = [];
         if (!form.periodicidad) errs.push("Seleccione la periodicidad.");
+        if (!form.cantidad) errs.push("Seleccione el Cantidada.");
         if (!form.tecnico?.trim())
             errs.push("El campo Técnico es requerido.");
         if (!form.ejecutado)
@@ -215,7 +264,7 @@ export default function ContenedoresCascaraGeneral() {
         if (form.ejecutado === "NO" && !form.observaciones.trim())
             errs.push("Explique por qué NO se efectuó (Observaciones).");
         if (form.ejecutado === "SI") {
-            const list = Q_SEMANAL;
+            const list = getQuestions();
             list.forEach((q) => {
                 if (!form.items[q.key]?.respuesta)
                     errs.push(`Responda: ${q.label}`);
@@ -234,41 +283,124 @@ export default function ContenedoresCascaraGeneral() {
 
         try {
             const baseDate = form.fecha_registro || toDateISO();
-            const proximo =
-                form.ejecutado === "NO"
-                    ? addDays(baseDate, 7)
-                    : addDays(baseDate, 7); // siempre +7d porque es SEMANAL
 
-            const payload = {
+            const respuestasPayload = Object.fromEntries(
+                Array.from({ length: 14 }, (_, i) => [
+                    `respuesta_q${i + 1}`,
+                    form.ejecutado === "SI"
+                        ? form.items[`q${i + 1}`]?.respuesta || null
+                        : null,
+                ])
+            );
+
+            const cantidadNum =
+                form.cantidad !== null && form.cantidad !== undefined
+                    ? Number(form.cantidad)
+                    : null;
+
+            const sufijo = String(cantidadNum || 0).padStart(2, "0");
+            const posicionCompleta = `${POSICION_ID_BASE}-${sufijo}`;
+
+            const basePayload = {
                 fecha_registro: form.fecha_registro,
                 hora_registro: form.hora_registro,
-                posicion_id: POSICION_ID,
+                posicion_id: posicionCompleta,
                 equipo: EQUIPO,
                 registro: REGISTRO,
-                cantidad: form.cantidad
-                    ? Number(String(form.cantidad).replace(/\D/g, ""))
-                    : null,
+                cantidad: Number.isNaN(cantidadNum) ? null : cantidadNum,
                 tecnico: form.tecnico,
                 ejecutado: form.ejecutado,
                 observaciones: form.observaciones || null,
                 periodicidad: form.periodicidad,
-                ...Object.fromEntries(
-                    Array.from({ length: 14 }, (_, i) => [
-                        `respuesta_q${i + 1}`,
-                        form.ejecutado === "SI"
-                            ? form.items[`q${i + 1}`]?.respuesta || null
-                            : null,
-                    ])
-                ),
-                ultimo_mantenimiento: form.ejecutado === "SI" ? baseDate : null,
-                proximo_mantenimiento: proximo,
+                ...respuestasPayload,
             };
 
-            const { error } = await supabase.from(TABLE).insert([payload]);
+            const preguntas = getQuestions();
+            const todasSi =
+                preguntas.length > 0
+                    ? preguntas.every(
+                        (q) => form.items[q.key]?.respuesta === "SI"
+                    )
+                    : false;
+
+            let error;
+
+            if (editingId) {
+                // 🔵 EDICIÓN
+                let updatePayload = { ...basePayload };
+
+                if (form.ejecutado === "SI" && todasSi) {
+                    // COMPLETADO: se queda en verde hasta que se cree un registro nuevo con el mismo consecutivo
+                    updatePayload = {
+                        ...updatePayload,
+                        ultimo_mantenimiento: baseDate,
+                        proximo_mantenimiento: null,
+                        completado: true,
+                        pendiente_nuevo: true,
+                        fecha_completado: new Date().toISOString(),
+                    };
+                } else if (form.ejecutado === "NO") {
+                    // NO ejecutado → +7 días
+                    updatePayload = {
+                        ...updatePayload,
+                        ultimo_mantenimiento: null,
+                        proximo_mantenimiento: addDays(baseDate, 7),
+                        completado: false,
+                        pendiente_nuevo: false,
+                        fecha_completado: null,
+                    };
+                } else {
+                    // Ejecutado = "SI" pero con alguna NO → sigue siendo SEMANAL (+7d)
+                    updatePayload = {
+                        ...updatePayload,
+                        ultimo_mantenimiento: baseDate,
+                        proximo_mantenimiento: addDays(baseDate, 7),
+                        completado: false,
+                        pendiente_nuevo: false,
+                        fecha_completado: null,
+                    };
+                }
+
+                ({ error } = await supabase
+                    .from(TABLE)
+                    .update(updatePayload)
+                    .eq("id", editingId));
+            } else {
+                // 🟢 NUEVO REGISTRO
+                let ultimo = null;
+                let proximo = null;
+
+                if (form.ejecutado === "NO") {
+                    ultimo = null;
+                    proximo = addDays(baseDate, 7);
+                } else {
+                    ultimo = baseDate;
+                    proximo = addDays(baseDate, 7);
+                }
+
+                const insertPayload = {
+                    ...basePayload,
+                    ultimo_mantenimiento: ultimo,
+                    proximo_mantenimiento: proximo,
+                    completado: false,
+                    pendiente_nuevo: false,
+                    fecha_completado: null,
+                };
+
+                ({ error } = await supabase
+                    .from(TABLE)
+                    .insert([insertPayload]));
+            }
+
             if (error) throw error;
 
-            showToast("success", "Éxito", "Registro guardado");
+            showToast(
+                "success",
+                "Éxito",
+                editingId ? "Registro actualizado" : "Registro guardado"
+            );
             setDialogOpen(false);
+            setEditingId(null);
             await fetchRows();
         } catch (e) {
             console.error(e);
@@ -301,7 +433,9 @@ export default function ContenedoresCascaraGeneral() {
                             ...r,
                             revisado: next,
                             revisado_por_username: next ? username : null,
-                            revisado_fecha: next ? new Date().toISOString() : null,
+                            revisado_fecha: next
+                                ? new Date().toISOString()
+                                : null,
                         }
                         : r
                 )
@@ -332,7 +466,7 @@ export default function ContenedoresCascaraGeneral() {
                     type="search"
                     value={globalFilter}
                     onInput={(e) => setGlobalFilter(e.target.value)}
-                    placeholder="Buscar (ej. D-CC-G, técnico, notas)"
+                    placeholder="Buscar (ej. D-CC-G-01, técnico, notas)"
                 />
             </span>
             <div className="flex align-items-center gap-2">
@@ -368,6 +502,10 @@ export default function ContenedoresCascaraGeneral() {
             equipo: r.equipo,
             registro: r.registro ?? "",
             periodicidad: r.periodicidad ?? "",
+            cantidad:
+                r.cantidad !== null && r.cantidad !== undefined
+                    ? String(r.cantidad).padStart(2, "0")
+                    : "",
             ultimo_mantenimiento: fmtDMY(r.ultimo_mantenimiento),
             proximo_mantenimiento: fmtDMY(r.proximo_mantenimiento),
             tecnico: r.tecnico ?? "",
@@ -380,7 +518,7 @@ export default function ContenedoresCascaraGeneral() {
         }));
         const ws = XLSX.utils.json_to_sheet(out);
         const wb = XLSX.utils.book_new();
-        XLSX.utils.book_append_sheet(wb, ws, "Cont Cascara");
+        XLSX.utils.book_append_sheet(wb, ws, "ContenedoresCascara");
         XLSX.writeFile(
             wb,
             `Dieta_ContenedoresCascara_${new Date()
@@ -389,7 +527,26 @@ export default function ContenedoresCascaraGeneral() {
         );
     };
 
-    const activeQuestions = Q_SEMANAL;
+    const activeQuestions = getQuestions();
+
+    const accionesTemplate = (row) => (
+        <div className="flex gap-2">
+            <Button
+                label="Ver"
+                icon="pi pi-eye"
+                text
+                onClick={() => openView(row)}
+            />
+            <Button
+                label="Editar"
+                icon="pi pi-pencil"
+                text
+                onClick={() => openEdit(row)}
+            />
+        </div>
+    );
+
+    const viewQuestionsForRow = () => getQuestions();
 
     return (
         <div className="controlrendcosechayfrass-container">
@@ -401,8 +558,8 @@ export default function ContenedoresCascaraGeneral() {
 
             <div className="welcome-message">
                 <p>
-                    <b>Posición (ID):</b> {POSICION_ID} &nbsp; | &nbsp; <b>Equipo:</b>{" "}
-                    {EQUIPO} &nbsp; | &nbsp;
+                    <b>Posición base (ID):</b> {POSICION_ID_BASE} &nbsp; | &nbsp;{" "}
+                    <b>Equipo:</b> {EQUIPO} &nbsp; | &nbsp;
                     <b>Registro:</b> {REGISTRO}
                 </p>
             </div>
@@ -456,6 +613,15 @@ export default function ContenedoresCascaraGeneral() {
                 <Column field="posicion_id" header="Posición" sortable />
                 <Column field="equipo" header="Equipo" sortable />
                 <Column field="registro" header="Registro" />
+                <Column
+                    header="Cantidad"
+                    body={(r) =>
+                        r.cantidad != null
+                            ? String(r.cantidad).padStart(2, "0")
+                            : ""
+                    }
+                    sortable
+                />
                 <Column field="periodicidad" header="Periodicidad" />
                 <Column
                     header="Último Mto."
@@ -478,12 +644,23 @@ export default function ContenedoresCascaraGeneral() {
                     body={revisadoTemplate}
                     style={{ width: "10rem", textAlign: "center" }}
                 />
+                <Column
+                    header="Acciones"
+                    body={accionesTemplate}
+                    exportable={false}
+                    style={{ width: "14rem" }}
+                />
             </DataTable>
 
+            {/* Dialog NUEVO / EDITAR */}
             <Dialog
                 visible={dialogOpen}
                 style={{ width: "72vw", maxWidth: 1100 }}
-                header="Nuevo registro — Contenedores de Cáscara (General)"
+                header={
+                    editingId
+                        ? "Editar registro — Contenedores de Cáscara (General)"
+                        : "Nuevo registro — Contenedores de Cáscara (General)"
+                }
                 modal
                 onHide={hideDialog}
                 footer={
@@ -513,7 +690,7 @@ export default function ContenedoresCascaraGeneral() {
                             placeholder="Seleccione"
                         />
                         <small className="block mt-2">
-                            <b>Semanal</b>: +7 días.
+                            <b>Semanal</b>: se reprograma automáticamente a +7 días.
                         </small>
                     </div>
 
@@ -522,7 +699,9 @@ export default function ContenedoresCascaraGeneral() {
                         <InputText
                             type="date"
                             value={form.fecha_registro}
-                            onChange={(e) => onChange("fecha_registro", e.target.value)}
+                            onChange={(e) =>
+                                onChange("fecha_registro", e.target.value)
+                            }
                         />
                     </div>
                     <div className="field col-12 md:col-4">
@@ -530,17 +709,19 @@ export default function ContenedoresCascaraGeneral() {
                         <InputText
                             type="time"
                             value={form.hora_registro}
-                            onChange={(e) => onChange("hora_registro", e.target.value)}
+                            onChange={(e) =>
+                                onChange("hora_registro", e.target.value)
+                            }
                         />
                     </div>
 
                     <div className="field col-6 md:col-3">
-                        <label className="font-bold">Posición (ID)</label>
-                        <InputText value={form.posicion_id} disabled />
+                        <label className="font-bold">Posición base</label>
+                        <InputText value={POSICION_ID_BASE} disabled />
                     </div>
                     <div className="field col-6 md:col-3">
                         <label className="font-bold">Equipo</label>
-                        <InputText value={form.equipo} disabled />
+                        <InputText value={EQUIPO} disabled />
                     </div>
 
                     <div className="field col-6 md:col-3">
@@ -552,21 +733,21 @@ export default function ContenedoresCascaraGeneral() {
                         </label>
                         <InputText
                             value={form.tecnico}
-                            onChange={(e) => onChange("tecnico", e.target.value)}
+                            onChange={(e) =>
+                                onChange("tecnico", e.target.value)
+                            }
                             placeholder="Nombre del técnico"
                         />
                     </div>
                     <div className="field col-6 md:col-3">
-                        <label className="font-bold">Cantidad (referencia)</label>
-                        <InputText
+                        <label className="font-bold">
+                            Cantidad
+                        </label>
+                        <Dropdown
                             value={form.cantidad}
-                            onChange={(e) =>
-                                onChange(
-                                    "cantidad",
-                                    e.target.value ? e.target.value.replace(/\D/g, "") : ""
-                                )
-                            }
-                            placeholder="Ej. 1"
+                            options={CANTIDAD_OPTIONS}
+                            onChange={(e) => onChange("cantidad", e.value)}
+                            placeholder="Seleccione Cantidad"
                         />
                     </div>
 
@@ -595,11 +776,14 @@ export default function ContenedoresCascaraGeneral() {
                             </label>
                             <InputText
                                 value={form.observaciones}
-                                onChange={(e) => onChange("observaciones", e.target.value)}
+                                onChange={(e) =>
+                                    onChange("observaciones", e.target.value)
+                                }
                                 placeholder="Explique el motivo"
                             />
                             <small className="block mt-2">
-                                Se reprogramará automáticamente para dentro de <b>7 días</b>.
+                                Se reprogramará automáticamente para dentro de{" "}
+                                <b>7 días</b>.
                             </small>
                         </div>
                     )}
@@ -624,7 +808,10 @@ export default function ContenedoresCascaraGeneral() {
                                                 <label className="font-bold">
                                                     {q.label}*{" "}
                                                     {submitted && !val && (
-                                                        <small className="p-error"> Requerido</small>
+                                                        <small className="p-error">
+                                                            {" "}
+                                                            Requerido
+                                                        </small>
                                                     )}
                                                 </label>
                                                 <Dropdown
@@ -650,7 +837,9 @@ export default function ContenedoresCascaraGeneral() {
                             </label>
                             <InputText
                                 value={form.observaciones}
-                                onChange={(e) => onChange("observaciones", e.target.value)}
+                                onChange={(e) =>
+                                    onChange("observaciones", e.target.value)
+                                }
                             />
                         </div>
                     )}
@@ -660,6 +849,82 @@ export default function ContenedoresCascaraGeneral() {
                         <InputText value={form.fecha_correccion_preview} disabled />
                     </div>
                 </div>
+            </Dialog>
+
+            {/* Dialog VER */}
+            <Dialog
+                visible={viewDialogOpen}
+                onHide={() => setViewDialogOpen(false)}
+                header="Detalle del registro"
+                style={{ width: "60vw", maxWidth: 900 }}
+                modal
+            >
+                {!viewRecord ? (
+                    <p>No hay datos para mostrar.</p>
+                ) : (
+                    <>
+                        <p>
+                            <b>ID:</b> {viewRecord.posicion_id} &nbsp; | &nbsp;
+                            <b>Equipo:</b> {viewRecord.equipo} &nbsp; | &nbsp;
+                            <b>Registro:</b> {viewRecord.registro} &nbsp; | &nbsp;
+                            <b>Periodicidad:</b> {viewRecord.periodicidad}
+                        </p>
+                        <p>
+                            <b>Consecutivo:</b>{" "}
+                            {viewRecord.cantidad !== null &&
+                                viewRecord.cantidad !== undefined
+                                ? String(viewRecord.cantidad).padStart(2, "0")
+                                : "—"}
+                        </p>
+                        <p>
+                            <b>Fecha intervención:</b>{" "}
+                            {fmtDMY(viewRecord.fecha_registro)} &nbsp; | &nbsp;
+                            <b>Hora:</b> {viewRecord.hora_registro || "—"}
+                        </p>
+                        <p>
+                            <b>Técnico:</b> {viewRecord.tecnico || "—"}
+                        </p>
+
+                        <hr />
+
+                        <div className="grid">
+                            {viewQuestionsForRow(viewRecord).map((q, idx) => {
+                                const col = `respuesta_q${idx + 1}`;
+                                const val = viewRecord[col] || "—";
+                                return (
+                                    <div
+                                        key={q.key}
+                                        className="col-12 md:col-6"
+                                        style={{ marginBottom: 8 }}
+                                    >
+                                        <div
+                                            style={{
+                                                fontSize: "0.85rem",
+                                                fontWeight: 600,
+                                            }}
+                                        >
+                                            {q.label}
+                                        </div>
+                                        <div
+                                            style={{
+                                                marginTop: 2,
+                                                fontSize: "0.85rem",
+                                            }}
+                                        >
+                                            Respuesta: <b>{val}</b>
+                                        </div>
+                                    </div>
+                                );
+                            })}
+                        </div>
+
+                        <hr />
+                        <p>
+                            <b>Observaciones:</b>{" "}
+                            {viewRecord.observaciones || "—"}
+                        </p>
+                    </>
+                )}
             </Dialog>
         </div>
     );

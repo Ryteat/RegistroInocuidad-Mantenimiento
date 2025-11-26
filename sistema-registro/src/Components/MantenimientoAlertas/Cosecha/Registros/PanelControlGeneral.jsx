@@ -25,6 +25,7 @@ const parseYMD = (s) => {
     if (!y || !m || !d) return null;
     return new Date(y, m - 1, d, 0, 0, 0, 0);
 };
+
 const fmtDMY = (iso) => {
     const d = parseYMD(iso);
     if (!d) return "—";
@@ -33,6 +34,7 @@ const fmtDMY = (iso) => {
     const yy = d.getFullYear();
     return `${dd}/${mm}/${yy}`;
 };
+
 const fmtDMYHM = (v) => {
     if (!v) return "—";
     const d = v instanceof Date ? v : new Date(v);
@@ -43,29 +45,33 @@ const fmtDMYHM = (v) => {
     const mi = String(d.getMinutes()).padStart(2, "0");
     return `${dd}/${mm}/${yy} ${hh}:${mi}`;
 };
+
 const toDateISO = (d = new Date()) =>
     `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(
         d.getDate()
     ).padStart(2, "0")}`;
+
 const toHM = (d = new Date()) =>
     d.toLocaleTimeString("en-GB", {
         hour: "2-digit",
         minute: "2-digit",
         hour12: false,
     });
+
 const addDays = (ymd, days) => {
     const b = parseYMD(ymd);
     b.setDate(b.getDate() + Number(days || 0));
     return toDateISO(b);
 };
+
 const addMonths = (ymd, months) => {
     const b = parseYMD(ymd);
     b.setMonth(b.getMonth() + Number(months || 0));
     return toDateISO(b);
 };
 
-/* ===== Constantes de este registro (COS-PC-G) ===== */
-const POSICION_ID = "COS-PC-G";
+/* ===== Constantes de este registro (COS-PC-G-01) ===== */
+const POSICION_BASE = "COS-PC-G"; // la posición REAL será COS-PC-G-01
 const EQUIPO = "PANEL DE CONTROL";
 const REGISTRO = "GENERAL";
 const TABLE = "mto_cosecha_panel_control_general";
@@ -78,7 +84,10 @@ const YESNO = [
 // Solo periodicidad MENSUAL
 const PERIODOS = [{ label: "Mensual", value: "MENSUAL" }];
 
-/* ===== Preguntas MENSUAL (texto de la OM) ===== */
+/** Cantidad: SOLO 1 → siempre sufijo 01 en el ID */
+const CANTIDAD_OPTIONS = [{ label: "01", value: "01" }];
+
+/* ===== Preguntas MENSUAL (texto OM) ===== */
 const Q_MENSUAL = [
     { key: "q1", label: "Botoneras y selectores, Revisar el funcionamiento" },
     { key: "q2", label: "Luces, Revisar las luces indicadoras, cambie si es necesario" },
@@ -89,13 +98,16 @@ const Q_MENSUAL = [
     { key: "q7", label: "Bornes, Revise la fijacion de los cables, calentamiento de cables en la entrada y la salida" },
 ];
 
+// Para compatibilidad con la tabla (respuesta_q1..respuesta_q14)
+const MAX_RESP = 14;
+
 const emptyForm = () => ({
     fecha_registro: toDateISO(),
     hora_registro: toHM(),
-    posicion_id: POSICION_ID,
+    posicion_id: `${POSICION_BASE}-01`, // vista previa
     equipo: EQUIPO,
     registro: REGISTRO,
-    cantidad: "",
+    cantidad: "01",
     tecnico: "",
     ejecutado: "",
     observaciones: "",
@@ -123,6 +135,10 @@ export default function PanelControlGeneral() {
     const [filtroRevisado, setFiltroRevisado] = useState("all");
     const { canReview, username } = useCanReview();
 
+    const [detailDialogOpen, setDetailDialogOpen] = useState(false);
+    const [detailRow, setDetailRow] = useState(null);
+    const [editingId, setEditingId] = useState(null);
+
     const showToast = (sev, sum, det, life = 3000) =>
         toast.current?.show({ severity: sev, summary: sum, detail: det, life });
 
@@ -137,11 +153,10 @@ export default function PanelControlGeneral() {
           fecha_registro, hora_registro,
           posicion_id, equipo, registro, cantidad, tecnico,
           ejecutado, observaciones, periodicidad,
-          ${Array.from({ length: 14 }, (_, i) => `respuesta_q${i + 1}`).join(
-                        ", "
-                    )},
+          ${Array.from({ length: MAX_RESP }, (_, i) => `respuesta_q${i + 1}`).join(", ")},
           ultimo_mantenimiento, proximo_mantenimiento,
-          revisado, revisado_por_username, revisado_fecha
+          revisado, revisado_por_username, revisado_fecha,
+          completado, pendiente_nuevo
         `
                 )
                 .order("fecha_registro", { ascending: false })
@@ -166,17 +181,6 @@ export default function PanelControlGeneral() {
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [filtroRevisado]);
 
-    const openNew = () => {
-        setForm(emptyForm());
-        setSubmitted(false);
-        setDialogOpen(true);
-    };
-
-    const hideDialog = () => {
-        setDialogOpen(false);
-        setSubmitted(false);
-    };
-
     const onChange = (field, value) =>
         setForm((prev) => ({
             ...prev,
@@ -198,6 +202,61 @@ export default function PanelControlGeneral() {
             items: { ...p.items, [key]: { respuesta: value } },
         }));
 
+    const onCantidadChange = (value) =>
+        setForm((prev) => ({
+            ...prev,
+            cantidad: value,
+            posicion_id: `${POSICION_BASE}-${value || "01"}`,
+        }));
+
+    const openNew = () => {
+        setForm(emptyForm());
+        setSubmitted(false);
+        setEditingId(null);
+        setDialogOpen(true);
+    };
+
+    const buildFormFromRow = (row) => {
+        const items = {};
+        Q_MENSUAL.forEach((q, idx) => {
+            const col = `respuesta_q${idx + 1}`;
+            items[q.key] = { respuesta: row[col] || "" };
+        });
+
+        const cantidadStr =
+            row.cantidad != null
+                ? String(row.cantidad).padStart(2, "0")
+                : "01";
+
+        return {
+            fecha_registro: row.fecha_registro || toDateISO(),
+            hora_registro: row.hora_registro || toHM(),
+            posicion_id: row.posicion_id || `${POSICION_BASE}-${cantidadStr}`,
+            equipo: row.equipo || EQUIPO,
+            registro: row.registro || REGISTRO,
+            cantidad: cantidadStr,
+            tecnico: row.tecnico || "",
+            ejecutado: row.ejecutado || "",
+            observaciones: row.observaciones || "",
+            periodicidad: row.periodicidad || "",
+            items,
+            fecha_correccion_preview: fmtDMYHM(row.created_at || new Date()),
+        };
+    };
+
+    const openEdit = (row) => {
+        setForm(buildFormFromRow(row));
+        setEditingId(row.id);
+        setSubmitted(false);
+        setDialogOpen(true);
+    };
+
+    const hideDialog = () => {
+        setDialogOpen(false);
+        setSubmitted(false);
+        setEditingId(null);
+    };
+
     const validate = () => {
         const errs = [];
         if (!form.periodicidad) errs.push("Seleccione la periodicidad.");
@@ -205,11 +264,12 @@ export default function PanelControlGeneral() {
             errs.push("El campo Técnico es requerido.");
         if (!form.ejecutado)
             errs.push("Indique si se va a efectuar el mantenimiento.");
+
         if (form.ejecutado === "NO" && !form.observaciones.trim())
             errs.push("Explique por qué NO se efectuó (Observaciones).");
+
         if (form.ejecutado === "SI") {
-            const list = Q_MENSUAL;
-            list.forEach((q) => {
+            Q_MENSUAL.forEach((q) => {
                 if (!form.items[q.key]?.respuesta)
                     errs.push(`Responda: ${q.label}`);
             });
@@ -226,27 +286,56 @@ export default function PanelControlGeneral() {
         }
 
         try {
+            const isEdit = !!editingId;
             const baseDate = form.fecha_registro || toDateISO();
-            const proximo =
+            const todayISO = toDateISO();
+
+            // Calculamos próximo mantenimiento base (lógica normal)
+            let proximo =
                 form.ejecutado === "NO"
                     ? addDays(baseDate, 7) // si NO ejecutado → +7 días
                     : addMonths(baseDate, 1); // Mensual → +1 mes
 
-            const payload = {
+            // ——— LÓGICA ESPECIAL "COMPLETADO" PARA REGISTROS VENCIDOS (PATRÓN TAMIZMOTOR) ———
+            let completadoFlag;
+            let pendienteNuevoFlag;
+
+            if (isEdit && form.ejecutado === "SI") {
+                const existingRow = rows.find((r) => r.id === editingId);
+                if (existingRow?.proximo_mantenimiento) {
+                    const proxOld = parseYMD(existingRow.proximo_mantenimiento);
+                    const today = parseYMD(todayISO);
+
+                    // Si el registro que estoy editando estaba VENCIDO → lo marcamos COMPLETADO
+                    if (proxOld && today && proxOld < today) {
+                        completadoFlag = true;
+                        pendienteNuevoFlag = true;
+                        // Para un COMPLETADO, dejamos proximo_mantenimiento en NULL,
+                        // el nuevo mantenimiento se crea desde la campanita con un registro nuevo.
+                        proximo = null;
+                    }
+                }
+            }
+
+            const cantidadNumero = form.cantidad
+                ? Number(form.cantidad)
+                : 1;
+
+            const posicionFinal = `${POSICION_BASE}-${form.cantidad || "01"}`;
+
+            const payloadBase = {
                 fecha_registro: form.fecha_registro,
                 hora_registro: form.hora_registro,
-                posicion_id: POSICION_ID,
+                posicion_id: posicionFinal,
                 equipo: EQUIPO,
                 registro: REGISTRO,
-                cantidad: form.cantidad
-                    ? Number(String(form.cantidad).replace(/\D/g, ""))
-                    : null,
+                cantidad: cantidadNumero,
                 tecnico: form.tecnico,
                 ejecutado: form.ejecutado,
                 observaciones: form.observaciones || null,
                 periodicidad: form.periodicidad,
                 ...Object.fromEntries(
-                    Array.from({ length: 14 }, (_, i) => [
+                    Array.from({ length: MAX_RESP }, (_, i) => [
                         `respuesta_q${i + 1}`,
                         form.ejecutado === "SI"
                             ? form.items[`q${i + 1}`]?.respuesta || null
@@ -257,11 +346,32 @@ export default function PanelControlGeneral() {
                 proximo_mantenimiento: proximo,
             };
 
-            const { error } = await supabase.from(TABLE).insert([payload]);
-            if (error) throw error;
+            // Solo incluimos estos flags cuando realmente queremos cambiar el estado
+            if (typeof completadoFlag !== "undefined") {
+                payloadBase.completado = completadoFlag;
+            }
+            if (typeof pendienteNuevoFlag !== "undefined") {
+                payloadBase.pendiente_nuevo = pendienteNuevoFlag;
+            }
 
-            showToast("success", "Éxito", "Registro guardado");
+            if (isEdit) {
+                const { error } = await supabase
+                    .from(TABLE)
+                    .update(payloadBase)
+                    .eq("id", editingId);
+
+                if (error) throw error;
+                showToast("success", "Éxito", "Registro actualizado");
+            } else {
+                const { error } = await supabase
+                    .from(TABLE)
+                    .insert([payloadBase]);
+                if (error) throw error;
+                showToast("success", "Éxito", "Registro guardado");
+            }
+
             setDialogOpen(false);
+            setEditingId(null);
             await fetchRows();
         } catch (e) {
             console.error(e);
@@ -294,7 +404,9 @@ export default function PanelControlGeneral() {
                             ...r,
                             revisado: next,
                             revisado_por_username: next ? username : null,
-                            revisado_fecha: next ? new Date().toISOString() : null,
+                            revisado_fecha: next
+                                ? new Date().toISOString()
+                                : null,
                         }
                         : r
                 )
@@ -325,7 +437,7 @@ export default function PanelControlGeneral() {
                     type="search"
                     value={globalFilter}
                     onInput={(e) => setGlobalFilter(e.target.value)}
-                    placeholder="Buscar (ej. COS-PC-G, técnico, notas)"
+                    placeholder="Buscar (ej. COS-PC-G-01, técnico, notas)"
                 />
             </span>
             <div className="flex align-items-center gap-2">
@@ -345,7 +457,7 @@ export default function PanelControlGeneral() {
     );
 
     const countSiNo = (row, val) =>
-        Array.from({ length: 14 }, (_, i) => i + 1).reduce(
+        Array.from({ length: MAX_RESP }, (_, i) => i + 1).reduce(
             (acc, i) =>
                 acc + ((row[`respuesta_q${i}`] || "") === val ? 1 : 0),
             0
@@ -382,6 +494,31 @@ export default function PanelControlGeneral() {
         );
     };
 
+    /* ===== Acciones (mismo patrón que Tamiz Malla) ===== */
+    const accionesTemplate = (row) => (
+        <div className="flex gap-2 justify-content-center">
+            <Button
+                icon="pi pi-search"
+                rounded
+                text
+                severity="info"
+                tooltip="Ver detalle"
+                onClick={() => {
+                    setDetailRow(row);
+                    setDetailDialogOpen(true);
+                }}
+            />
+            <Button
+                icon="pi pi-pencil"
+                rounded
+                text
+                severity="warning"
+                tooltip="Editar"
+                onClick={() => openEdit(row)}
+            />
+        </div>
+    );
+
     const activeQuestions = Q_MENSUAL;
 
     return (
@@ -394,8 +531,8 @@ export default function PanelControlGeneral() {
 
             <div className="welcome-message">
                 <p>
-                    <b>Posición (ID):</b> {POSICION_ID} &nbsp; | &nbsp; <b>Equipo:</b>{" "}
-                    {EQUIPO} &nbsp; | &nbsp;
+                    <b>Posición (ID):</b> {POSICION_BASE}-01 &nbsp; | &nbsp;{" "}
+                    <b>Equipo:</b> {EQUIPO} &nbsp; | &nbsp;
                     <b>Registro:</b> {REGISTRO}
                 </p>
             </div>
@@ -471,8 +608,15 @@ export default function PanelControlGeneral() {
                     body={revisadoTemplate}
                     style={{ width: "10rem", textAlign: "center" }}
                 />
+                <Column
+                    header="Acciones"
+                    body={accionesTemplate}
+                    exportable={false}
+                    style={{ width: "10rem", textAlign: "center" }}
+                />
             </DataTable>
 
+            {/* Dialogo de creación / edición */}
             <Dialog
                 visible={dialogOpen}
                 style={{ width: "72vw", maxWidth: 1100 }}
@@ -549,17 +693,16 @@ export default function PanelControlGeneral() {
                             placeholder="Nombre del técnico"
                         />
                     </div>
+
                     <div className="field col-6 md:col-3">
-                        <label className="font-bold">Cantidad (referencia)</label>
-                        <InputText
+                        <label className="font-bold">
+                            Cantidad (referencia)
+                        </label>
+                        <Dropdown
                             value={form.cantidad}
-                            onChange={(e) =>
-                                onChange(
-                                    "cantidad",
-                                    e.target.value ? e.target.value.replace(/\D/g, "") : ""
-                                )
-                            }
-                            placeholder="Ej. 1"
+                            options={CANTIDAD_OPTIONS}
+                            onChange={(e) => onCantidadChange(e.value)}
+                            placeholder="Seleccione"
                         />
                     </div>
 
@@ -588,11 +731,14 @@ export default function PanelControlGeneral() {
                             </label>
                             <InputText
                                 value={form.observaciones}
-                                onChange={(e) => onChange("observaciones", e.target.value)}
+                                onChange={(e) =>
+                                    onChange("observaciones", e.target.value)
+                                }
                                 placeholder="Explique el motivo"
                             />
                             <small className="block mt-2">
-                                Se reprogramará automáticamente para dentro de <b>7 días</b>.
+                                Se reprogramará automáticamente para dentro de{" "}
+                                <b>7 días</b>.
                             </small>
                         </div>
                     )}
@@ -611,9 +757,13 @@ export default function PanelControlGeneral() {
                                 >{`Checklist — MENSUAL`}</div>
                                 <div className="grid">
                                     {activeQuestions.map((q) => {
-                                        const val = form.items[q.key]?.respuesta || "";
+                                        const val =
+                                            form.items[q.key]?.respuesta || "";
                                         return (
-                                            <div key={q.key} className="col-12 md:col-6">
+                                            <div
+                                                key={q.key}
+                                                className="col-12 md:col-6"
+                                            >
                                                 <label className="font-bold">
                                                     {q.label}*{" "}
                                                     {submitted && !val && (
@@ -627,7 +777,10 @@ export default function PanelControlGeneral() {
                                                     value={val}
                                                     options={YESNO}
                                                     onChange={(e) =>
-                                                        onYesNoChange(q.key, e.value)
+                                                        onYesNoChange(
+                                                            q.key,
+                                                            e.value
+                                                        )
                                                     }
                                                     placeholder="Seleccione"
                                                 />
@@ -646,7 +799,9 @@ export default function PanelControlGeneral() {
                             </label>
                             <InputText
                                 value={form.observaciones}
-                                onChange={(e) => onChange("observaciones", e.target.value)}
+                                onChange={(e) =>
+                                    onChange("observaciones", e.target.value)
+                                }
                             />
                         </div>
                     )}
@@ -656,6 +811,61 @@ export default function PanelControlGeneral() {
                         <InputText value={form.fecha_correccion_preview} disabled />
                     </div>
                 </div>
+            </Dialog>
+
+            {/* Diálogo de detalle para ver preguntas / respuestas (igual estructura que Malla) */}
+            <Dialog
+                visible={detailDialogOpen}
+                header="Detalle del registro — Panel de Control"
+                style={{ width: "60vw", maxWidth: 900 }}
+                modal
+                onHide={() => setDetailDialogOpen(false)}
+            >
+                {detailRow && (
+                    <div className="p-fluid">
+                        <p>
+                            <b>Posición:</b> {detailRow.posicion_id} <br />
+                            <b>Equipo:</b> {detailRow.equipo} <br />
+                            <b>Registro:</b> {detailRow.registro} <br />
+                            <b>Técnico:</b> {detailRow.tecnico} <br />
+                            <b>Fecha intervención:</b>{" "}
+                            {fmtDMY(detailRow.fecha_registro)}{" "}
+                            {detailRow.hora_registro && ` ${detailRow.hora_registro}`}{" "}
+                            <br />
+                            <b>Periodicidad:</b> {detailRow.periodicidad}
+                        </p>
+
+                        <h3 className="mt-3 mb-2">Checklist</h3>
+                        <div className="grid">
+                            {Q_MENSUAL.map((q, idx) => {
+                                const resp =
+                                    detailRow[`respuesta_q${idx + 1}`] || "—";
+                                return (
+                                    <div
+                                        key={q.key}
+                                        className="col-12 md:col-6 mb-2"
+                                    >
+                                        <p className="m-0">
+                                            <b>{q.label}</b>
+                                            <br />
+                                            Respuesta:{" "}
+                                            <span>
+                                                {resp === "SI"
+                                                    ? "Sí"
+                                                    : resp === "NO"
+                                                        ? "No"
+                                                        : "—"}
+                                            </span>
+                                        </p>
+                                    </div>
+                                );
+                            })}
+                        </div>
+
+                        <h3 className="mt-3 mb-2">Observaciones</h3>
+                        <p>{detailRow.observaciones || "Sin observaciones."}</p>
+                    </div>
+                )}
             </Dialog>
         </div>
     );

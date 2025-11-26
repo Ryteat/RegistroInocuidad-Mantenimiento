@@ -1,6 +1,6 @@
 // src/Components/MantenimientoAlertas/Cosecha/Registros/TamizRevisionEstructuraMalla.jsx
 import React, { useEffect, useRef, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useLocation } from "react-router-dom";
 import supabase from "../../../../supabaseClient.js";
 import logo2 from "../../../../assets/mosca.png";
 
@@ -18,7 +18,7 @@ import { Checkbox } from "primereact/checkbox";
 import * as XLSX from "xlsx";
 import useCanReview from "../../../Inocuidad/Registros/Hooks/useCanReview.js";
 
-// Helpers de fecha
+/* ===== Helpers de fecha ===== */
 const parseYMD = (s) => {
     if (!s) return null;
     const [y, m, d] = String(s).split("-").map(Number);
@@ -64,8 +64,8 @@ const addDays = (ymd, days) => {
     return toDateISO(b);
 };
 
-/* ===== Constantes de este registro (COS-T-REM) ===== */
-const POSICION_ID = "COS-T-REM";
+/* ===== Constantes de este registro (COS-T-REM-01..06) ===== */
+const POSICION_ID_BASE = "COS-T-REM";
 const EQUIPO = "TAMIZ";
 const REGISTRO = "REVISIÓN DE ESTRUCTURA Y MALLA";
 const TABLE = "mto_cosecha_tamiz_revision_estructura_malla";
@@ -78,6 +78,15 @@ const YESNO = [
 // Solo tiene periodicidad SEMANAL
 const PERIODOS = [{ label: "Semanal", value: "SEMANAL" }];
 
+// Cantidad fija 01..06
+const CANTIDAD_OPTIONS = [
+    { label: "01", value: "01" },
+    { label: "02", value: "02" },
+    { label: "03", value: "03" },
+    { label: "04", value: "04" },
+    { label: "05", value: "05" },
+    { label: "06", value: "06" },
+];
 
 const Q_SEMANAL = [
     // ESTRUCTURA
@@ -99,13 +108,18 @@ const Q_SEMANAL = [
     },
 ];
 
+const getQuestionsFor = (periodicidad) => {
+    if (periodicidad === "SEMANAL") return Q_SEMANAL;
+    return [];
+};
+
 const emptyForm = () => ({
     fecha_registro: toDateISO(),
     hora_registro: toHM(),
-    posicion_id: POSICION_ID,
+    posicion_id: `${POSICION_ID_BASE}-01`,
     equipo: EQUIPO,
     registro: REGISTRO,
-    cantidad: "",
+    cantidad: "01",
     tecnico: "",
     ejecutado: "",
     observaciones: "",
@@ -118,20 +132,33 @@ const packRow = (r) => ({
     ...r,
     tecnico: r.tecnico ?? "",
     observaciones: r.observaciones ?? "",
+    cantidad:
+        r.cantidad != null
+            ? String(r.cantidad).padStart(2, "0")
+            : r.cantidad,
 });
 
 export default function TamizRevisionEstructuraMalla() {
     const navigate = useNavigate();
+    const location = useLocation();
     const toast = useRef(null);
+
     const [rows, setRows] = useState([]);
     const [selected, setSelected] = useState([]);
     const [globalFilter, setGlobalFilter] = useState("");
     const [loading, setLoading] = useState(false);
+
     const [dialogOpen, setDialogOpen] = useState(false);
     const [submitted, setSubmitted] = useState(false);
     const [form, setForm] = useState(emptyForm());
+    const [editingId, setEditingId] = useState(null);
+
     const [filtroRevisado, setFiltroRevisado] = useState("all");
     const { canReview, username } = useCanReview();
+
+    // Dialog de VER
+    const [viewDialogOpen, setViewDialogOpen] = useState(false);
+    const [viewRecord, setViewRecord] = useState(null);
 
     const showToast = (sev, sum, det, life = 3000) =>
         toast.current?.show({ severity: sev, summary: sum, detail: det, life });
@@ -151,6 +178,7 @@ export default function TamizRevisionEstructuraMalla() {
                         ", "
                     )},
           ultimo_mantenimiento, proximo_mantenimiento,
+          completado, pendiente_nuevo,
           revisado, revisado_por_username, revisado_fecha
         `
                 )
@@ -176,15 +204,73 @@ export default function TamizRevisionEstructuraMalla() {
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [filtroRevisado]);
 
+    // Si venimos desde la campanita con un focusId, abrir directamente en editar
+    useEffect(() => {
+        const focusId = location.state?.focusId;
+        if (!focusId || !rows.length) return;
+        const row = rows.find((r) => r.id === focusId);
+        if (row) openEdit(row);
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [location.state, rows]);
+
     const openNew = () => {
         setForm(emptyForm());
+        setEditingId(null);
         setSubmitted(false);
         setDialogOpen(true);
+    };
+
+    const openEdit = (row) => {
+        const baseQuestions = getQuestionsFor(row.periodicidad);
+        const items = {};
+        baseQuestions.forEach((q, idx) => {
+            const col = `respuesta_q${idx + 1}`;
+            items[q.key] = { respuesta: row[col] || "" };
+        });
+
+        // Derivar cantidad (01..06) desde la columna cantidad o desde el sufijo del ID
+        let cantidadStr = "";
+        if (row.cantidad != null) {
+            cantidadStr = String(row.cantidad).padStart(2, "0");
+        } else if (row.posicion_id) {
+            const parts = row.posicion_id.split("-");
+            const last = parts[parts.length - 1];
+            if (CANTIDAD_OPTIONS.some((o) => o.value === last)) {
+                cantidadStr = last;
+            }
+        }
+        if (!cantidadStr) cantidadStr = "01";
+
+        setForm({
+            fecha_registro: row.fecha_registro || toDateISO(),
+            hora_registro: row.hora_registro || toHM(),
+            posicion_id:
+                row.posicion_id || `${POSICION_ID_BASE}-${cantidadStr}`,
+            equipo: row.equipo || EQUIPO,
+            registro: row.registro || REGISTRO,
+            cantidad: cantidadStr,
+            tecnico: row.tecnico || "",
+            ejecutado: row.ejecutado || "",
+            observaciones: row.observaciones || "",
+            periodicidad: row.periodicidad || "",
+            items,
+            fecha_correccion_preview: fmtDMYHM(row.created_at),
+        });
+
+        setEditingId(row.id);
+        setSubmitted(false);
+        setDialogOpen(true);
+    };
+
+    const openView = (row) => {
+        setViewRecord(row);
+        setViewDialogOpen(true);
     };
 
     const hideDialog = () => {
         setDialogOpen(false);
         setSubmitted(false);
+        setEditingId(null);
     };
 
     const onChange = (field, value) =>
@@ -193,8 +279,16 @@ export default function TamizRevisionEstructuraMalla() {
             [field]: value,
         }));
 
+    const onCantidadChange = (value) => {
+        setForm((prev) => ({
+            ...prev,
+            cantidad: value,
+            posicion_id: `${POSICION_ID_BASE}-${value || "01"}`,
+        }));
+    };
+
     const onPeriodoChange = (value) => {
-        const base = Q_SEMANAL;
+        const base = getQuestionsFor(value);
         const items = base.reduce(
             (acc, q) => ({ ...acc, [q.key]: { respuesta: "" } }),
             {}
@@ -218,12 +312,13 @@ export default function TamizRevisionEstructuraMalla() {
         if (form.ejecutado === "NO" && !form.observaciones.trim())
             errs.push("Explique por qué NO se efectuó (Observaciones).");
         if (form.ejecutado === "SI") {
-            const list = Q_SEMANAL;
+            const list = getQuestionsFor(form.periodicidad);
             list.forEach((q) => {
                 if (!form.items[q.key]?.respuesta)
                     errs.push(`Responda: ${q.label}`);
             });
         }
+        if (!form.cantidad) errs.push("Seleccione la cantidad (01..06).");
         return errs;
     };
 
@@ -237,18 +332,38 @@ export default function TamizRevisionEstructuraMalla() {
 
         try {
             const baseDate = form.fecha_registro || toDateISO();
-            // SEMANAL: siempre +7 días (se haya ejecutado o no)
+            const isEdit = !!editingId;
+
+            const questions = getQuestionsFor(form.periodicidad);
+            const allYes =
+                form.ejecutado === "SI" &&
+                questions.length > 0 &&
+                questions.every(
+                    (q) => form.items[q.key]?.respuesta === "SI"
+                );
+
+            // Lógica de completado igual que TamizMotor
+            const completadoFlag = isEdit && allYes ? true : false;
+            const pendienteNuevoFlag = isEdit && allYes ? true : false;
+
+            // SEMANAL: siempre +7 días
             const proximo = addDays(baseDate, 7);
+
+            const cantidadNum = form.cantidad
+                ? Number(form.cantidad)
+                : null;
+
+            const posicionIdFinal = form.cantidad
+                ? `${POSICION_ID_BASE}-${form.cantidad}`
+                : `${POSICION_ID_BASE}-01`;
 
             const payload = {
                 fecha_registro: form.fecha_registro,
                 hora_registro: form.hora_registro,
-                posicion_id: POSICION_ID,
+                posicion_id: posicionIdFinal,
                 equipo: EQUIPO,
                 registro: REGISTRO,
-                cantidad: form.cantidad
-                    ? Number(String(form.cantidad).replace(/\D/g, ""))
-                    : null,
+                cantidad: cantidadNum,
                 tecnico: form.tecnico,
                 ejecutado: form.ejecutado,
                 observaciones: form.observaciones || null,
@@ -261,15 +376,32 @@ export default function TamizRevisionEstructuraMalla() {
                             : null,
                     ])
                 ),
-                ultimo_mantenimiento: form.ejecutado === "SI" ? baseDate : null,
+                ultimo_mantenimiento:
+                    form.ejecutado === "SI" ? baseDate : null,
                 proximo_mantenimiento: proximo,
+                completado: completadoFlag,
+                pendiente_nuevo: pendienteNuevoFlag,
             };
 
-            const { error } = await supabase.from(TABLE).insert([payload]);
+            let error;
+            if (editingId) {
+                ({ error } = await supabase
+                    .from(TABLE)
+                    .update(payload)
+                    .eq("id", editingId));
+            } else {
+                ({ error } = await supabase.from(TABLE).insert([payload]));
+            }
+
             if (error) throw error;
 
-            showToast("success", "Éxito", "Registro guardado");
+            showToast(
+                "success",
+                "Éxito",
+                editingId ? "Registro actualizado" : "Registro guardado"
+            );
             setDialogOpen(false);
+            setEditingId(null);
             await fetchRows();
         } catch (e) {
             console.error(e);
@@ -335,7 +467,7 @@ export default function TamizRevisionEstructuraMalla() {
                     type="search"
                     value={globalFilter}
                     onInput={(e) => setGlobalFilter(e.target.value)}
-                    placeholder="Buscar (ej. COS-T-REM, técnico, notas)"
+                    placeholder="Buscar (ej. COS-T-REM-01, técnico, notas)"
                 />
             </span>
             <div className="flex align-items-center gap-2">
@@ -392,7 +524,27 @@ export default function TamizRevisionEstructuraMalla() {
         );
     };
 
-    const activeQuestions = Q_SEMANAL;
+    const activeQuestions = getQuestionsFor(form.periodicidad);
+
+    const accionesTemplate = (row) => (
+        <div className="flex gap-2">
+            <Button
+                label="Ver"
+                icon="pi pi-eye"
+                text
+                onClick={() => openView(row)}
+            />
+            <Button
+                label="Editar"
+                icon="pi pi-pencil"
+                text
+                onClick={() => openEdit(row)}
+            />
+        </div>
+    );
+
+    const viewQuestionsForRow = (row) =>
+        getQuestionsFor(row.periodicidad || "");
 
     return (
         <div className="controlrendcosechayfrass-container">
@@ -404,8 +556,8 @@ export default function TamizRevisionEstructuraMalla() {
 
             <div className="welcome-message">
                 <p>
-                    <b>Posición (ID):</b> {POSICION_ID} &nbsp; | &nbsp; <b>Equipo:</b>{" "}
-                    {EQUIPO} &nbsp; | &nbsp;
+                    <b>Posición (ID base):</b> {POSICION_ID_BASE}-01..06 &nbsp; | &nbsp;{" "}
+                    <b>Equipo:</b> {EQUIPO} &nbsp; | &nbsp;
                     <b>Registro:</b> {REGISTRO}
                 </p>
             </div>
@@ -481,12 +633,23 @@ export default function TamizRevisionEstructuraMalla() {
                     body={revisadoTemplate}
                     style={{ width: "10rem", textAlign: "center" }}
                 />
+                <Column
+                    header="Acciones"
+                    body={accionesTemplate}
+                    exportable={false}
+                    style={{ width: "14rem" }}
+                />
             </DataTable>
 
+            {/* Dialog NUEVO / EDITAR */}
             <Dialog
                 visible={dialogOpen}
                 style={{ width: "72vw", maxWidth: 1100 }}
-                header="Nuevo registro — Tamiz (Revisión de Estructura y Malla)"
+                header={
+                    editingId
+                        ? "Editar registro — Tamiz (Revisión de Estructura y Malla)"
+                        : "Nuevo registro — Tamiz (Revisión de Estructura y Malla)"
+                }
                 modal
                 onHide={hideDialog}
                 footer={
@@ -540,11 +703,15 @@ export default function TamizRevisionEstructuraMalla() {
 
                     <div className="field col-6 md:col-3">
                         <label className="font-bold">Posición (ID)</label>
-                        <InputText value={form.posicion_id} disabled />
+                        <InputText
+                            value={`${POSICION_ID_BASE}-${form.cantidad || "01"
+                                }`}
+                            disabled
+                        />
                     </div>
                     <div className="field col-6 md:col-3">
                         <label className="font-bold">Equipo</label>
-                        <InputText value={form.equipo} disabled />
+                        <InputText value={EQUIPO} disabled />
                     </div>
 
                     <div className="field col-6 md:col-3">
@@ -560,17 +727,19 @@ export default function TamizRevisionEstructuraMalla() {
                             placeholder="Nombre del técnico"
                         />
                     </div>
+
                     <div className="field col-6 md:col-3">
-                        <label className="font-bold">Cantidad (referencia)</label>
-                        <InputText
+                        <label className="font-bold">
+                            Cantidad (01..06)*{" "}
+                            {submitted && !form.cantidad && (
+                                <small className="p-error"> Requerido</small>
+                            )}
+                        </label>
+                        <Dropdown
                             value={form.cantidad}
-                            onChange={(e) =>
-                                onChange(
-                                    "cantidad",
-                                    e.target.value ? e.target.value.replace(/\D/g, "") : ""
-                                )
-                            }
-                            placeholder="Ej. 1"
+                            options={CANTIDAD_OPTIONS}
+                            onChange={(e) => onCantidadChange(e.value)}
+                            placeholder="Seleccione"
                         />
                     </div>
 
@@ -628,7 +797,10 @@ export default function TamizRevisionEstructuraMalla() {
                                                 <label className="font-bold">
                                                     {q.label}*{" "}
                                                     {submitted && !val && (
-                                                        <small className="p-error"> Requerido</small>
+                                                        <small className="p-error">
+                                                            {" "}
+                                                            Requerido
+                                                        </small>
                                                     )}
                                                 </label>
                                                 <Dropdown
@@ -664,6 +836,78 @@ export default function TamizRevisionEstructuraMalla() {
                         <InputText value={form.fecha_correccion_preview} disabled />
                     </div>
                 </div>
+            </Dialog>
+
+            {/* Dialog VER */}
+            <Dialog
+                visible={viewDialogOpen}
+                onHide={() => setViewDialogOpen(false)}
+                header="Detalle del registro"
+                style={{ width: "60vw", maxWidth: 900 }}
+                modal
+            >
+                {!viewRecord ? (
+                    <p>No hay datos para mostrar.</p>
+                ) : (
+                    <>
+                        <p>
+                            <b>ID:</b> {viewRecord.posicion_id} &nbsp; | &nbsp;
+                            <b>Equipo:</b> {viewRecord.equipo} &nbsp; | &nbsp;
+                            <b>Registro:</b> {viewRecord.registro} &nbsp; | &nbsp;
+                            <b>Periodicidad:</b> {viewRecord.periodicidad}
+                        </p>
+                        <p>
+                            <b>Fecha intervención:</b>{" "}
+                            {fmtDMY(viewRecord.fecha_registro)} &nbsp; | &nbsp;
+                            <b>Hora:</b> {viewRecord.hora_registro || "—"}
+                        </p>
+                        <p>
+                            <b>Técnico:</b> {viewRecord.tecnico || "—"}
+                        </p>
+
+                        <hr />
+
+                        <div className="grid">
+                            {viewQuestionsForRow(viewRecord).map((q, idx) => {
+                                const col = `respuesta_q${idx + 1}`;
+                                const val = viewRecord[col] || "—";
+                                return (
+                                    <div
+                                        key={q.key}
+                                        className="col-12 md:col-6"
+                                        style={{ marginBottom: 8 }}
+                                    >
+                                        <div
+                                            style={{
+                                                fontSize: "0.85rem",
+                                                fontWeight: 600,
+                                            }}
+                                        >
+                                            {q.label}
+                                        </div>
+                                        <div
+                                            style={{
+                                                marginTop: 2,
+                                                fontSize: "0.85rem",
+                                            }}
+                                        >
+                                            Respuesta:{" "}
+                                            <b>
+                                                {val === "SI" || val === "NO" ? val : "—"}
+                                            </b>
+                                        </div>
+                                    </div>
+                                );
+                            })}
+                        </div>
+
+                        <hr />
+                        <p>
+                            <b>Observaciones:</b>{" "}
+                            {viewRecord.observaciones || "—"}
+                        </p>
+                    </>
+                )}
             </Dialog>
         </div>
     );

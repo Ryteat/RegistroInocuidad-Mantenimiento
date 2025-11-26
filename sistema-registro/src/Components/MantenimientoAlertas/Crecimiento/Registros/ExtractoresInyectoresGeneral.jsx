@@ -65,7 +65,7 @@ const addMonths = (ymd, m) => {
 };
 
 /* ===== Constantes de este registro (CRE-EY-G) ===== */
-const POSICION_ID = "CRE-EY-G";
+const POSICION_ID_BASE = "CRE-EY-G";
 const EQUIPO = "EXTRACTORES E INYECTORES";
 const REGISTRO = "GENERAL";
 const TABLE = "mto_crecimiento_extractores_inyectores_general";
@@ -77,6 +77,12 @@ const YESNO = [
 
 // Solo tiene periodicidad TRIMESTRAL
 const PERIODOS = [{ label: "Trimestral", value: "TRIMESTRAL" }];
+
+/** Cantidad 1–64 (sufijo -01..-64 en posicion_id) */
+const CANTIDAD_OPTIONS = Array.from({ length: 64 }, (_, i) => ({
+    label: String(i + 1), // se muestra 1..64
+    value: i + 1,         // sufijo se arma con padStart(2, "0")
+}));
 
 /* ===== Preguntas TRIMESTRAL (texto literal de la OM) ===== */
 const Q_TRIMESTRAL = [
@@ -115,13 +121,15 @@ const Q_TRIMESTRAL = [
     { key: "q13", label: "Verificar que no exista presencia de humedad" },
 ];
 
+const getQuestions = () => Q_TRIMESTRAL;
+
 const emptyForm = () => ({
     fecha_registro: toDateISO(),
     hora_registro: toHM(),
-    posicion_id: POSICION_ID,
+    posicion_id: POSICION_ID_BASE,
     equipo: EQUIPO,
     registro: REGISTRO,
-    cantidad: "",
+    cantidad: null,
     tecnico: "",
     ejecutado: "",
     observaciones: "",
@@ -143,11 +151,18 @@ export default function ExtractoresInyectoresGeneral() {
     const [selected, setSelected] = useState([]);
     const [globalFilter, setGlobalFilter] = useState("");
     const [loading, setLoading] = useState(false);
+
     const [dialogOpen, setDialogOpen] = useState(false);
     const [submitted, setSubmitted] = useState(false);
     const [form, setForm] = useState(emptyForm());
+    const [editingId, setEditingId] = useState(null);
+
     const [filtroRevisado, setFiltroRevisado] = useState("all");
     const { canReview, username } = useCanReview();
+
+    // Dialog VER
+    const [viewDialogOpen, setViewDialogOpen] = useState(false);
+    const [viewRecord, setViewRecord] = useState(null);
 
     const showToast = (sev, sum, det, life = 3000) =>
         toast.current?.show({ severity: sev, summary: sum, detail: det, life });
@@ -167,7 +182,8 @@ export default function ExtractoresInyectoresGeneral() {
                         ", "
                     )},
           ultimo_mantenimiento, proximo_mantenimiento,
-          revisado, revisado_por_username, revisado_fecha
+          revisado, revisado_por_username, revisado_fecha,
+          completado, pendiente_nuevo, fecha_completado
         `
                 )
                 .order("fecha_registro", { ascending: false })
@@ -194,13 +210,57 @@ export default function ExtractoresInyectoresGeneral() {
 
     const openNew = () => {
         setForm(emptyForm());
+        setEditingId(null);
         setSubmitted(false);
         setDialogOpen(true);
+    };
+
+    const openEdit = (row) => {
+        const baseQuestions = getQuestions();
+        const items = {};
+        baseQuestions.forEach((q, idx) => {
+            const col = `respuesta_q${idx + 1}`;
+            items[q.key] = { respuesta: row[col] || "" };
+        });
+
+        // intentar sacar la cantidad desde el sufijo del ID (CRE-EY-G-01..)
+        let cant = row.cantidad ?? null;
+        if (!cant && row.posicion_id) {
+            const parts = String(row.posicion_id).split("-");
+            const last = parts[parts.length - 1];
+            const parsed = parseInt(last, 10);
+            if (!Number.isNaN(parsed)) cant = parsed;
+        }
+
+        setForm({
+            fecha_registro: row.fecha_registro || toDateISO(),
+            hora_registro: row.hora_registro || toHM(),
+            posicion_id: POSICION_ID_BASE,
+            equipo: row.equipo || EQUIPO,
+            registro: row.registro || REGISTRO,
+            cantidad: cant,
+            tecnico: row.tecnico || "",
+            ejecutado: row.ejecutado || "",
+            observaciones: row.observaciones || "",
+            periodicidad: row.periodicidad || "TRIMESTRAL",
+            items,
+            fecha_correccion_preview: fmtDMYHM(row.created_at),
+        });
+
+        setEditingId(row.id);
+        setSubmitted(false);
+        setDialogOpen(true);
+    };
+
+    const openView = (row) => {
+        setViewRecord(row);
+        setViewDialogOpen(true);
     };
 
     const hideDialog = () => {
         setDialogOpen(false);
         setSubmitted(false);
+        setEditingId(null);
     };
 
     const onChange = (field, value) =>
@@ -210,7 +270,7 @@ export default function ExtractoresInyectoresGeneral() {
         }));
 
     const onPeriodoChange = (value) => {
-        const base = Q_TRIMESTRAL;
+        const base = getQuestions();
         const items = base.reduce(
             (acc, q) => ({ ...acc, [q.key]: { respuesta: "" } }),
             {}
@@ -224,9 +284,15 @@ export default function ExtractoresInyectoresGeneral() {
             items: { ...p.items, [key]: { respuesta: value } },
         }));
 
+    const allAnswersAreYes = () => {
+        const list = getQuestions();
+        return list.every((q) => form.items[q.key]?.respuesta === "SI");
+    };
+
     const validate = () => {
         const errs = [];
         if (!form.periodicidad) errs.push("Seleccione la periodicidad.");
+        if (!form.cantidad) errs.push("Seleccione la cantidad.");
         if (!form.tecnico?.trim())
             errs.push("El campo Técnico es requerido.");
         if (!form.ejecutado)
@@ -234,7 +300,7 @@ export default function ExtractoresInyectoresGeneral() {
         if (form.ejecutado === "NO" && !form.observaciones.trim())
             errs.push("Explique por qué NO se efectuó (Observaciones).");
         if (form.ejecutado === "SI") {
-            const list = Q_TRIMESTRAL;
+            const list = getQuestions();
             list.forEach((q) => {
                 if (!form.items[q.key]?.respuesta)
                     errs.push(`Responda: ${q.label}`);
@@ -253,41 +319,110 @@ export default function ExtractoresInyectoresGeneral() {
 
         try {
             const baseDate = form.fecha_registro || toDateISO();
-            const proximo =
-                form.ejecutado === "NO"
-                    ? addDays(baseDate, 7)
-                    : addMonths(baseDate, 3); // TRIMESTRAL: +3 meses
+            const cantidadNum = Number(form.cantidad);
+            const sufijo = String(cantidadNum).padStart(2, "0");
+            const posicionCompleta = `${POSICION_ID_BASE}-${sufijo}`;
 
-            const payload = {
+            const respuestasPayload = Object.fromEntries(
+                Array.from({ length: 14 }, (_, i) => [
+                    `respuesta_q${i + 1}`,
+                    form.ejecutado === "SI"
+                        ? form.items[`q${i + 1}`]?.respuesta || null
+                        : null,
+                ])
+            );
+
+            const basePayload = {
                 fecha_registro: form.fecha_registro,
                 hora_registro: form.hora_registro,
-                posicion_id: POSICION_ID,
+                posicion_id: posicionCompleta,
                 equipo: EQUIPO,
                 registro: REGISTRO,
-                cantidad: form.cantidad
-                    ? Number(String(form.cantidad).replace(/\D/g, ""))
-                    : null,
+                cantidad: Number.isNaN(cantidadNum) ? null : cantidadNum,
                 tecnico: form.tecnico,
                 ejecutado: form.ejecutado,
                 observaciones: form.observaciones || null,
                 periodicidad: form.periodicidad,
-                ...Object.fromEntries(
-                    Array.from({ length: 14 }, (_, i) => [
-                        `respuesta_q${i + 1}`,
-                        form.ejecutado === "SI"
-                            ? form.items[`q${i + 1}`]?.respuesta || null
-                            : null,
-                    ])
-                ),
-                ultimo_mantenimiento: form.ejecutado === "SI" ? baseDate : null,
-                proximo_mantenimiento: proximo,
+                ...respuestasPayload,
             };
 
-            const { error } = await supabase.from(TABLE).insert([payload]);
+            let error;
+
+            if (editingId) {
+                // EDICIÓN desde la campanita / panel
+                let updatePayload = { ...basePayload };
+
+                if (form.ejecutado === "SI" && allAnswersAreYes()) {
+                    // COMPLETADO → queda en verde hasta que se cree un nuevo registro
+                    updatePayload = {
+                        ...updatePayload,
+                        ultimo_mantenimiento: baseDate,
+                        completado: true,
+                        pendiente_nuevo: true,
+                        fecha_completado: new Date().toISOString(),
+                        // No tocamos proximo_mantenimiento aquí: la vista usa COMPLETADO
+                    };
+                } else if (form.ejecutado === "NO") {
+                    // No ejecutado → reprogramar +7d y quitar COMPLETADO
+                    updatePayload = {
+                        ...updatePayload,
+                        ultimo_mantenimiento: null,
+                        proximo_mantenimiento: addDays(baseDate, 7),
+                        completado: false,
+                        pendiente_nuevo: false,
+                        fecha_completado: null,
+                    };
+                } else {
+                    // Ejecutado pero con algún NO → tratar como ciclo normal TRIMESTRAL
+                    updatePayload = {
+                        ...updatePayload,
+                        ultimo_mantenimiento: baseDate,
+                        proximo_mantenimiento: addMonths(baseDate, 3),
+                        completado: false,
+                        pendiente_nuevo: false,
+                        fecha_completado: null,
+                    };
+                }
+
+                ({ error } = await supabase
+                    .from(TABLE)
+                    .update(updatePayload)
+                    .eq("id", editingId));
+            } else {
+                // NUEVO REGISTRO (no debe arrancar como COMPLETADO)
+                let ultimo = null;
+                let proximo = null;
+
+                if (form.ejecutado === "NO") {
+                    proximo = addDays(baseDate, 7);
+                } else {
+                    ultimo = baseDate;
+                    proximo = addMonths(baseDate, 3);
+                }
+
+                const insertPayload = {
+                    ...basePayload,
+                    ultimo_mantenimiento: ultimo,
+                    proximo_mantenimiento: proximo,
+                    completado: false,
+                    pendiente_nuevo: false,
+                    fecha_completado: null,
+                };
+
+                ({ error } = await supabase
+                    .from(TABLE)
+                    .insert([insertPayload]));
+            }
+
             if (error) throw error;
 
-            showToast("success", "Éxito", "Registro guardado");
+            showToast(
+                "success",
+                "Éxito",
+                editingId ? "Registro actualizado" : "Registro guardado"
+            );
             setDialogOpen(false);
+            setEditingId(null);
             await fetchRows();
         } catch (e) {
             console.error(e);
@@ -320,7 +455,9 @@ export default function ExtractoresInyectoresGeneral() {
                             ...r,
                             revisado: next,
                             revisado_por_username: next ? username : null,
-                            revisado_fecha: next ? new Date().toISOString() : null,
+                            revisado_fecha: next
+                                ? new Date().toISOString()
+                                : null,
                         }
                         : r
                 )
@@ -351,7 +488,7 @@ export default function ExtractoresInyectoresGeneral() {
                     type="search"
                     value={globalFilter}
                     onInput={(e) => setGlobalFilter(e.target.value)}
-                    placeholder="Buscar (ej. CRE-EY-G, técnico, notas)"
+                    placeholder="Buscar (ej. CRE-EY-G-01, técnico, notas)"
                 />
             </span>
             <div className="flex align-items-center gap-2">
@@ -386,6 +523,7 @@ export default function ExtractoresInyectoresGeneral() {
             equipo: r.equipo,
             registro: r.registro ?? "",
             periodicidad: r.periodicidad ?? "",
+            cantidad: r.cantidad ?? "",
             ultimo_mantenimiento: fmtDMY(r.ultimo_mantenimiento),
             proximo_mantenimiento: fmtDMY(r.proximo_mantenimiento),
             tecnico: r.tecnico ?? "",
@@ -407,7 +545,26 @@ export default function ExtractoresInyectoresGeneral() {
         );
     };
 
-    const activeQuestions = Q_TRIMESTRAL;
+    const activeQuestions = getQuestions();
+
+    const accionesTemplate = (row) => (
+        <div className="flex gap-2">
+            <Button
+                label="Ver"
+                icon="pi pi-eye"
+                text
+                onClick={() => openView(row)}
+            />
+            <Button
+                label="Editar"
+                icon="pi pi-pencil"
+                text
+                onClick={() => openEdit(row)}
+            />
+        </div>
+    );
+
+    const viewQuestionsForRow = () => getQuestions();
 
     return (
         <div className="controlrendcosechayfrass-container">
@@ -419,8 +576,8 @@ export default function ExtractoresInyectoresGeneral() {
 
             <div className="welcome-message">
                 <p>
-                    <b>Posición (ID):</b> {POSICION_ID} &nbsp; | &nbsp; <b>Equipo:</b>{" "}
-                    {EQUIPO} &nbsp; | &nbsp;
+                    <b>Posición base (ID):</b> {POSICION_ID_BASE} &nbsp; | &nbsp;{" "}
+                    <b>Equipo:</b> {EQUIPO} &nbsp; | &nbsp;
                     <b>Registro:</b> {REGISTRO}
                 </p>
             </div>
@@ -474,6 +631,7 @@ export default function ExtractoresInyectoresGeneral() {
                 <Column field="posicion_id" header="Posición" sortable />
                 <Column field="equipo" header="Equipo" sortable />
                 <Column field="registro" header="Registro" />
+                <Column field="cantidad" header="Cant." sortable />
                 <Column field="periodicidad" header="Periodicidad" />
                 <Column
                     header="Último Mto."
@@ -496,12 +654,23 @@ export default function ExtractoresInyectoresGeneral() {
                     body={revisadoTemplate}
                     style={{ width: "10rem", textAlign: "center" }}
                 />
+                <Column
+                    header="Acciones"
+                    body={accionesTemplate}
+                    exportable={false}
+                    style={{ width: "14rem" }}
+                />
             </DataTable>
 
+            {/* Dialog NUEVO / EDITAR */}
             <Dialog
                 visible={dialogOpen}
                 style={{ width: "72vw", maxWidth: 1100 }}
-                header="Nuevo registro — Extractores e Inyectores (General)"
+                header={
+                    editingId
+                        ? "Editar registro — Extractores e Inyectores (General)"
+                        : "Nuevo registro — Extractores e Inyectores (General)"
+                }
                 modal
                 onHide={hideDialog}
                 footer={
@@ -540,7 +709,9 @@ export default function ExtractoresInyectoresGeneral() {
                         <InputText
                             type="date"
                             value={form.fecha_registro}
-                            onChange={(e) => onChange("fecha_registro", e.target.value)}
+                            onChange={(e) =>
+                                onChange("fecha_registro", e.target.value)
+                            }
                         />
                     </div>
                     <div className="field col-12 md:col-4">
@@ -548,17 +719,19 @@ export default function ExtractoresInyectoresGeneral() {
                         <InputText
                             type="time"
                             value={form.hora_registro}
-                            onChange={(e) => onChange("hora_registro", e.target.value)}
+                            onChange={(e) =>
+                                onChange("hora_registro", e.target.value)
+                            }
                         />
                     </div>
 
                     <div className="field col-6 md:col-3">
-                        <label className="font-bold">Posición (ID)</label>
-                        <InputText value={form.posicion_id} disabled />
+                        <label className="font-bold">Posición base</label>
+                        <InputText value={POSICION_ID_BASE} disabled />
                     </div>
                     <div className="field col-6 md:col-3">
                         <label className="font-bold">Equipo</label>
-                        <InputText value={form.equipo} disabled />
+                        <InputText value={EQUIPO} disabled />
                     </div>
 
                     <div className="field col-6 md:col-3">
@@ -570,21 +743,24 @@ export default function ExtractoresInyectoresGeneral() {
                         </label>
                         <InputText
                             value={form.tecnico}
-                            onChange={(e) => onChange("tecnico", e.target.value)}
+                            onChange={(e) =>
+                                onChange("tecnico", e.target.value)
+                            }
                             placeholder="Nombre del técnico"
                         />
                     </div>
                     <div className="field col-6 md:col-3">
-                        <label className="font-bold">Cantidad (referencia)</label>
-                        <InputText
+                        <label className="font-bold">
+                            Cantidad* (1–64){" "}
+                            {submitted && !form.cantidad && (
+                                <small className="p-error"> Requerido</small>
+                            )}
+                        </label>
+                        <Dropdown
                             value={form.cantidad}
-                            onChange={(e) =>
-                                onChange(
-                                    "cantidad",
-                                    e.target.value ? e.target.value.replace(/\D/g, "") : ""
-                                )
-                            }
-                            placeholder="Ej. 1"
+                            options={CANTIDAD_OPTIONS}
+                            onChange={(e) => onChange("cantidad", e.value)}
+                            placeholder="Seleccione"
                         />
                     </div>
 
@@ -607,17 +783,24 @@ export default function ExtractoresInyectoresGeneral() {
                         <div className="field col-12">
                             <label className="font-bold">
                                 Observaciones (obligatorio si NO){" "}
-                                {submitted && !form.observaciones.trim() && (
-                                    <small className="p-error"> Requerido</small>
-                                )}
+                                {submitted &&
+                                    !form.observaciones.trim() && (
+                                        <small className="p-error">
+                                            {" "}
+                                            Requerido
+                                        </small>
+                                    )}
                             </label>
                             <InputText
                                 value={form.observaciones}
-                                onChange={(e) => onChange("observaciones", e.target.value)}
+                                onChange={(e) =>
+                                    onChange("observaciones", e.target.value)
+                                }
                                 placeholder="Explique el motivo"
                             />
                             <small className="block mt-2">
-                                Se reprogramará automáticamente para dentro de <b>7 días</b>.
+                                Se reprogramará automáticamente para dentro de{" "}
+                                <b>7 días</b>.
                             </small>
                         </div>
                     )}
@@ -636,9 +819,13 @@ export default function ExtractoresInyectoresGeneral() {
                                 >{`Checklist — TRIMESTRAL`}</div>
                                 <div className="grid">
                                     {activeQuestions.map((q) => {
-                                        const val = form.items[q.key]?.respuesta || "";
+                                        const val =
+                                            form.items[q.key]?.respuesta || "";
                                         return (
-                                            <div key={q.key} className="col-12 md:col-6">
+                                            <div
+                                                key={q.key}
+                                                className="col-12 md:col-6"
+                                            >
                                                 <label className="font-bold">
                                                     {q.label}*{" "}
                                                     {submitted && !val && (
@@ -652,7 +839,10 @@ export default function ExtractoresInyectoresGeneral() {
                                                     value={val}
                                                     options={YESNO}
                                                     onChange={(e) =>
-                                                        onYesNoChange(q.key, e.value)
+                                                        onYesNoChange(
+                                                            q.key,
+                                                            e.value
+                                                        )
                                                     }
                                                     placeholder="Seleccione"
                                                 />
@@ -671,16 +861,93 @@ export default function ExtractoresInyectoresGeneral() {
                             </label>
                             <InputText
                                 value={form.observaciones}
-                                onChange={(e) => onChange("observaciones", e.target.value)}
+                                onChange={(e) =>
+                                    onChange("observaciones", e.target.value)
+                                }
                             />
                         </div>
                     )}
 
                     <div className="field col-12 md:col-4">
-                        <label className="font-bold">Fecha de Registro (auto)</label>
-                        <InputText value={form.fecha_correccion_preview} disabled />
+                        <label className="font-bold">
+                            Fecha de Registro (auto)
+                        </label>
+                        <InputText
+                            value={form.fecha_correccion_preview}
+                            disabled
+                        />
                     </div>
                 </div>
+            </Dialog>
+
+            {/* Dialog VER */}
+            <Dialog
+                visible={viewDialogOpen}
+                onHide={() => setViewDialogOpen(false)}
+                header="Detalle del registro"
+                style={{ width: "60vw", maxWidth: 900 }}
+                modal
+            >
+                {!viewRecord ? (
+                    <p>No hay datos para mostrar.</p>
+                ) : (
+                    <>
+                        <p>
+                            <b>ID:</b> {viewRecord.posicion_id} &nbsp; | &nbsp;
+                            <b>Equipo:</b> {viewRecord.equipo} &nbsp; | &nbsp;
+                            <b>Registro:</b> {viewRecord.registro} &nbsp; |
+                            &nbsp;
+                            <b>Periodicidad:</b> {viewRecord.periodicidad}
+                        </p>
+                        <p>
+                            <b>Fecha intervención:</b>{" "}
+                            {fmtDMY(viewRecord.fecha_registro)} &nbsp; | &nbsp;
+                            <b>Hora:</b> {viewRecord.hora_registro || "—"}
+                        </p>
+                        <p>
+                            <b>Técnico:</b> {viewRecord.tecnico || "—"}
+                        </p>
+
+                        <hr />
+
+                        <div className="grid">
+                            {viewQuestionsForRow(viewRecord).map((q, idx) => {
+                                const col = `respuesta_q${idx + 1}`;
+                                const val = viewRecord[col] || "—";
+                                return (
+                                    <div
+                                        key={q.key}
+                                        className="col-12 md:col-6"
+                                        style={{ marginBottom: 8 }}
+                                    >
+                                        <div
+                                            style={{
+                                                fontSize: "0.85rem",
+                                                fontWeight: 600,
+                                            }}
+                                        >
+                                            {q.label}
+                                        </div>
+                                        <div
+                                            style={{
+                                                marginTop: 2,
+                                                fontSize: "0.85rem",
+                                            }}
+                                        >
+                                            Respuesta: <b>{val}</b>
+                                        </div>
+                                    </div>
+                                );
+                            })}
+                        </div>
+
+                        <hr />
+                        <p>
+                            <b>Observaciones:</b>{" "}
+                            {viewRecord.observaciones || "—"}
+                        </p>
+                    </>
+                )}
             </Dialog>
         </div>
     );

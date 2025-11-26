@@ -18,7 +18,7 @@ import { Checkbox } from "primereact/checkbox";
 import * as XLSX from "xlsx";
 import useCanReview from "../../../Inocuidad/Registros/Hooks/useCanReview.js";
 
-/* ===== Helpers de fecha (mismo patrón que el resto) ===== */
+/* ===== Helpers de fecha (mismo patrón) ===== */
 const parseYMD = (s) => {
     if (!s) return null;
     const [y, m, d] = String(s).split("-").map(Number);
@@ -60,7 +60,7 @@ const addDays = (ymd, days) => {
 };
 
 /* ===== Constantes de este registro (CRE-C-AS) ===== */
-const POSICION_ID = "CRE-C-AS";
+const POSICION_BASE = "CRE-C-AS";
 const EQUIPO = "CARRO";
 const REGISTRO = "AS";
 const TABLE = "mto_crecimiento_carro_as";
@@ -80,6 +80,19 @@ const ESTADOS_ACCION = [
 
 // Solo tiene periodicidad BISEMANAL
 const PERIODOS = [{ label: "Bisemanal", value: "BISEMANAL" }];
+
+/** Cantidades (4 carros): 01, 02, 03, 04 */
+const CANTIDADES = [
+    { label: "01", value: 1 },
+    { label: "02", value: 2 },
+    { label: "03", value: 3 },
+    { label: "04", value: 4 },
+];
+
+const buildPosicionId = (cantidad) => {
+    if (!cantidad) return POSICION_BASE;
+    return `${POSICION_BASE}-${String(cantidad).padStart(2, "0")}`;
+};
 
 /* ===== Preguntas BISEMANAL (texto literal de la OM) ===== */
 const Q_BISEMANAL = [
@@ -119,10 +132,10 @@ const Q_BISEMANAL = [
 const emptyForm = () => ({
     fecha_registro: toDateISO(),
     hora_registro: toHM(),
-    posicion_id: POSICION_ID,
+    posicion_id: POSICION_BASE, // base, sin sufijo
     equipo: EQUIPO,
     registro: REGISTRO,
-    cantidad: "",
+    cantidad: null, // 1..4
     tecnico: "",
     ejecutado: "",
     observaciones: "",
@@ -144,11 +157,18 @@ export default function CarroAS() {
     const [selected, setSelected] = useState([]);
     const [globalFilter, setGlobalFilter] = useState("");
     const [loading, setLoading] = useState(false);
+
     const [dialogOpen, setDialogOpen] = useState(false);
     const [submitted, setSubmitted] = useState(false);
     const [form, setForm] = useState(emptyForm());
+    const [editingId, setEditingId] = useState(null);
+
     const [filtroRevisado, setFiltroRevisado] = useState("all");
     const { canReview, username } = useCanReview();
+
+    // Dialog de VER (como en TamizMotor)
+    const [viewDialogOpen, setViewDialogOpen] = useState(false);
+    const [viewRecord, setViewRecord] = useState(null);
 
     const showToast = (sev, sum, det, life = 3000) =>
         toast.current?.show({ severity: sev, summary: sum, detail: det, life });
@@ -195,13 +215,50 @@ export default function CarroAS() {
 
     const openNew = () => {
         setForm(emptyForm());
+        setEditingId(null);
         setSubmitted(false);
         setDialogOpen(true);
+    };
+
+    const buildFormFromRow = (row) => {
+        const items = {};
+        Q_BISEMANAL.forEach((q, idx) => {
+            const col = `respuesta_q${idx + 1}`;
+            items[q.key] = { respuesta: row[col] || "" };
+        });
+
+        return {
+            fecha_registro: row.fecha_registro || toDateISO(),
+            hora_registro: row.hora_registro || toHM(),
+            posicion_id: row.posicion_id || POSICION_BASE,
+            equipo: row.equipo || EQUIPO,
+            registro: row.registro || REGISTRO,
+            cantidad: row.cantidad || null,
+            tecnico: row.tecnico || "",
+            ejecutado: row.ejecutado || "",
+            observaciones: row.observaciones || "",
+            periodicidad: row.periodicidad || "",
+            items,
+            fecha_correccion_preview: fmtDMYHM(row.created_at),
+        };
+    };
+
+    const openEdit = (row) => {
+        setForm(buildFormFromRow(row));
+        setEditingId(row.id);
+        setSubmitted(false);
+        setDialogOpen(true);
+    };
+
+    const openView = (row) => {
+        setViewRecord(row);
+        setViewDialogOpen(true);
     };
 
     const hideDialog = () => {
         setDialogOpen(false);
         setSubmitted(false);
+        setEditingId(null);
     };
 
     const onChange = (field, value) =>
@@ -211,12 +268,20 @@ export default function CarroAS() {
         }));
 
     const onPeriodoChange = (value) => {
-        const base = Q_BISEMANAL;
-        const items = base.reduce(
+        const items = Q_BISEMANAL.reduce(
             (acc, q) => ({ ...acc, [q.key]: { respuesta: "" } }),
             {}
         );
         setForm((p) => ({ ...p, periodicidad: value, items }));
+    };
+
+    const onCantidadChange = (value) => {
+        const cantidadNum = value ?? null;
+        setForm((prev) => ({
+            ...prev,
+            cantidad: cantidadNum,
+            posicion_id: buildPosicionId(cantidadNum),
+        }));
     };
 
     const onEstadoAccionChange = (key, value) =>
@@ -228,6 +293,7 @@ export default function CarroAS() {
     const validate = () => {
         const errs = [];
         if (!form.periodicidad) errs.push("Seleccione la periodicidad.");
+        if (!form.cantidad) errs.push("Seleccione la cantidad (Carro 01–04).");
         if (!form.tecnico?.trim())
             errs.push("El campo Técnico es requerido.");
         if (!form.ejecutado)
@@ -235,8 +301,7 @@ export default function CarroAS() {
         if (form.ejecutado === "NO" && !form.observaciones.trim())
             errs.push("Explique por qué NO se efectuó (Observaciones).");
         if (form.ejecutado === "SI") {
-            const list = Q_BISEMANAL;
-            list.forEach((q) => {
+            Q_BISEMANAL.forEach((q) => {
                 if (!form.items[q.key]?.respuesta)
                     errs.push(`Responda: ${q.label}`);
             });
@@ -254,41 +319,72 @@ export default function CarroAS() {
 
         try {
             const baseDate = form.fecha_registro || toDateISO();
-            const proximo =
-                form.ejecutado === "NO"
-                    ? addDays(baseDate, 7) // si NO ejecutado → +7 días
-                    : addDays(baseDate, 14); // BISEMANAL → +14 días
+            const cantidadNum = form.cantidad ? Number(form.cantidad) : null;
+            const posicionConsecutiva = buildPosicionId(cantidadNum);
 
-            const payload = {
+            const respuestasPayload = Object.fromEntries(
+                Array.from({ length: 14 }, (_, i) => [
+                    `respuesta_q${i + 1}`,
+                    form.ejecutado === "SI"
+                        ? form.items[`q${i + 1}`]?.respuesta || null
+                        : null,
+                ])
+            );
+
+            const basePayload = {
                 fecha_registro: form.fecha_registro,
                 hora_registro: form.hora_registro,
-                posicion_id: POSICION_ID,
+                posicion_id: posicionConsecutiva,
                 equipo: EQUIPO,
                 registro: REGISTRO,
-                cantidad: form.cantidad
-                    ? Number(String(form.cantidad).replace(/\D/g, ""))
-                    : null,
+                cantidad: cantidadNum,
                 tecnico: form.tecnico,
                 ejecutado: form.ejecutado,
                 observaciones: form.observaciones || null,
                 periodicidad: form.periodicidad,
-                ...Object.fromEntries(
-                    Array.from({ length: 14 }, (_, i) => [
-                        `respuesta_q${i + 1}`,
-                        form.ejecutado === "SI"
-                            ? form.items[`q${i + 1}`]?.respuesta || null
-                            : null,
-                    ])
-                ),
-                ultimo_mantenimiento: form.ejecutado === "SI" ? baseDate : null,
-                proximo_mantenimiento: proximo,
+                ...respuestasPayload,
             };
 
-            const { error } = await supabase.from(TABLE).insert([payload]);
+            let error;
+
+            if (editingId) {
+                // EDICIÓN: no tocamos completado/pendiente_nuevo aquí
+                const updatePayload = {
+                    ...basePayload,
+                };
+
+                ({ error } = await supabase
+                    .from(TABLE)
+                    .update(updatePayload)
+                    .eq("id", editingId));
+            } else {
+                // NUEVO REGISTRO
+                const proximo =
+                    form.ejecutado === "NO"
+                        ? addDays(baseDate, 7) // NO ejecutado → +7 días
+                        : addDays(baseDate, 14); // BISEMANAL → +14 días
+
+                const insertPayload = {
+                    ...basePayload,
+                    ultimo_mantenimiento: form.ejecutado === "SI" ? baseDate : null,
+                    proximo_mantenimiento: proximo,
+                    completado: false,
+                    pendiente_nuevo: false,
+                    fecha_completado: null,
+                };
+
+                ({ error } = await supabase.from(TABLE).insert([insertPayload]));
+            }
+
             if (error) throw error;
 
-            showToast("success", "Éxito", "Registro guardado");
+            showToast(
+                "success",
+                "Éxito",
+                editingId ? "Registro actualizado" : "Registro guardado"
+            );
             setDialogOpen(false);
+            setEditingId(null);
             await fetchRows();
         } catch (e) {
             console.error(e);
@@ -321,7 +417,9 @@ export default function CarroAS() {
                             ...r,
                             revisado: next,
                             revisado_por_username: next ? username : null,
-                            revisado_fecha: next ? new Date().toISOString() : null,
+                            revisado_fecha: next
+                                ? new Date().toISOString()
+                                : null,
                         }
                         : r
                 )
@@ -352,7 +450,7 @@ export default function CarroAS() {
                     type="search"
                     value={globalFilter}
                     onInput={(e) => setGlobalFilter(e.target.value)}
-                    placeholder="Buscar (ej. CRE-C-AS, técnico, notas)"
+                    placeholder="Buscar (ej. CRE-C-AS-01, técnico, notas)"
                 />
             </span>
             <div className="flex align-items-center gap-2">
@@ -405,11 +503,30 @@ export default function CarroAS() {
         XLSX.utils.book_append_sheet(wb, ws, "Carro AS");
         XLSX.writeFile(
             wb,
-            `Crecimiento_CarroAS_${new Date().toISOString().slice(0, 10)}.xlsx`
+            `Crecimiento_CarroAS_${new Date()
+                .toISOString()
+                .slice(0, 10)}.xlsx`
         );
     };
 
-    const activeQuestions = Q_BISEMANAL;
+    const accionesTemplate = (row) => (
+        <div className="flex gap-2">
+            <Button
+                label="Ver"
+                icon="pi pi-eye"
+                text
+                onClick={() => openView(row)}
+            />
+            <Button
+                label="Editar"
+                icon="pi pi-pencil"
+                text
+                onClick={() => openEdit(row)}
+            />
+        </div>
+    );
+
+    const viewQuestionsForRow = () => Q_BISEMANAL; // solo BISEMANAL aquí
 
     return (
         <div className="controlrendcosechayfrass-container">
@@ -421,9 +538,14 @@ export default function CarroAS() {
 
             <div className="welcome-message">
                 <p>
-                    <b>Posición (ID):</b> {POSICION_ID} &nbsp; | &nbsp; <b>Equipo:</b>{" "}
-                    {EQUIPO} &nbsp; | &nbsp;
+                    <b>Posición base:</b> {POSICION_BASE} &nbsp; | &nbsp;{" "}
+                    <b>Equipo:</b> {EQUIPO} &nbsp; | &nbsp;
                     <b>Registro:</b> {REGISTRO}
+                </p>
+                <p>
+                    <b>ID final de ejemplo:</b>{" "}
+                    {buildPosicionId(form.cantidad) ||
+                        "Seleccione cantidad (01–04) para ver el ID"}
                 </p>
             </div>
 
@@ -476,6 +598,7 @@ export default function CarroAS() {
                 <Column field="posicion_id" header="Posición" sortable />
                 <Column field="equipo" header="Equipo" sortable />
                 <Column field="registro" header="Registro" />
+                <Column field="cantidad" header="Cant." sortable />
                 <Column field="periodicidad" header="Periodicidad" />
                 <Column
                     header="Último Mto."
@@ -496,14 +619,25 @@ export default function CarroAS() {
                 <Column
                     header="Revisado"
                     body={revisadoTemplate}
-                    style={{ width: "10rem", textAlign: "center" }}
+                    style={{ width: "8rem", textAlign: "center" }}
+                />
+                <Column
+                    header="Acciones"
+                    body={accionesTemplate}
+                    exportable={false}
+                    style={{ width: "14rem" }}
                 />
             </DataTable>
 
+            {/* Dialog NUEVO / EDITAR (igual patrón TamizMotor) */}
             <Dialog
                 visible={dialogOpen}
                 style={{ width: "72vw", maxWidth: 1100 }}
-                header="Nuevo registro — Carro (AS)"
+                header={
+                    editingId
+                        ? "Editar registro — Carro (AS)"
+                        : "Nuevo registro — Carro (AS)"
+                }
                 modal
                 onHide={hideDialog}
                 footer={
@@ -514,7 +648,11 @@ export default function CarroAS() {
                             outlined
                             onClick={hideDialog}
                         />
-                        <Button label="Guardar" icon="pi pi-check" onClick={save} />
+                        <Button
+                            label="Guardar"
+                            icon="pi pi-check"
+                            onClick={save}
+                        />
                     </div>
                 }
             >
@@ -542,7 +680,9 @@ export default function CarroAS() {
                         <InputText
                             type="date"
                             value={form.fecha_registro}
-                            onChange={(e) => onChange("fecha_registro", e.target.value)}
+                            onChange={(e) =>
+                                onChange("fecha_registro", e.target.value)
+                            }
                         />
                     </div>
                     <div className="field col-12 md:col-4">
@@ -550,17 +690,19 @@ export default function CarroAS() {
                         <InputText
                             type="time"
                             value={form.hora_registro}
-                            onChange={(e) => onChange("hora_registro", e.target.value)}
+                            onChange={(e) =>
+                                onChange("hora_registro", e.target.value)
+                            }
                         />
                     </div>
 
                     <div className="field col-6 md:col-3">
-                        <label className="font-bold">Posición (ID)</label>
-                        <InputText value={form.posicion_id} disabled />
+                        <label className="font-bold">Posición base</label>
+                        <InputText value={POSICION_BASE} disabled />
                     </div>
                     <div className="field col-6 md:col-3">
                         <label className="font-bold">Equipo</label>
-                        <InputText value={form.equipo} disabled />
+                        <InputText value={EQUIPO} disabled />
                     </div>
 
                     <div className="field col-6 md:col-3">
@@ -572,22 +714,29 @@ export default function CarroAS() {
                         </label>
                         <InputText
                             value={form.tecnico}
-                            onChange={(e) => onChange("tecnico", e.target.value)}
+                            onChange={(e) =>
+                                onChange("tecnico", e.target.value)
+                            }
                             placeholder="Nombre del técnico"
                         />
                     </div>
+
                     <div className="field col-6 md:col-3">
-                        <label className="font-bold">Cantidad (referencia)</label>
-                        <InputText
+                        <label className="font-bold">
+                            Cantidad (Carro)*{" "}
+                            {submitted && !form.cantidad && (
+                                <small className="p-error"> Requerido</small>
+                            )}
+                        </label>
+                        <Dropdown
                             value={form.cantidad}
-                            onChange={(e) =>
-                                onChange(
-                                    "cantidad",
-                                    e.target.value ? e.target.value.replace(/\D/g, "") : ""
-                                )
-                            }
-                            placeholder="Ej. 1"
+                            options={CANTIDADES}
+                            onChange={(e) => onCantidadChange(e.value)}
+                            placeholder="Seleccione (01–04)"
                         />
+                        <small className="block mt-1">
+                            Se usará para el ID: {buildPosicionId(form.cantidad)}
+                        </small>
                     </div>
 
                     <div className="field col-12 md:col-6">
@@ -609,22 +758,29 @@ export default function CarroAS() {
                         <div className="field col-12">
                             <label className="font-bold">
                                 Observaciones (obligatorio si NO){" "}
-                                {submitted && !form.observaciones.trim() && (
-                                    <small className="p-error"> Requerido</small>
-                                )}
+                                {submitted &&
+                                    !form.observaciones.trim() && (
+                                        <small className="p-error">
+                                            {" "}
+                                            Requerido
+                                        </small>
+                                    )}
                             </label>
                             <InputText
                                 value={form.observaciones}
-                                onChange={(e) => onChange("observaciones", e.target.value)}
+                                onChange={(e) =>
+                                    onChange("observaciones", e.target.value)
+                                }
                                 placeholder="Explique el motivo"
                             />
                             <small className="block mt-2">
-                                Se reprogramará automáticamente para dentro de <b>7 días</b>.
+                                Se reprogramará automáticamente para dentro de{" "}
+                                <b>7 días</b>.
                             </small>
                         </div>
                     )}
 
-                    {form.ejecutado === "SI" && !!activeQuestions.length && (
+                    {form.ejecutado === "SI" && (
                         <div className="field col-12">
                             <div
                                 style={{
@@ -634,13 +790,23 @@ export default function CarroAS() {
                                 }}
                             >
                                 <div
-                                    style={{ fontWeight: 700, marginBottom: 8 }}
-                                >{`Checklist — BISEMANAL`}</div>
+                                    style={{
+                                        fontWeight: 700,
+                                        marginBottom: 8,
+                                    }}
+                                >
+                                    Checklist — BISEMANAL
+                                </div>
                                 <div className="grid">
-                                    {activeQuestions.map((q) => {
-                                        const val = form.items[q.key]?.respuesta || "";
+                                    {Q_BISEMANAL.map((q) => {
+                                        const val =
+                                            form.items[q.key]?.respuesta ||
+                                            "";
                                         return (
-                                            <div key={q.key} className="col-12 md:col-6">
+                                            <div
+                                                key={q.key}
+                                                className="col-12 md:col-6"
+                                            >
                                                 <label className="font-bold">
                                                     {q.label}*{" "}
                                                     {submitted && !val && (
@@ -654,7 +820,10 @@ export default function CarroAS() {
                                                     value={val}
                                                     options={ESTADOS_ACCION}
                                                     onChange={(e) =>
-                                                        onEstadoAccionChange(q.key, e.value)
+                                                        onEstadoAccionChange(
+                                                            q.key,
+                                                            e.value
+                                                        )
                                                     }
                                                     placeholder="Seleccione"
                                                 />
@@ -673,16 +842,93 @@ export default function CarroAS() {
                             </label>
                             <InputText
                                 value={form.observaciones}
-                                onChange={(e) => onChange("observaciones", e.target.value)}
+                                onChange={(e) =>
+                                    onChange("observaciones", e.target.value)
+                                }
                             />
                         </div>
                     )}
 
                     <div className="field col-12 md:col-4">
-                        <label className="font-bold">Fecha de Registro (auto)</label>
-                        <InputText value={form.fecha_correccion_preview} disabled />
+                        <label className="font-bold">
+                            Fecha de Registro (auto)
+                        </label>
+                        <InputText
+                            value={form.fecha_correccion_preview}
+                            disabled
+                        />
                     </div>
                 </div>
+            </Dialog>
+
+            {/* Dialog VER (solo lectura), mismo estilo que TamizMotor */}
+            <Dialog
+                visible={viewDialogOpen}
+                onHide={() => setViewDialogOpen(false)}
+                header="Detalle del registro — Carro (AS)"
+                style={{ width: "60vw", maxWidth: 900 }}
+                modal
+            >
+                {!viewRecord ? (
+                    <p>No hay datos para mostrar.</p>
+                ) : (
+                    <>
+                        <p>
+                            <b>ID:</b> {viewRecord.posicion_id} &nbsp; | &nbsp;
+                            <b>Equipo:</b> {viewRecord.equipo} &nbsp; | &nbsp;
+                            <b>Registro:</b> {viewRecord.registro} &nbsp; |
+                            &nbsp;
+                            <b>Periodicidad:</b> {viewRecord.periodicidad}
+                        </p>
+                        <p>
+                            <b>Fecha intervención:</b>{" "}
+                            {fmtDMY(viewRecord.fecha_registro)} &nbsp; | &nbsp;
+                            <b>Hora:</b> {viewRecord.hora_registro || "—"}
+                        </p>
+                        <p>
+                            <b>Técnico:</b> {viewRecord.tecnico || "—"}
+                        </p>
+
+                        <hr />
+
+                        <div className="grid">
+                            {viewQuestionsForRow(viewRecord).map((q, idx) => {
+                                const col = `respuesta_q${idx + 1}`;
+                                const val = viewRecord[col] || "—";
+                                return (
+                                    <div
+                                        key={q.key}
+                                        className="col-12 md:col-6"
+                                        style={{ marginBottom: 8 }}
+                                    >
+                                        <div
+                                            style={{
+                                                fontSize: "0.85rem",
+                                                fontWeight: 600,
+                                            }}
+                                        >
+                                            {q.label}
+                                        </div>
+                                        <div
+                                            style={{
+                                                marginTop: 2,
+                                                fontSize: "0.85rem",
+                                            }}
+                                        >
+                                            Respuesta: <b>{val}</b>
+                                        </div>
+                                    </div>
+                                );
+                            })}
+                        </div>
+
+                        <hr />
+                        <p>
+                            <b>Observaciones:</b>{" "}
+                            {viewRecord.observaciones || "—"}
+                        </p>
+                    </>
+                )}
             </Dialog>
         </div>
     );

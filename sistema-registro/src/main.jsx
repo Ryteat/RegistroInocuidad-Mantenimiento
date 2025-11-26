@@ -245,7 +245,10 @@ const router = createBrowserRouter(
             { path: `Horno/LineaGasGLPHornoMultilevel`, element: <LineaGasGLPHornoMultilevel /> },
             { path: `Horno/TransmisionTurbinaHornoMultilevel`, element: <TransmisionTurbinaHornoMultilevel /> },
             { path: `Horno/LubricacionBandasHornoMultilevel`, element: <LubricacionBandasHornoMultilevel /> },
-            { path: `Horno/SelladoraBandaContinuaGeneral`, element: <SelladoraBandaContinuaGeneral /> },
+            {
+              path: `Horno/SelladoraBandaContinuaGeneral`,
+              element: <SelladoraBandaContinuaGeneral />,
+            },
             { path: `Horno/SensorPT100`, element: <SensorPT100 /> },
             { path: `Horno`, element: <HornoMA /> },
 

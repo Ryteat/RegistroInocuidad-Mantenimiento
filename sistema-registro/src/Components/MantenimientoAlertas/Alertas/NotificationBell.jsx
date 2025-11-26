@@ -58,11 +58,16 @@ const ALLOWED_TABLES = [
     "mto_horno_multilevel_vibrador",
     "mto_horno_linea_gas_glp_horno_multilevel",
     "mto_horno_multilevel_sensor_pt100",
+    "mto_horno_multilevel_lubricacion_bandas",
+    //Horno - Selladora Banda 
+    "mto_horno_selladora_banda_continua_general",
+
     // Dieta
     "mto_dieta_bomba_sumergible_general",
     "mto_dieta_mezcladora_general",
     "mto_dieta_bandas_lubricacion",
     "mto_dieta_contenedores_cascara_general",
+
     // Crecimiento
     "mto_crecimiento_extractores_inyectores_general",
     "mto_crecimiento_paneles_general",
@@ -72,6 +77,7 @@ const ALLOWED_TABLES = [
     // Cosecha
     "mto_cosecha_panel_control_general",
     "mto_cosecha_tamiz_motor",
+    "mto_cosecha_tamiz_revision_estructura_malla",
 ];
 
 /**
@@ -81,18 +87,38 @@ const ALLOWED_TABLES = [
  */
 const FORM_MAP = {
     // Crecimiento
-    "CRE-EY-G":
-        "/MantenimientoAlertas/Crecimiento/ExtractoresInyectoresGeneral",
+    "CRE-EY-G": "/MantenimientoAlertas/Crecimiento/ExtractoresInyectoresGeneral",
     "CRE-P-G": "/MantenimientoAlertas/Crecimiento/PanelesGeneral",
-    "CRE-CC-G":
-        "/MantenimientoAlertas/Crecimiento/CadenasConveyorGeneral",
+    "CRE-CC-G": "/MantenimientoAlertas/Crecimiento/CadenasConveyorGeneral",
     "CRE-C-RS": "/MantenimientoAlertas/Crecimiento/CarroRS",
     "CRE-C-AS": "/MantenimientoAlertas/Crecimiento/CarroAS",
-
+    // Dieta
+    "D-BS-G": "/MantenimientoAlertas/Dieta/BombaSumergibleGeneral",
+    "D-M-G": "/MantenimientoAlertas/Dieta/MezcladoraGeneral",
+    "D-B-L": "/MantenimientoAlertas/Dieta/BandasLubricacion",
+    "D-CC-G": "/MantenimientoAlertas/Dieta/ContenedoresCascaraGeneral",
     // Cosecha
     "COS-PC-G": "/MantenimientoAlertas/Cosecha/PanelControlGeneral",
     "COS-T-M": "/MantenimientoAlertas/Cosecha/TamizMotor",
-    // "COS-T-REM": "/MantenimientoAlertas/Cosecha/TamizRevisionEstructuraMalla",
+    "COS-T-REM": "/MantenimientoAlertas/Cosecha/TamizRevisionEstructuraMalla",
+    //Horno
+    "H-E-SN": "/MantenimientoAlertas/HornoEmpacadora/SistemaNeumatico",
+    "H-E-MR": "/MantenimientoAlertas/HornoEmpacadora/MotorReductor",
+    "H-E-V": "/MantenimientoAlertas/HornoEmpacadora/Vibrador",
+    "H-EN-MR": "/MantenimientoAlertas/HornoEnfriador/MotorReductor",
+    "H-EN-LB": "/MantenimientoAlertas/HornoEnfriador/LubricacionBandas",
+    "H-EN-V": "/MantenimientoAlertas/HornoEnfriador/Vibrador",
+    "H-ML-V": "/MantenimientoAlertas/Horno/Vibrador",
+    "H-HM-LB": "/MantenimientoAlertas/Horno/LubricacionBandasHornoMultilevel",
+    "H-LG-HML": "/MantenimientoAlertas/Horno/LineaGasGLP/HornoMultilevel",
+    "H-ML-SPT100": "/MantenimientoAlertas/HornoMultilevel/SensorPT100",
+    "H-SBC-G": "/MantenimientoAlertas/Horno/SelladoraBandaContinuaGeneral",
+
+
+
+
+
+
 };
 
 /** Recorta un POSICION_ID con consecutivo, ej. COS-T-M-02 → COS-T-M */

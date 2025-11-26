@@ -65,7 +65,7 @@ const addMonths = (ymd, m) => {
 };
 
 /* ===== Constantes ===== */
-const POSICION_ID = "D-BS-G";
+const POSICION_ID_BASE = "D-BS-G";
 const EQUIPO = "BOMBA SUMERGIBLE";
 const REGISTRO = "GENERAL";
 const TABLE = "mto_dieta_bomba_sumergible_general";
@@ -79,6 +79,12 @@ const PERIODOS = [
     { label: "Semanal", value: "SEMANAL" },
     { label: "Trimestral", value: "TRIMESTRAL" },
     { label: "Anual", value: "ANUAL" },
+];
+
+/* Cantidad = número de consecutivos → 01 y 02 */
+const CANTIDAD_OPTIONS = [
+    { label: "01", value: 1 },
+    { label: "02", value: 2 },
 ];
 
 /* ===== Preguntas EXACTAS según OM ===== */
@@ -150,13 +156,20 @@ const Q_ANUAL = [
     },
 ];
 
+const getQuestionsFor = (periodicidad) => {
+    if (periodicidad === "SEMANAL") return Q_SEMANAL;
+    if (periodicidad === "TRIMESTRAL") return Q_TRIMESTRAL;
+    if (periodicidad === "ANUAL") return Q_ANUAL;
+    return [];
+};
+
 const emptyForm = () => ({
     fecha_registro: toDateISO(),
     hora_registro: toHM(),
-    posicion_id: POSICION_ID,
+    posicion_id: POSICION_ID_BASE,
     equipo: EQUIPO,
     registro: REGISTRO,
-    cantidad: "",
+    cantidad: null, // el usuario elige 01 o 02
     tecnico: "",
     ejecutado: "",
     observaciones: "",
@@ -179,11 +192,18 @@ export default function BombaSumergibleGeneral() {
     const [selected, setSelected] = useState([]);
     const [globalFilter, setGlobalFilter] = useState("");
     const [loading, setLoading] = useState(false);
+
     const [dialogOpen, setDialogOpen] = useState(false);
     const [submitted, setSubmitted] = useState(false);
     const [form, setForm] = useState(emptyForm());
+    const [editingId, setEditingId] = useState(null);
+
     const [filtroRevisado, setFiltroRevisado] = useState("all");
     const { canReview, username } = useCanReview();
+
+    // Dialog VER
+    const [viewDialogOpen, setViewDialogOpen] = useState(false);
+    const [viewRecord, setViewRecord] = useState(null);
 
     const showToast = (sev, sum, det, life = 3000) =>
         toast.current?.show({ severity: sev, summary: sum, detail: det, life });
@@ -201,7 +221,8 @@ export default function BombaSumergibleGeneral() {
         ejecutado, observaciones, periodicidad,
         ${Array.from({ length: 14 }, (_, i) => `respuesta_q${i + 1}`).join(", ")},
         ultimo_mantenimiento, proximo_mantenimiento,
-        revisado, revisado_por_username, revisado_fecha
+        revisado, revisado_por_username, revisado_fecha,
+        completado, pendiente_nuevo, fecha_completado
       `
                 )
                 .order("fecha_registro", { ascending: false })
@@ -228,13 +249,50 @@ export default function BombaSumergibleGeneral() {
 
     const openNew = () => {
         setForm(emptyForm());
+        setEditingId(null);
         setSubmitted(false);
         setDialogOpen(true);
     };
+
+    const openEdit = (row) => {
+        const baseQuestions = getQuestionsFor(row.periodicidad);
+        const items = {};
+        baseQuestions.forEach((q, idx) => {
+            const col = `respuesta_q${idx + 1}`;
+            items[q.key] = { respuesta: row[col] || "" };
+        });
+
+        setForm({
+            fecha_registro: row.fecha_registro || toDateISO(),
+            hora_registro: row.hora_registro || toHM(),
+            posicion_id: row.posicion_id || POSICION_ID_BASE,
+            equipo: row.equipo || EQUIPO,
+            registro: row.registro || REGISTRO,
+            cantidad: row.cantidad ?? null,
+            tecnico: row.tecnico || "",
+            ejecutado: row.ejecutado || "",
+            observaciones: row.observaciones || "",
+            periodicidad: row.periodicidad || "",
+            items,
+            fecha_correccion_preview: fmtDMYHM(row.created_at),
+        });
+
+        setEditingId(row.id);
+        setSubmitted(false);
+        setDialogOpen(true);
+    };
+
+    const openView = (row) => {
+        setViewRecord(row);
+        setViewDialogOpen(true);
+    };
+
     const hideDialog = () => {
         setDialogOpen(false);
         setSubmitted(false);
+        setEditingId(null);
     };
+
     const onChange = (field, value) =>
         setForm((prev) => ({
             ...prev,
@@ -242,11 +300,7 @@ export default function BombaSumergibleGeneral() {
         }));
 
     const onPeriodoChange = (value) => {
-        let base = [];
-        if (value === "SEMANAL") base = Q_SEMANAL;
-        else if (value === "TRIMESTRAL") base = Q_TRIMESTRAL;
-        else if (value === "ANUAL") base = Q_ANUAL;
-
+        const base = getQuestionsFor(value);
         const items = base.reduce(
             (acc, q) => ({
                 ...acc,
@@ -273,6 +327,7 @@ export default function BombaSumergibleGeneral() {
     const validate = () => {
         const errs = [];
         if (!form.periodicidad) errs.push("Seleccione la periodicidad.");
+        if (!form.cantidad) errs.push("Seleccione el consecutivo (cantidad).");
         if (!form.tecnico?.trim())
             errs.push("El campo Técnico es requerido.");
         if (!form.ejecutado)
@@ -283,14 +338,7 @@ export default function BombaSumergibleGeneral() {
             );
 
         if (form.ejecutado === "SI") {
-            const list =
-                form.periodicidad === "SEMANAL"
-                    ? Q_SEMANAL
-                    : form.periodicidad === "TRIMESTRAL"
-                        ? Q_TRIMESTRAL
-                        : form.periodicidad === "ANUAL"
-                            ? Q_ANUAL
-                            : [];
+            const list = getQuestionsFor(form.periodicidad);
             list.forEach((q) => {
                 if (!form.items[q.key]?.respuesta) {
                     errs.push(`Responda: ${q.label}`);
@@ -310,46 +358,145 @@ export default function BombaSumergibleGeneral() {
 
         try {
             const baseDate = form.fecha_registro || toDateISO();
-            const proximo =
-                form.ejecutado === "NO"
-                    ? addDays(baseDate, 7)
-                    : form.periodicidad === "SEMANAL"
-                        ? addDays(baseDate, 7)
-                        : form.periodicidad === "TRIMESTRAL"
-                            ? addMonths(baseDate, 3)
-                            : addMonths(baseDate, 12); // ANUAL
 
-            const payload = {
+            const respuestasPayload = Object.fromEntries(
+                Array.from({ length: 14 }, (_, i) => [
+                    `respuesta_q${i + 1}`,
+                    form.ejecutado === "SI"
+                        ? form.items[`q${i + 1}`]?.respuesta || null
+                        : null,
+                ])
+            );
+
+            const cantidadNum =
+                form.cantidad !== null && form.cantidad !== undefined
+                    ? Number(form.cantidad)
+                    : null;
+
+            const sufijo = cantidadNum
+                ? String(cantidadNum).padStart(2, "0")
+                : null;
+            const posicionCompleta = sufijo
+                ? `${POSICION_ID_BASE}-${sufijo}`
+                : POSICION_ID_BASE;
+
+            const basePayload = {
                 fecha_registro: form.fecha_registro,
                 hora_registro: form.hora_registro,
-                posicion_id: POSICION_ID,
+                posicion_id: posicionCompleta,
                 equipo: EQUIPO,
                 registro: REGISTRO,
-                cantidad: form.cantidad
-                    ? Number(String(form.cantidad).replace(/\D/g, ""))
-                    : null,
+                cantidad: Number.isNaN(cantidadNum) ? null : cantidadNum,
                 tecnico: form.tecnico,
                 ejecutado: form.ejecutado,
                 observaciones: form.observaciones || null,
                 periodicidad: form.periodicidad,
-                ...Object.fromEntries(
-                    Array.from({ length: 14 }, (_, i) => [
-                        `respuesta_q${i + 1}`,
-                        form.ejecutado === "SI"
-                            ? form.items[`q${i + 1}`]?.respuesta || null
-                            : null,
-                    ])
-                ),
-                ultimo_mantenimiento:
-                    form.ejecutado === "SI" ? baseDate : null,
-                proximo_mantenimiento: proximo,
+                ...respuestasPayload,
             };
 
-            const { error } = await supabase.from(TABLE).insert([payload]);
+            const preguntas = getQuestionsFor(form.periodicidad);
+            const todasSi =
+                preguntas.length > 0
+                    ? preguntas.every(
+                        (q) => form.items[q.key]?.respuesta === "SI"
+                    )
+                    : false;
+
+            let error;
+
+            if (editingId) {
+                // 🔵 EDICIÓN
+                let updatePayload = { ...basePayload };
+
+                if (form.ejecutado === "SI" && todasSi) {
+                    // ✅ Todas en "SI" → COMPLETADO
+                    updatePayload = {
+                        ...updatePayload,
+                        ultimo_mantenimiento: baseDate,
+                        proximo_mantenimiento: null,
+                        completado: true,
+                        pendiente_nuevo: true,
+                        fecha_completado: new Date().toISOString(),
+                    };
+                } else if (form.ejecutado === "NO") {
+                    // ❌ NO ejecutado → reprogramar a 7 días
+                    updatePayload = {
+                        ...updatePayload,
+                        ultimo_mantenimiento: null,
+                        proximo_mantenimiento: addDays(baseDate, 7),
+                        completado: false,
+                        pendiente_nuevo: false,
+                        fecha_completado: null,
+                    };
+                } else {
+                    // ejecutado = "SI" pero con alguna "NO" → NO COMPLETO, se reprograma según periodicidad
+                    let proximo;
+                    if (form.periodicidad === "SEMANAL") {
+                        proximo = addDays(baseDate, 7);
+                    } else if (form.periodicidad === "TRIMESTRAL") {
+                        proximo = addMonths(baseDate, 3);
+                    } else if (form.periodicidad === "ANUAL") {
+                        proximo = addMonths(baseDate, 12);
+                    } else {
+                        proximo = addDays(baseDate, 7);
+                    }
+
+                    updatePayload = {
+                        ...updatePayload,
+                        ultimo_mantenimiento: baseDate,
+                        proximo_mantenimiento: proximo,
+                        completado: false,
+                        pendiente_nuevo: false,
+                        fecha_completado: null,
+                    };
+                }
+
+                ({ error } = await supabase
+                    .from(TABLE)
+                    .update(updatePayload)
+                    .eq("id", editingId));
+            } else {
+                // 🟢 NUEVO REGISTRO
+                let ultimo = null;
+                let proximo = null;
+
+                if (form.ejecutado === "NO") {
+                    proximo = addDays(baseDate, 7);
+                } else if (form.periodicidad === "SEMANAL") {
+                    ultimo = baseDate;
+                    proximo = addDays(baseDate, 7);
+                } else if (form.periodicidad === "TRIMESTRAL") {
+                    ultimo = baseDate;
+                    proximo = addMonths(baseDate, 3);
+                } else if (form.periodicidad === "ANUAL") {
+                    ultimo = baseDate;
+                    proximo = addMonths(baseDate, 12);
+                } else {
+                    ultimo = baseDate;
+                    proximo = addDays(baseDate, 7);
+                }
+
+                const insertPayload = {
+                    ...basePayload,
+                    ultimo_mantenimiento: ultimo,
+                    proximo_mantenimiento: proximo,
+                    completado: false,
+                    pendiente_nuevo: false,
+                    fecha_completado: null,
+                };
+
+                ({ error } = await supabase.from(TABLE).insert([insertPayload]));
+            }
+
             if (error) throw error;
 
-            showToast("success", "Éxito", "Registro guardado");
+            showToast(
+                "success",
+                "Éxito",
+                editingId ? "Registro actualizado" : "Registro guardado"
+            );
             setDialogOpen(false);
+            setEditingId(null);
             await fetchRows();
         } catch (e) {
             console.error(e);
@@ -454,6 +601,7 @@ export default function BombaSumergibleGeneral() {
             equipo: r.equipo,
             registro: r.registro ?? "",
             periodicidad: r.periodicidad ?? "",
+            cantidad: r.cantidad ?? "",
             ultimo_mantenimiento: fmtDMY(r.ultimo_mantenimiento),
             proximo_mantenimiento: fmtDMY(r.proximo_mantenimiento),
             tecnico: r.tecnico ?? "",
@@ -475,14 +623,27 @@ export default function BombaSumergibleGeneral() {
         );
     };
 
-    const activeQuestions =
-        form.periodicidad === "SEMANAL"
-            ? Q_SEMANAL
-            : form.periodicidad === "TRIMESTRAL"
-                ? Q_TRIMESTRAL
-                : form.periodicidad === "ANUAL"
-                    ? Q_ANUAL
-                    : [];
+    const activeQuestions = getQuestionsFor(form.periodicidad);
+
+    const accionesTemplate = (row) => (
+        <div className="flex gap-2">
+            <Button
+                label="Ver"
+                icon="pi pi-eye"
+                text
+                onClick={() => openView(row)}
+            />
+            <Button
+                label="Editar"
+                icon="pi pi-pencil"
+                text
+                onClick={() => openEdit(row)}
+            />
+        </div>
+    );
+
+    const viewQuestionsForRow = (row) =>
+        getQuestionsFor(row.periodicidad || "");
 
     return (
         <div className="controlrendcosechayfrass-container">
@@ -494,7 +655,7 @@ export default function BombaSumergibleGeneral() {
 
             <div className="welcome-message">
                 <p>
-                    <b>Posición (ID):</b> {POSICION_ID} &nbsp; | &nbsp;{" "}
+                    <b>Posición base (ID):</b> {POSICION_ID_BASE} &nbsp; | &nbsp{" "}
                     <b>Equipo:</b> {EQUIPO} &nbsp; | &nbsp;
                     <b>Registro:</b> {REGISTRO}
                 </p>
@@ -555,6 +716,7 @@ export default function BombaSumergibleGeneral() {
                 <Column field="posicion_id" header="Posición" sortable />
                 <Column field="equipo" header="Equipo" sortable />
                 <Column field="registro" header="Registro" />
+                <Column field="cantidad" header="Cantidad" />
                 <Column field="periodicidad" header="Periodicidad" />
                 <Column
                     header="Último Mto."
@@ -577,12 +739,23 @@ export default function BombaSumergibleGeneral() {
                     body={revisadoTemplate}
                     style={{ width: "10rem", textAlign: "center" }}
                 />
+                <Column
+                    header="Acciones"
+                    body={accionesTemplate}
+                    exportable={false}
+                    style={{ width: "14rem" }}
+                />
             </DataTable>
 
+            {/* Dialog NUEVO / EDITAR */}
             <Dialog
                 visible={dialogOpen}
                 style={{ width: "72vw", maxWidth: 1100 }}
-                header="Nuevo registro — Bomba Sumergible (General)"
+                header={
+                    editingId
+                        ? "Editar registro — Bomba Sumergible (General)"
+                        : "Nuevo registro — Bomba Sumergible (General)"
+                }
                 modal
                 onHide={hideDialog}
                 footer={
@@ -651,12 +824,12 @@ export default function BombaSumergibleGeneral() {
                     </div>
 
                     <div className="field col-6 md:col-3">
-                        <label className="font-bold">Posición (ID)</label>
-                        <InputText value={form.posicion_id} disabled />
+                        <label className="font-bold">Posición base</label>
+                        <InputText value={POSICION_ID_BASE} disabled />
                     </div>
                     <div className="field col-6 md:col-3">
                         <label className="font-bold">Equipo</label>
-                        <InputText value={form.equipo} disabled />
+                        <InputText value={EQUIPO} disabled />
                     </div>
 
                     <div className="field col-6 md:col-3">
@@ -679,19 +852,13 @@ export default function BombaSumergibleGeneral() {
                     </div>
                     <div className="field col-6 md:col-3">
                         <label className="font-bold">
-                            Cantidad (referencia)
+                            Cantidad
                         </label>
-                        <InputText
+                        <Dropdown
                             value={form.cantidad}
-                            onChange={(e) =>
-                                onChange(
-                                    "cantidad",
-                                    e.target.value
-                                        ? e.target.value.replace(/\D/g, "")
-                                        : ""
-                                )
-                            }
-                            placeholder="Ej. 1"
+                            options={CANTIDAD_OPTIONS}
+                            onChange={(e) => onChange("cantidad", e.value)}
+                            placeholder="Seleccione Cantidad"
                         />
                     </div>
 
@@ -829,6 +996,82 @@ export default function BombaSumergibleGeneral() {
                         />
                     </div>
                 </div>
+            </Dialog>
+
+            {/* Dialog VER */}
+            <Dialog
+                visible={viewDialogOpen}
+                onHide={() => setViewDialogOpen(false)}
+                header="Detalle del registro"
+                style={{ width: "60vw", maxWidth: 900 }}
+                modal
+            >
+                {!viewRecord ? (
+                    <p>No hay datos para mostrar.</p>
+                ) : (
+                    <>
+                        <p>
+                            <b>ID:</b> {viewRecord.posicion_id} &nbsp; | &nbsp;
+                            <b>Equipo:</b> {viewRecord.equipo} &nbsp; | &nbsp;
+                            <b>Registro:</b> {viewRecord.registro} &nbsp; | &nbsp;
+                            <b>Periodicidad:</b> {viewRecord.periodicidad}
+                        </p>
+                        <p>
+                            <b>Consecutivo:</b>{" "}
+                            {viewRecord.cantidad !== null &&
+                                viewRecord.cantidad !== undefined
+                                ? String(viewRecord.cantidad).padStart(2, "0")
+                                : "—"}
+                        </p>
+                        <p>
+                            <b>Fecha intervención:</b>{" "}
+                            {fmtDMY(viewRecord.fecha_registro)} &nbsp; | &nbsp;
+                            <b>Hora:</b> {viewRecord.hora_registro || "—"}
+                        </p>
+                        <p>
+                            <b>Técnico:</b> {viewRecord.tecnico || "—"}
+                        </p>
+
+                        <hr />
+
+                        <div className="grid">
+                            {viewQuestionsForRow(viewRecord).map((q, idx) => {
+                                const col = `respuesta_q${idx + 1}`;
+                                const val = viewRecord[col] || "—";
+                                return (
+                                    <div
+                                        key={q.key}
+                                        className="col-12 md:col-6"
+                                        style={{ marginBottom: 8 }}
+                                    >
+                                        <div
+                                            style={{
+                                                fontSize: "0.85rem",
+                                                fontWeight: 600,
+                                            }}
+                                        >
+                                            {q.label}
+                                        </div>
+                                        <div
+                                            style={{
+                                                marginTop: 2,
+                                                fontSize: "0.85rem",
+                                            }}
+                                        >
+                                            Respuesta: <b>{val}</b>
+                                        </div>
+                                    </div>
+                                );
+                            })}
+                        </div>
+
+                        <hr />
+                        <p>
+                            <b>Observaciones:</b>{" "}
+                            {viewRecord.observaciones || "—"}
+                        </p>
+                    </>
+                )}
             </Dialog>
         </div>
     );
