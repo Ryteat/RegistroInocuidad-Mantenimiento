@@ -51,9 +51,15 @@ const fmtDMYHM = (isoOrDate) => {
 
 // YYYY-MM-DD para inputs
 const toDateISO = (d = new Date()) =>
-    `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+    `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(
+        d.getDate()
+    ).padStart(2, "0")}`;
 const toHM = (d = new Date()) =>
-    d.toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit", hour12: false });
+    d.toLocaleTimeString("en-GB", {
+        hour: "2-digit",
+        minute: "2-digit",
+        hour12: false,
+    });
 
 // Sumas seguras sin TZ shift (operan sobre YYYY-MM-DD)
 const addDays = (ymd, days) => {
@@ -68,56 +74,117 @@ const addMonths = (ymd, months) => {
 };
 
 /* ===== Constantes del registro ===== */
-const POSICION_ID = "H-EL-SN";
+const POSICION_ID_BASE = "H-EL-SN";
 const EQUIPO = "EMPACADORA DE LARVA";
 const REGISTRO = "SISTEMA NEUMÁTICO";
 const TABLE = "mto_horno_empacadora_sistema_neumatico";
 
-const YESNO = [{ label: "Sí", value: "SI" }, { label: "No", value: "NO" }];
+const YESNO = [
+    { label: "Sí", value: "SI" },
+    { label: "No", value: "NO" },
+];
 const PERIODOS = [
     { label: "Semanal", value: "SEMANAL" },
     { label: "Bimensual", value: "BIMENSUAL" },
 ];
 
+// Cantidad: este lleva solo 01, pero se guarda y se refleja en posicion_id
+const CANTIDAD_OPCIONES = [{ label: "01", value: "01" }];
+
 /* Checklists (resumen de las OMs) */
 const Q_SEMANAL = [
-    { key: "q1", label: "Engrasar bisagras y ejes de tolvascon lubricante grado alimenticio" },
-    { key: "q2", label: "Verificar funcionamiento de vibradores lineales y actuadores neumáticos" },
+    {
+        key: "q1",
+        label:
+            "Engrasar bisagras y ejes de tolvas con lubricante grado alimenticio",
+    },
+    {
+        key: "q2",
+        label:
+            "Verificar funcionamiento de vibradores lineales y actuadores neumáticos",
+    },
     { key: "q3", label: "Revisar fijaciones mecánicas" },
-    { key: "q4", label: "Prueba de pesaje con patrón para verificar precisión" },
-    { key: "q5", label: "Purgar trampas de aire en el filtro de condensado" },
-    { key: "q6", label: "Revisar nivel de aceite del lubricador" },
-    { key: "q7", label: "Verificar presión del regulador (0.4–0.6 MPa)" },
+    {
+        key: "q4",
+        label:
+            "Prueba de pesaje con patrón para verificar precisión",
+    },
+    {
+        key: "q5",
+        label:
+            "Purgar trampas de aire en el filtro de condensado",
+    },
+    {
+        key: "q6",
+        label: "Revisar nivel de aceite del lubricador",
+    },
+    {
+        key: "q7",
+        label:
+            "Verificar presión del regulador (0.4–0.6 MPa)",
+    },
 ];
+
 const Q_BIMENSUAL = [
-    { key: "q1", label: "Retirar polvo en actuadores, ventiladores, zonas de difícil acceso con aire seco" },
+    {
+        key: "q1",
+        label:
+            "Retirar polvo en actuadores, ventiladores, zonas de difícil acceso con aire seco",
+    },
     { key: "q2", label: "Revisar cables, conectores y tierra" },
-    { key: "q3", label: "Verificar integridad de celdas de carga y sensores" },
-    { key: "q4", label: "Desmontar y limpiar vaso del filtro de aire comprimido" },
-    { key: "q5", label: "Revisar boquilla de goteo del lubricador y calibrar goteo(1–2 gotas/min)" },
-    { key: "q6", label: "Realizar calibración con pesas patrón" },
+    {
+        key: "q3",
+        label:
+            "Verificar integridad de celdas de carga y sensores",
+    },
+    {
+        key: "q4",
+        label:
+            "Desmontar y limpiar vaso del filtro de aire comprimido",
+    },
+    {
+        key: "q5",
+        label:
+            "Revisar boquilla de goteo del lubricador y calibrar goteo (1–2 gotas/min)",
+    },
+    {
+        key: "q6",
+        label: "Realizar calibración con pesas patrón",
+    },
 ];
+
+const getQuestionsByPeriodo = (periodicidad) =>
+    periodicidad === "SEMANAL"
+        ? Q_SEMANAL
+        : periodicidad === "BIMENSUAL"
+            ? Q_BIMENSUAL
+            : [];
 
 const emptyForm = () => ({
     fecha_registro: toDateISO(),
     hora_registro: toHM(),
-    posicion_id: POSICION_ID,
+    posicion_id: `${POSICION_ID_BASE}-01`,
     equipo: EQUIPO,
     registro: REGISTRO,
-    cantidad: "",
+    cantidad: "01",
     tecnico: "",
     ejecutado: "",
     observaciones: "",
     periodicidad: "", // usuario debe elegir
-    items: {},        // se llena tras elegir periodicidad
+    items: {}, // se llena tras elegir periodicidad
     fecha_correccion_preview: fmtDMYHM(new Date()),
 });
 
-const packRow = (r) => ({ ...r, tecnico: r.tecnico ?? "", observaciones: r.observaciones ?? "" });
+const packRow = (r) => ({
+    ...r,
+    tecnico: r.tecnico ?? "",
+    observaciones: r.observaciones ?? "",
+});
 
 export default function SistemaNeumatico() {
     const navigate = useNavigate();
     const toast = useRef(null);
+    const { canReview, username } = useCanReview();
 
     const [rows, setRows] = useState([]);
     const [selected, setSelected] = useState([]);
@@ -127,9 +194,12 @@ export default function SistemaNeumatico() {
     const [dialogOpen, setDialogOpen] = useState(false);
     const [submitted, setSubmitted] = useState(false);
     const [form, setForm] = useState(emptyForm());
+    const [editingId, setEditingId] = useState(null);
+
+    const [viewDialogOpen, setViewDialogOpen] = useState(false);
+    const [viewRow, setViewRow] = useState(null);
 
     const [filtroRevisado, setFiltroRevisado] = useState("all");
-    const { canReview, username } = useCanReview();
 
     const showToast = (sev, sum, det, life = 3000) =>
         toast.current?.show({ severity: sev, summary: sum, detail: det, life });
@@ -140,15 +210,18 @@ export default function SistemaNeumatico() {
             setLoading(true);
             let q = supabase
                 .from(TABLE)
-                .select(`
+                .select(
+                    `
           id, created_at,
           fecha_registro, hora_registro,
           posicion_id, equipo, registro, cantidad, tecnico,
           ejecutado, observaciones, periodicidad,
-          respuesta_q1, respuesta_q2, respuesta_q3, respuesta_q4, respuesta_q5, respuesta_q6,
+          respuesta_q1, respuesta_q2, respuesta_q3, respuesta_q4, respuesta_q5, respuesta_q6, respuesta_q7,
           ultimo_mantenimiento, proximo_mantenimiento,
-          revisado, revisado_por_username, revisado_fecha
-        `)
+          revisado, revisado_por_username, revisado_fecha,
+          completado, pendiente_nuevo, fecha_completado
+        `
+                )
                 .order("fecha_registro", { ascending: false })
                 .order("created_at", { ascending: false });
 
@@ -165,81 +238,228 @@ export default function SistemaNeumatico() {
             setLoading(false);
         }
     };
-    useEffect(() => { fetchRows(); /* eslint-disable-next-line */ }, [filtroRevisado]);
 
-    const openNew = () => { setForm(emptyForm()); setSubmitted(false); setDialogOpen(true); };
-    const hideDialog = () => { setDialogOpen(false); setSubmitted(false); };
+    useEffect(() => {
+        fetchRows();
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [filtroRevisado]);
 
-    const onChange = (field, value) => setForm(p => ({ ...p, [field]: value }));
+    const openNew = () => {
+        setForm(emptyForm());
+        setSubmitted(false);
+        setEditingId(null);
+        setDialogOpen(true);
+    };
+    const hideDialog = () => {
+        setDialogOpen(false);
+        setSubmitted(false);
+        setEditingId(null);
+    };
+
+    const onChange = (field, value) =>
+        setForm((p) => ({
+            ...p,
+            [field]: value,
+        }));
 
     const onPeriodoChange = (value) => {
-        const base = value === "SEMANAL" ? Q_SEMANAL : Q_BIMENSUAL;
-        const items = base.reduce((acc, q) => ({ ...acc, [q.key]: { respuesta: "" } }), {});
-        setForm(p => ({ ...p, periodicidad: value, items }));
+        const base = getQuestionsByPeriodo(value);
+        const items = base.reduce(
+            (acc, q) => ({ ...acc, [q.key]: { respuesta: "" } }),
+            {}
+        );
+        setForm((p) => ({
+            ...p,
+            periodicidad: value,
+            items,
+        }));
     };
 
     const onYesNoChange = (key, value) =>
-        setForm(p => ({ ...p, items: { ...p.items, [key]: { respuesta: value } } }));
+        setForm((p) => ({
+            ...p,
+            items: { ...p.items, [key]: { respuesta: value } },
+        }));
+
+    const onCantidadChange = (value) => {
+        const consecutivo = value || "01";
+        setForm((p) => ({
+            ...p,
+            cantidad: consecutivo,
+            posicion_id: `${POSICION_ID_BASE}-${consecutivo}`,
+        }));
+    };
+
+    /* ----------- Ver / Editar ----------- */
+    const openView = (row) => {
+        setViewRow(row);
+        setViewDialogOpen(true);
+    };
+
+    const openEdit = (row) => {
+        const periodicidad = row.periodicidad || "";
+        const baseQuestions = getQuestionsByPeriodo(periodicidad);
+
+        const items = baseQuestions.reduce((acc, q, index) => {
+            const idx = index + 1;
+            return {
+                ...acc,
+                [q.key]: { respuesta: row[`respuesta_q${idx}`] || "" },
+            };
+        }, {});
+
+        let cantidadStr = "01";
+        if (row.cantidad != null) {
+            cantidadStr = String(row.cantidad).padStart(2, "0");
+        } else if (row.posicion_id) {
+            const parts = row.posicion_id.split("-");
+            const last = parts[parts.length - 1];
+            if (/^\d+$/.test(last)) {
+                cantidadStr = last.padStart(2, "0");
+            }
+        }
+
+        const posicionFinal =
+            row.posicion_id || `${POSICION_ID_BASE}-${cantidadStr}`;
+
+        setForm({
+            fecha_registro: row.fecha_registro || toDateISO(),
+            hora_registro: row.hora_registro || toHM(),
+            posicion_id: posicionFinal,
+            equipo: row.equipo || EQUIPO,
+            registro: row.registro || REGISTRO,
+            cantidad: cantidadStr,
+            tecnico: row.tecnico || "",
+            ejecutado: row.ejecutado || "",
+            observaciones: row.observaciones || "",
+            periodicidad,
+            items,
+            fecha_correccion_preview: fmtDMYHM(row.created_at || new Date()),
+        });
+        setSubmitted(false);
+        setEditingId(row.id);
+        setDialogOpen(true);
+    };
 
     /* ----------- validación ----------- */
     const validate = () => {
         const errs = [];
-        if (!form.periodicidad) errs.push("Seleccione la periodicidad (Semanal o Bimensual).");
-        if (!form.tecnico?.trim()) errs.push("El campo Técnico es requerido.");
-        if (!form.ejecutado) errs.push("Indique si se va a efectuar el mantenimiento.");
-        if (form.ejecutado === "NO" && !form.observaciones.trim()) errs.push("Explique por qué NO se efectuó (Observaciones).");
+        if (!form.periodicidad)
+            errs.push("Seleccione la periodicidad (Semanal o Bimensual).");
+        if (!form.tecnico?.trim())
+            errs.push("El campo Técnico es requerido.");
+        if (!form.ejecutado)
+            errs.push("Indique si se va a efectuar el mantenimiento.");
+        if (form.ejecutado === "NO" && !form.observaciones.trim())
+            errs.push("Explique por qué NO se efectuó (Observaciones).");
         if (form.ejecutado === "SI") {
-            const list = form.periodicidad === "SEMANAL" ? Q_SEMANAL : Q_BIMENSUAL;
-            list.forEach(q => { if (!form.items[q.key]?.respuesta) errs.push(`Responda: ${q.label}`); });
+            const list = getQuestionsByPeriodo(form.periodicidad);
+            list.forEach((q) => {
+                if (!form.items[q.key]?.respuesta)
+                    errs.push(`Responda: ${q.label}`);
+            });
         }
         return errs;
     };
 
-    /* ----------- guardado ----------- */
+    /* ----------- guardado (insert / update) ----------- */
     const save = async () => {
         setSubmitted(true);
         const errs = validate();
-        if (errs.length) { showToast("warn", "Validación", errs[0]); return; }
+        if (errs.length) {
+            showToast("warn", "Validación", errs[0]);
+            return;
+        }
 
         try {
             const baseDate = form.fecha_registro || toDateISO();
             const proximo =
                 form.ejecutado === "NO"
                     ? addDays(baseDate, 7)
-                    : (form.periodicidad === "SEMANAL" ? addDays(baseDate, 7) : addMonths(baseDate, 2));
+                    : form.periodicidad === "SEMANAL"
+                        ? addDays(baseDate, 7)
+                        : addMonths(baseDate, 2);
+
+            const cantidadNumero = form.cantidad
+                ? parseInt(form.cantidad, 10)
+                : null;
 
             const payload = {
                 fecha_registro: form.fecha_registro,
                 hora_registro: form.hora_registro,
-                posicion_id: POSICION_ID,
-                equipo: EQUIPO,
-                registro: REGISTRO,
-                cantidad: form.cantidad ? Number(String(form.cantidad).replace(/\D/g, "")) : null,
+                posicion_id: form.posicion_id || `${POSICION_ID_BASE}-01`,
+                equipo: form.equipo || EQUIPO,
+                registro: form.registro || REGISTRO,
+                cantidad: Number.isNaN(cantidadNumero)
+                    ? null
+                    : cantidadNumero,
                 tecnico: form.tecnico,
                 ejecutado: form.ejecutado,
                 observaciones: form.observaciones || null,
                 periodicidad: form.periodicidad,
 
-                respuesta_q1: form.ejecutado === "SI" ? form.items.q1?.respuesta || null : null,
-                respuesta_q2: form.ejecutado === "SI" ? form.items.q2?.respuesta || null : null,
-                respuesta_q3: form.ejecutado === "SI" ? form.items.q3?.respuesta || null : null,
-                respuesta_q4: form.ejecutado === "SI" ? form.items.q4?.respuesta || null : null,
-                respuesta_q5: form.ejecutado === "SI" ? form.items.q5?.respuesta || null : null,
-                respuesta_q6: form.ejecutado === "SI" ? form.items.q6?.respuesta || null : null,
+                // respuestas q1..q7 (q7 se usa solo en semanal)
+                respuesta_q1:
+                    form.ejecutado === "SI"
+                        ? form.items.q1?.respuesta || null
+                        : null,
+                respuesta_q2:
+                    form.ejecutado === "SI"
+                        ? form.items.q2?.respuesta || null
+                        : null,
+                respuesta_q3:
+                    form.ejecutado === "SI"
+                        ? form.items.q3?.respuesta || null
+                        : null,
+                respuesta_q4:
+                    form.ejecutado === "SI"
+                        ? form.items.q4?.respuesta || null
+                        : null,
+                respuesta_q5:
+                    form.ejecutado === "SI"
+                        ? form.items.q5?.respuesta || null
+                        : null,
+                respuesta_q6:
+                    form.ejecutado === "SI"
+                        ? form.items.q6?.respuesta || null
+                        : null,
+                respuesta_q7:
+                    form.ejecutado === "SI"
+                        ? form.items.q7?.respuesta || null
+                        : null,
 
-                ultimo_mantenimiento: form.ejecutado === "SI" ? baseDate : null,
+                ultimo_mantenimiento:
+                    form.ejecutado === "SI" ? baseDate : null,
                 proximo_mantenimiento: proximo,
             };
 
-            const { error } = await supabase.from(TABLE).insert([payload]);
+            let error;
+            if (editingId) {
+                ({ error } = await supabase
+                    .from(TABLE)
+                    .update(payload)
+                    .eq("id", editingId));
+            } else {
+                ({ error } = await supabase.from(TABLE).insert([payload]));
+            }
+
             if (error) throw error;
 
-            showToast("success", "Éxito", "Registro guardado");
+            showToast(
+                "success",
+                "Éxito",
+                editingId ? "Registro actualizado" : "Registro guardado"
+            );
             setDialogOpen(false);
+            setEditingId(null);
             await fetchRows();
         } catch (e) {
             console.error(e);
-            showToast("error", "Error", e.message || "No se pudo guardar");
+            showToast(
+                "error",
+                "Error",
+                e.message || "No se pudo guardar"
+            );
         }
     };
 
@@ -247,32 +467,80 @@ export default function SistemaNeumatico() {
     const revisadoTemplate = (row) => {
         if (!canReview) return <span>{row.revisado ? "Sí" : "No"}</span>;
         const onToggle = async (next) => {
-            const { error } = await supabase.from(TABLE).update({
-                revisado: next,
-                revisado_por_username: next ? username : null,
-                revisado_fecha: next ? new Date().toISOString() : null,
-            }).eq("id", row.id);
-            if (error) { showToast("error", "No se guardó", error.message); return; }
-            setRows(prev => prev.map(r => r.id === row.id ? {
-                ...r, revisado: next,
-                revisado_por_username: next ? username : null,
-                revisado_fecha: next ? new Date().toISOString() : null
-            } : r));
-            showToast("success", "OK", next ? "Marcado revisado" : "Marcado no revisado");
+            const { error } = await supabase
+                .from(TABLE)
+                .update({
+                    revisado: next,
+                    revisado_por_username: next ? username : null,
+                    revisado_fecha: next ? new Date().toISOString() : null,
+                })
+                .eq("id", row.id);
+            if (error) {
+                showToast("error", "No se guardó", error.message);
+                return;
+            }
+            setRows((prev) =>
+                prev.map((r) =>
+                    r.id === row.id
+                        ? {
+                            ...r,
+                            revisado: next,
+                            revisado_por_username: next
+                                ? username
+                                : null,
+                            revisado_fecha: next
+                                ? new Date().toISOString()
+                                : null,
+                        }
+                        : r
+                )
+            );
+            showToast(
+                "success",
+                "OK",
+                next ? "Marcado revisado" : "Marcado no revisado"
+            );
         };
         return (
             <div className="flex align-items-center justify-content-center gap-2">
-                <Checkbox checked={!!row.revisado} onChange={(e) => onToggle(e.checked)} />
+                <Checkbox
+                    checked={!!row.revisado}
+                    onChange={(e) => onToggle(e.checked)}
+                />
                 <span className="text-sm">Revisado</span>
             </div>
         );
     };
 
+    /* ----------- acciones Ver / Editar ----------- */
+    const actionTemplate = (row) => (
+        <div className="flex align-items-center justify-content-center gap-2">
+            <Button
+                label="Ver"
+                icon="pi pi-eye"
+                outlined
+                size="small"
+                onClick={() => openView(row)}
+            />
+            <Button
+                label="Editar"
+                icon="pi pi-pencil"
+                size="small"
+                onClick={() => openEdit(row)}
+            />
+        </div>
+    );
+
     const header = (
         <div className="flex flex-wrap gap-2 align-items-center justify-content-between">
             <span className="p-input-icon-left">
                 <i className="pi pi-search" />
-                <InputText type="search" value={globalFilter} onInput={(e) => setGlobalFilter(e.target.value)} placeholder="Buscar (ej. H-EL-SN, técnico, notas)" />
+                <InputText
+                    type="search"
+                    value={globalFilter}
+                    onInput={(e) => setGlobalFilter(e.target.value)}
+                    placeholder="Buscar (ej. H-EL-SN-01, técnico, notas)"
+                />
             </span>
             <div className="flex align-items-center gap-2">
                 <span className="text-sm font-medium">Filtro:</span>
@@ -291,11 +559,19 @@ export default function SistemaNeumatico() {
     );
 
     const countSiNo = (row, val) =>
-        [1, 2, 3, 4, 5, 6].reduce((acc, i) => acc + (((row[`respuesta_q${i}`] || "") === val) ? 1 : 0), 0);
+        [1, 2, 3, 4, 5, 6, 7].reduce(
+            (acc, i) =>
+                acc +
+                (((row[`respuesta_q${i}`] || "") === val) ? 1 : 0),
+            0
+        );
 
     const exportXlsx = () => {
-        if (!rows?.length) { showToast("warn", "Exportación", "No hay datos"); return; }
-        const out = rows.map(r => ({
+        if (!rows?.length) {
+            showToast("warn", "Exportación", "No hay datos");
+            return;
+        }
+        const out = rows.map((r) => ({
             posicion: r.posicion_id,
             equipo: r.equipo,
             registro: r.registro ?? "",
@@ -313,14 +589,26 @@ export default function SistemaNeumatico() {
         const ws = XLSX.utils.json_to_sheet(out);
         const wb = XLSX.utils.book_new();
         XLSX.utils.book_append_sheet(wb, ws, "Sistema Neumático");
-        XLSX.writeFile(wb, `Horno_SistemaNeumatico_${new Date().toISOString().slice(0, 10)}.xlsx`);
+        XLSX.writeFile(
+            wb,
+            `Horno_SistemaNeumatico_${new Date()
+                .toISOString()
+                .slice(0, 10)}.xlsx`
+        );
+    };
+
+    const activeQuestions = getQuestionsByPeriodo(form.periodicidad);
+
+    const preguntasView = (row) => {
+        if (!row?.periodicidad) return [];
+        const base = getQuestionsByPeriodo(row.periodicidad);
+        return base.map((q, idx) => ({
+            label: q.label,
+            respuesta: row[`respuesta_q${idx + 1}`] || "",
+        }));
     };
 
     /* ----------- UI ----------- */
-    const activeQuestions = form.periodicidad === "SEMANAL" ? Q_SEMANAL
-        : form.periodicidad === "BIMENSUAL" ? Q_BIMENSUAL
-            : [];
-
     return (
         <div className="controlrendcosechayfrass-container">
             <Toast ref={toast} />
@@ -331,20 +619,44 @@ export default function SistemaNeumatico() {
 
             <div className="welcome-message">
                 <p>
-                    <b>Posición (ID):</b> {POSICION_ID} &nbsp; | &nbsp; <b>Equipo:</b> {EQUIPO} &nbsp; | &nbsp;
+                    <b>Posición (ID base):</b> {POSICION_ID_BASE} &nbsp; | &nbsp;{" "}
+                    <b>Equipo:</b> {EQUIPO} &nbsp; | &nbsp;
                     <b>Registro:</b> {REGISTRO}
+                </p>
+                <p>
+                    El ID final se muestra como{" "}
+                    <b>{`${POSICION_ID_BASE}-01`}</b> según el consecutivo de
+                    cantidad.
                 </p>
             </div>
 
             <div className="buttons-container">
-                <button onClick={() => navigate(-1)} className="return-button">Volver</button>
-                <button onClick={() => navigate(-2)} className="menu-button">Menú principal</button>
+                <button onClick={() => navigate(-1)} className="return-button">
+                    Volver
+                </button>
+                <button onClick={() => navigate(-2)} className="menu-button">
+                    Menú principal
+                </button>
             </div>
 
             <Toolbar
                 className="mb-4"
-                left={() => <Button label="Nuevo" icon="pi pi-plus" severity="success" onClick={openNew} />}
-                right={() => <Button label="Exportar a Excel" icon="pi pi-upload" className="p-button-help" onClick={exportXlsx} />}
+                left={() => (
+                    <Button
+                        label="Nuevo"
+                        icon="pi pi-plus"
+                        severity="success"
+                        onClick={openNew}
+                    />
+                )}
+                right={() => (
+                    <Button
+                        label="Exportar a Excel"
+                        icon="pi pi-upload"
+                        className="p-button-help"
+                        onClick={exportXlsx}
+                    />
+                )}
             />
 
             <DataTable
@@ -355,8 +667,11 @@ export default function SistemaNeumatico() {
                 selectionMode="multiple"
                 header={header}
                 globalFilter={globalFilter}
-                paginator rows={10} rowsPerPageOptions={[5, 10, 25]}
-                dataKey="id" showGridlines
+                paginator
+                rows={10}
+                rowsPerPageOptions={[5, 10, 25]}
+                dataKey="id"
+                showGridlines
                 paginatorTemplate="FirstPageLink PrevPageLink PageLinks NextPageLink LastPageLink CurrentPageReport RowsPerPageDropdown"
                 currentPageReportTemplate="Mostrando del {first} al {last} de {totalRecords} Registros"
             >
@@ -365,23 +680,59 @@ export default function SistemaNeumatico() {
                 <Column field="equipo" header="Equipo" sortable />
                 <Column field="registro" header="Registro" />
                 <Column field="periodicidad" header="Periodicidad" />
-                <Column header="Último Mto." body={(r) => fmtDMY(r.ultimo_mantenimiento)} sortable />
-                <Column header="Próximo Mto." body={(r) => fmtDMY(r.proximo_mantenimiento)} sortable />
+                <Column
+                    header="Último Mto."
+                    body={(r) => fmtDMY(r.ultimo_mantenimiento)}
+                    sortable
+                />
+                <Column
+                    header="Próximo Mto."
+                    body={(r) => fmtDMY(r.proximo_mantenimiento)}
+                    sortable
+                />
                 <Column field="tecnico" header="Técnico" sortable />
-                <Column header="Fecha de Registro" body={(r) => fmtDMYHM(r.created_at)} sortable />
-                <Column header="Revisado" body={revisadoTemplate} style={{ width: "10rem", textAlign: "center" }} />
+                <Column
+                    header="Fecha de Registro"
+                    body={(r) => fmtDMYHM(r.created_at)}
+                    sortable
+                />
+                <Column
+                    header="Revisado"
+                    body={revisadoTemplate}
+                    style={{ width: "10rem", textAlign: "center" }}
+                />
+                <Column
+                    header="Acciones"
+                    body={actionTemplate}
+                    exportable={false}
+                    style={{ width: "14rem", textAlign: "center" }}
+                />
             </DataTable>
 
+            {/* Diálogo de crear / editar */}
             <Dialog
                 visible={dialogOpen}
                 style={{ width: "72vw", maxWidth: 1100 }}
-                header="Nuevo registro — Sistema Neumático"
+                header={
+                    editingId
+                        ? "Editar registro — Sistema Neumático"
+                        : "Nuevo registro — Sistema Neumático"
+                }
                 modal
                 onHide={hideDialog}
                 footer={
                     <div className="flex gap-2 justify-content-end">
-                        <Button label="Cancelar" icon="pi pi-times" outlined onClick={hideDialog} />
-                        <Button label="Guardar" icon="pi pi-check" onClick={save} />
+                        <Button
+                            label="Cancelar"
+                            icon="pi pi-times"
+                            outlined
+                            onClick={hideDialog}
+                        />
+                        <Button
+                            label="Guardar"
+                            icon="pi pi-check"
+                            onClick={save}
+                        />
                     </div>
                 }
             >
@@ -390,25 +741,48 @@ export default function SistemaNeumatico() {
                     <div className="field col-12 md:col-4">
                         <label className="font-bold">
                             Periodicidad*
-                            {submitted && !form.periodicidad && <small className="p-error"> Requerido</small>}
+                            {submitted && !form.periodicidad && (
+                                <small className="p-error"> Requerido</small>
+                            )}
                         </label>
-                        <Dropdown value={form.periodicidad} options={PERIODOS} onChange={(e) => onPeriodoChange(e.value)} placeholder="Seleccione" />
+                        <Dropdown
+                            value={form.periodicidad}
+                            options={PERIODOS}
+                            onChange={(e) => onPeriodoChange(e.value)}
+                            placeholder="Seleccione"
+                        />
                         <small className="block mt-2">
-                            Si es <b>Semanal</b> el próximo mto se programa a <b>7 días</b>; si es <b>Bimensual</b>, a <b>2 meses</b>.
+                            Si es <b>Semanal</b> el próximo mto se programa a{" "}
+                            <b>7 días</b>; si es <b>Bimensual</b>, a{" "}
+                            <b>2 meses</b>. Si NO se ejecuta: <b>+7 días</b>.
                         </small>
                     </div>
 
                     <div className="field col-12 md:col-4">
                         <label className="font-bold">Fecha intervención</label>
-                        <InputText type="date" value={form.fecha_registro} onChange={(e) => onChange("fecha_registro", e.target.value)} />
+                        <InputText
+                            type="date"
+                            value={form.fecha_registro}
+                            onChange={(e) =>
+                                onChange("fecha_registro", e.target.value)
+                            }
+                        />
                     </div>
                     <div className="field col-12 md:col-4">
                         <label className="font-bold">Hora intervención</label>
-                        <InputText type="time" value={form.hora_registro} onChange={(e) => onChange("hora_registro", e.target.value)} />
+                        <InputText
+                            type="time"
+                            value={form.hora_registro}
+                            onChange={(e) =>
+                                onChange("hora_registro", e.target.value)
+                            }
+                        />
                     </div>
 
                     <div className="field col-6 md:col-3">
-                        <label className="font-bold">Posición (ID)</label>
+                        <label className="font-bold">
+                            Posición (ID con consecutivo)
+                        </label>
                         <InputText value={form.posicion_id} disabled />
                     </div>
                     <div className="field col-6 md:col-3">
@@ -417,46 +791,129 @@ export default function SistemaNeumatico() {
                     </div>
 
                     <div className="field col-6 md:col-3">
-                        <label className="font-bold">Técnico* {submitted && !form.tecnico && <small className="p-error"> Requerido</small>}</label>
-                        <InputText value={form.tecnico} onChange={(e) => onChange("tecnico", e.target.value)} placeholder="Nombre del técnico" />
+                        <label className="font-bold">
+                            Técnico*{" "}
+                            {submitted && !form.tecnico && (
+                                <small className="p-error"> Requerido</small>
+                            )}
+                        </label>
+                        <InputText
+                            value={form.tecnico}
+                            onChange={(e) =>
+                                onChange("tecnico", e.target.value)
+                            }
+                            placeholder="Nombre del técnico"
+                        />
                     </div>
                     <div className="field col-6 md:col-3">
-                        <label className="font-bold">Cantidad (referencia)</label>
-                        <InputText value={form.cantidad} onChange={(e) => onChange("cantidad", e.target.value ? e.target.value.replace(/\D/g, "") : "")} placeholder="Ej. 1" />
+                        <label className="font-bold">
+                            Cantidad / Consecutivo
+                        </label>
+                        <Dropdown
+                            value={form.cantidad}
+                            options={CANTIDAD_OPCIONES}
+                            onChange={(e) => onCantidadChange(e.value)}
+                            placeholder="01"
+                        />
+                        <small className="block mt-1">
+                            Se usa para formar el ID, p. ej.{" "}
+                            <b>{`${POSICION_ID_BASE}-01`}</b>.
+                        </small>
                     </div>
 
                     <div className="field col-12 md:col-6">
                         <label className="font-bold">
-                            ¿Se va a efectuar el mantenimiento?* {submitted && !form.ejecutado && <small className="p-error"> Requerido</small>}
+                            ¿Se va a efectuar el mantenimiento?*{" "}
+                            {submitted && !form.ejecutado && (
+                                <small className="p-error"> Requerido</small>
+                            )}
                         </label>
-                        <Dropdown value={form.ejecutado} options={YESNO} onChange={(e) => onChange("ejecutado", e.value)} placeholder="Seleccione" />
+                        <Dropdown
+                            value={form.ejecutado}
+                            options={YESNO}
+                            onChange={(e) => onChange("ejecutado", e.value)}
+                            placeholder="Seleccione"
+                        />
                     </div>
 
                     {form.ejecutado === "NO" && (
                         <div className="field col-12">
                             <label className="font-bold">
-                                Observaciones (obligatorio si NO) {submitted && !form.observaciones.trim() && <small className="p-error"> Requerido</small>}
+                                Observaciones (obligatorio si NO){" "}
+                                {submitted &&
+                                    !form.observaciones.trim() && (
+                                        <small className="p-error">
+                                            {" "}
+                                            Requerido
+                                        </small>
+                                    )}
                             </label>
-                            <InputText value={form.observaciones} onChange={(e) => onChange("observaciones", e.target.value)} placeholder="Explique el motivo" />
-                            <small className="block mt-2">Se reprogramará automáticamente para dentro de <b>7 días</b>.</small>
+                            <InputText
+                                value={form.observaciones}
+                                onChange={(e) =>
+                                    onChange(
+                                        "observaciones",
+                                        e.target.value
+                                    )
+                                }
+                                placeholder="Explique el motivo"
+                            />
+                            <small className="block mt-2">
+                                Se reprogramará automáticamente para dentro de{" "}
+                                <b>7 días</b>.
+                            </small>
                         </div>
                     )}
 
                     {form.ejecutado === "SI" && !!activeQuestions.length && (
                         <div className="field col-12">
-                            <div style={{ border: "1px solid #d1d5db", borderRadius: 8, padding: 12 }}>
-                                <div style={{ fontWeight: 700, marginBottom: 8 }}>
-                                    {form.periodicidad === "SEMANAL" ? "Checklist — SEMANAL" : "Checklist — BIMENSUAL"}
+                            <div
+                                style={{
+                                    border: "1px solid #d1d5db",
+                                    borderRadius: 8,
+                                    padding: 12,
+                                }}
+                            >
+                                <div
+                                    style={{
+                                        fontWeight: 700,
+                                        marginBottom: 8,
+                                    }}
+                                >
+                                    {form.periodicidad === "SEMANAL"
+                                        ? "Checklist — SEMANAL"
+                                        : "Checklist — BIMENSUAL"}
                                 </div>
                                 <div className="grid">
-                                    {activeQuestions.map(q => {
-                                        const val = form.items[q.key]?.respuesta || "";
+                                    {activeQuestions.map((q) => {
+                                        const val =
+                                            form.items[q.key]?.respuesta ||
+                                            "";
                                         return (
-                                            <div key={q.key} className="col-12 md:col-6">
+                                            <div
+                                                key={q.key}
+                                                className="col-12 md:col-6"
+                                            >
                                                 <label className="font-bold">
-                                                    {q.label}* {submitted && !val && <small className="p-error"> Requerido</small>}
+                                                    {q.label}*{" "}
+                                                    {submitted && !val && (
+                                                        <small className="p-error">
+                                                            {" "}
+                                                            Requerido
+                                                        </small>
+                                                    )}
                                                 </label>
-                                                <Dropdown value={val} options={YESNO} onChange={(e) => onYesNoChange(q.key, e.value)} placeholder="Seleccione" />
+                                                <Dropdown
+                                                    value={val}
+                                                    options={YESNO}
+                                                    onChange={(e) =>
+                                                        onYesNoChange(
+                                                            q.key,
+                                                            e.value
+                                                        )
+                                                    }
+                                                    placeholder="Seleccione"
+                                                />
                                             </div>
                                         );
                                     })}
@@ -467,16 +924,130 @@ export default function SistemaNeumatico() {
 
                     {form.ejecutado === "SI" && (
                         <div className="field col-12">
-                            <label className="font-bold">Observaciones (opcional)</label>
-                            <InputText value={form.observaciones} onChange={(e) => onChange("observaciones", e.target.value)} />
+                            <label className="font-bold">
+                                Observaciones (opcional)
+                            </label>
+                            <InputText
+                                value={form.observaciones}
+                                onChange={(e) =>
+                                    onChange(
+                                        "observaciones",
+                                        e.target.value
+                                    )
+                                }
+                            />
                         </div>
                     )}
 
                     <div className="field col-12 md:col-4">
-                        <label className="font-bold">Fecha de Registro (auto)</label>
-                        <InputText value={form.fecha_correccion_preview} disabled />
+                        <label className="font-bold">
+                            Fecha de Registro (auto)
+                        </label>
+                        <InputText
+                            value={form.fecha_correccion_preview}
+                            disabled
+                        />
                     </div>
                 </div>
+            </Dialog>
+
+            {/* Diálogo de VER (solo lectura) */}
+            <Dialog
+                visible={viewDialogOpen}
+                style={{ width: "60vw", maxWidth: 900 }}
+                header="Detalle del registro — Sistema Neumático"
+                modal
+                onHide={() => setViewDialogOpen(false)}
+            >
+                {viewRow && (
+                    <div className="p-fluid grid">
+                        <div className="field col-12 md:col-4">
+                            <label className="font-bold">
+                                Posición (ID)
+                            </label>
+                            <p>{viewRow.posicion_id}</p>
+                        </div>
+                        <div className="field col-12 md:col-4">
+                            <label className="font-bold">
+                                Periodicidad
+                            </label>
+                            <p>{viewRow.periodicidad || "—"}</p>
+                        </div>
+                        <div className="field col-12 md:col-4">
+                            <label className="font-bold">
+                                Técnico
+                            </label>
+                            <p>{viewRow.tecnico || "—"}</p>
+                        </div>
+
+                        <div className="field col-12 md:col-4">
+                            <label className="font-bold">
+                                Fecha intervención
+                            </label>
+                            <p>{fmtDMY(viewRow.fecha_registro)}</p>
+                        </div>
+                        <div className="field col-12 md:col-4">
+                            <label className="font-bold">
+                                Hora intervención
+                            </label>
+                            <p>{viewRow.hora_registro || "—"}</p>
+                        </div>
+                        <div className="field col-12 md:col-4">
+                            <label className="font-bold">
+                                Ejecutado
+                            </label>
+                            <p>{viewRow.ejecutado || "—"}</p>
+                        </div>
+
+                        <div className="field col-12">
+                            <label className="font-bold">
+                                Observaciones
+                            </label>
+                            <p>{viewRow.observaciones || "—"}</p>
+                        </div>
+
+                        <div className="field col-12">
+                            <label className="font-bold">
+                                Checklist
+                            </label>
+                            <div
+                                style={{
+                                    border: "1px solid #d1d5db",
+                                    borderRadius: 8,
+                                    padding: 12,
+                                }}
+                            >
+                                {preguntasView(viewRow).length ===
+                                    0 ? (
+                                    <p>No hay preguntas asociadas.</p>
+                                ) : (
+                                    <div className="grid">
+                                        {preguntasView(
+                                            viewRow
+                                        ).map((pq, idx) => (
+                                            <div
+                                                key={idx}
+                                                className="col-12 md:col-6"
+                                            >
+                                                <p>
+                                                    <b>
+                                                        {
+                                                            pq.label
+                                                        }
+                                                    </b>
+                                                    <br />
+                                                    Respuesta:{" "}
+                                                    {pq.respuesta ||
+                                                        "—"}
+                                                </p>
+                                            </div>
+                                        ))}
+                                    </div>
+                                )}
+                            </div>
+                        </div>
+                    </div>
+                )}
             </Dialog>
         </div>
     );

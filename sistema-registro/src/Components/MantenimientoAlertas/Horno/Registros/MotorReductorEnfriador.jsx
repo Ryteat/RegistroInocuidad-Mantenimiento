@@ -44,40 +44,79 @@ const fmtDMYHM = (isoOrDate) => {
     return `${dd}/${mm}/${yy} ${hh}:${mi}`;
 };
 const toDateISO = (d = new Date()) =>
-    `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+    `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(
+        d.getDate()
+    ).padStart(2, "0")}`;
 const toHM = (d = new Date()) =>
-    d.toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit", hour12: false });
-const addDays = (ymd, days) => { const b = parseYMD(ymd); b.setDate(b.getDate() + Number(days || 0)); return toDateISO(b); };
-const addMonths = (ymd, months) => { const b = parseYMD(ymd); b.setMonth(b.getMonth() + Number(months || 0)); return toDateISO(b); };
+    d.toLocaleTimeString("en-GB", {
+        hour: "2-digit",
+        minute: "2-digit",
+        hour12: false,
+    });
+const addDays = (ymd, days) => {
+    const b = parseYMD(ymd);
+    b.setDate(b.getDate() + Number(days || 0));
+    return toDateISO(b);
+};
+const addMonths = (ymd, months) => {
+    const b = parseYMD(ymd);
+    b.setMonth(b.getMonth() + Number(months || 0));
+    return toDateISO(b);
+};
 
 /* ===== Constantes del registro ===== */
-const POSICION_ID = "H-ENF-MR"; // Horno - ENfriador de Larva - Motor Reductor
+const POSICION_ID_BASE = "H-ENF-MR"; // Horno - ENfriador de Larva - Motor Reductor
 const EQUIPO = "ENFRIADOR DE LARVA";
 const REGISTRO = "MOTOR REDUCTOR";
 const TABLE = "mto_horno_enfriador_motor_reductor";
 
-const YESNO = [{ label: "Sí", value: "SI" }, { label: "No", value: "NO" }];
+const YESNO = [
+    { label: "Sí", value: "SI" },
+    { label: "No", value: "NO" },
+];
+
 const PERIODOS = [
     { label: "Trimestral", value: "TRIMESTRAL" },
     { label: "Anual", value: "ANUAL" },
 ];
+
+// Cantidad: este lleva solo 01, pero se guarda y se refleja en posicion_id
+const CANTIDAD_OPCIONES = [{ label: "01", value: "01" }];
 
 /* Preguntas: mismas que Motor Reductor (Empacadora) */
 const Q_TRIMESTRAL = [
     { key: "q1", label: "Revisar y verificar estado general del motor, limpieza" },
     { key: "q2", label: "Revisar y verificar estado general del motor, pintura" },
     { key: "q3", label: "Revisar estado del cable de alimentación, conector o manguito" },
-    { key: "q4", label: "Abrir caja de conexiones y verificar estado y apriete de los bornes de conexión" },
-    { key: "q5", label: "Verificar presencia de agua en caja de conexión, si lo hay utilice desplazador de humedad" },
+    {
+        key: "q4",
+        label: "Abrir caja de conexiones y verificar estado y apriete de los bornes de conexión",
+    },
+    {
+        key: "q5",
+        label:
+            "Verificar presencia de agua en caja de conexión, si lo hay utilice desplazador de humedad",
+    },
     { key: "q6", label: "Realizar medición de aislamiento al bobinado, Reporte" },
-    { key: "q7", label: "Tomar lecturas de amperaje y comparar con los datos de placa, Reporte" },
+    {
+        key: "q7",
+        label: "Tomar lecturas de amperaje y comparar con los datos de placa, Reporte",
+    },
     { key: "q8", label: "Revisar temperatura del motor, Reporte" },
-    { key: "q9", label: "Verificar que no hallan presencia de ruidos o ruidos extraños" },
-    { key: "q10", label: "Verificar que el cobertor del motor y base se encuentre en su lugar, Reporte" },
+    {
+        key: "q9",
+        label: "Verificar que no hallan presencia de ruidos o ruidos extraños",
+    },
+    {
+        key: "q10",
+        label:
+            "Verificar que el cobertor del motor y base se encuentre en su lugar, Reporte",
+    },
     { key: "q11", label: "Reducir fugas" },
     { key: "q12", label: "Revisar estado y nivel del aceite" },
     { key: "q13", label: "Lubricar" },
 ];
+
 const Q_ANUAL = [
     { key: "q1", label: "Desarme el motor, no dañe el bobinado" },
     { key: "q2", label: "Lavar, secar y barnizar el bobinado" },
@@ -90,31 +129,50 @@ const Q_ANUAL = [
     { key: "q9", label: "Desarme el reductor y realice lavado" },
     { key: "q10", label: "Cambie todos los rodamientos" },
     { key: "q11", label: "Cambie los retenedores" },
-    { key: "q12", label: "Armar el equipo con cuidado de no dañar los retenedores y los roles" },
+    {
+        key: "q12",
+        label:
+            "Armar el equipo con cuidado de no dañar los retenedores y los roles",
+    },
     { key: "q13", label: "Pinte si es necesario" },
     { key: "q14", label: "Rellene con aceite nuevo" },
 ];
 
+const getQuestionsByPeriodo = (periodicidad) =>
+    periodicidad === "TRIMESTRAL"
+        ? Q_TRIMESTRAL
+        : periodicidad === "ANUAL"
+            ? Q_ANUAL
+            : [];
+
+/* ===== Form vacío ===== */
 const emptyForm = () => ({
     fecha_registro: toDateISO(),
     hora_registro: toHM(),
-    posicion_id: POSICION_ID,
+    // Se mostrará ya con el consecutivo 01
+    posicion_id: `${POSICION_ID_BASE}-01`,
     equipo: EQUIPO,
     registro: REGISTRO,
-    cantidad: "",
+    cantidad: "01", // referencia y para el consecutivo
     tecnico: "",
     ejecutado: "",
     observaciones: "",
-    periodicidad: "", // usuario debe elegir
-    items: {},        // se llena tras elegir periodicidad
+    periodicidad: "",
+    items: {},
     fecha_correccion_preview: fmtDMYHM(new Date()),
 });
 
-const packRow = (r) => ({ ...r, tecnico: r.tecnico ?? "", observaciones: r.observaciones ?? "" });
+const packRow = (r) => ({
+    ...r,
+    tecnico: r.tecnico ?? "",
+    observaciones: r.observaciones ?? "",
+});
 
 export default function MotorReductorEnfriador() {
     const navigate = useNavigate();
     const toast = useRef(null);
+    const { canReview, username } = useCanReview();
+
     const [rows, setRows] = useState([]);
     const [selected, setSelected] = useState([]);
     const [globalFilter, setGlobalFilter] = useState("");
@@ -123,9 +181,12 @@ export default function MotorReductorEnfriador() {
     const [dialogOpen, setDialogOpen] = useState(false);
     const [submitted, setSubmitted] = useState(false);
     const [form, setForm] = useState(emptyForm());
+    const [editingId, setEditingId] = useState(null);
+
+    const [viewDialogOpen, setViewDialogOpen] = useState(false);
+    const [viewRow, setViewRow] = useState(null);
 
     const [filtroRevisado, setFiltroRevisado] = useState("all");
-    const { canReview, username } = useCanReview();
 
     const showToast = (sev, sum, det, life = 3000) =>
         toast.current?.show({ severity: sev, summary: sum, detail: det, life });
@@ -134,7 +195,10 @@ export default function MotorReductorEnfriador() {
     const fetchRows = async () => {
         try {
             setLoading(true);
-            let q = supabase.from(TABLE).select(`
+            let q = supabase
+                .from(TABLE)
+                .select(
+                    `
         id, created_at,
         fecha_registro, hora_registro,
         posicion_id, equipo, registro, cantidad, tecnico,
@@ -142,7 +206,8 @@ export default function MotorReductorEnfriador() {
         ${Array.from({ length: 14 }, (_, i) => `respuesta_q${i + 1}`).join(", ")},
         ultimo_mantenimiento, proximo_mantenimiento,
         revisado, revisado_por_username, revisado_fecha
-      `)
+      `
+                )
                 .order("fecha_registro", { ascending: false })
                 .order("created_at", { ascending: false });
 
@@ -159,112 +224,291 @@ export default function MotorReductorEnfriador() {
             setLoading(false);
         }
     };
-    useEffect(() => { fetchRows(); /* eslint-disable-next-line */ }, [filtroRevisado]);
 
-    const openNew = () => { setForm(emptyForm()); setSubmitted(false); setDialogOpen(true); };
-    const hideDialog = () => { setDialogOpen(false); setSubmitted(false); };
-    const onChange = (field, value) => setForm(p => ({ ...p, [field]: value }));
+    useEffect(() => {
+        fetchRows();
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [filtroRevisado]);
+
+    const openNew = () => {
+        setForm(emptyForm());
+        setSubmitted(false);
+        setEditingId(null);
+        setDialogOpen(true);
+    };
+
+    const hideDialog = () => {
+        setDialogOpen(false);
+        setSubmitted(false);
+        setEditingId(null);
+    };
+
+    const onChange = (field, value) =>
+        setForm((p) => ({
+            ...p,
+            [field]: value,
+        }));
 
     const onPeriodoChange = (value) => {
-        const base = value === "TRIMESTRAL" ? Q_TRIMESTRAL : Q_ANUAL;
-        const items = base.reduce((acc, q) => ({ ...acc, [q.key]: { respuesta: "" } }), {});
-        setForm(p => ({ ...p, periodicidad: value, items }));
+        const base = getQuestionsByPeriodo(value);
+        const items = base.reduce(
+            (acc, q) => ({ ...acc, [q.key]: { respuesta: "" } }),
+            {}
+        );
+        setForm((p) => ({
+            ...p,
+            periodicidad: value,
+            items,
+        }));
     };
+
     const onYesNoChange = (key, value) =>
-        setForm(p => ({ ...p, items: { ...p.items, [key]: { respuesta: value } } }));
+        setForm((p) => ({
+            ...p,
+            items: { ...p.items, [key]: { respuesta: value } },
+        }));
+
+    const onCantidadChange = (value) => {
+        // Siempre será 01 para este registro, pero dejamos la lógica genérica
+        const consecutivo = value || "01";
+        setForm((p) => ({
+            ...p,
+            cantidad: consecutivo,
+            posicion_id: `${POSICION_ID_BASE}-${consecutivo}`,
+        }));
+    };
+
+    /* ----------- Ver / Editar ----------- */
+    const openView = (row) => {
+        setViewRow(row);
+        setViewDialogOpen(true);
+    };
+
+    const openEdit = (row) => {
+        const periodicidad = row.periodicidad || "";
+        const baseQuestions = getQuestionsByPeriodo(periodicidad);
+        const items = baseQuestions.reduce((acc, q, index) => {
+            const idx = index + 1;
+            return {
+                ...acc,
+                [q.key]: { respuesta: row[`respuesta_q${idx}`] || "" },
+            };
+        }, {});
+
+        // Intentar reconstruir cantidad y posicion_id
+        let cantidadStr = "01";
+        if (row.cantidad != null) {
+            cantidadStr = String(row.cantidad).padStart(2, "0");
+        } else if (row.posicion_id) {
+            const parts = row.posicion_id.split("-");
+            const last = parts[parts.length - 1];
+            if (/^\d+$/.test(last)) {
+                cantidadStr = last.padStart(2, "0");
+            }
+        }
+
+        const posicionFinal =
+            row.posicion_id || `${POSICION_ID_BASE}-${cantidadStr}`;
+
+        setForm({
+            fecha_registro: row.fecha_registro || toDateISO(),
+            hora_registro: row.hora_registro || toHM(),
+            posicion_id: posicionFinal,
+            equipo: row.equipo || EQUIPO,
+            registro: row.registro || REGISTRO,
+            cantidad: cantidadStr,
+            tecnico: row.tecnico || "",
+            ejecutado: row.ejecutado || "",
+            observaciones: row.observaciones || "",
+            periodicidad,
+            items,
+            fecha_correccion_preview: fmtDMYHM(row.created_at || new Date()),
+        });
+        setSubmitted(false);
+        setEditingId(row.id);
+        setDialogOpen(true);
+    };
 
     /* ----------- validación ----------- */
     const validate = () => {
         const errs = [];
-        if (!form.periodicidad) errs.push("Seleccione la periodicidad (Trimestral o Anual).");
-        if (!form.tecnico?.trim()) errs.push("El campo Técnico es requerido.");
-        if (!form.ejecutado) errs.push("Indique si se va a efectuar el mantenimiento.");
-        if (form.ejecutado === "NO" && !form.observaciones.trim()) errs.push("Explique por qué NO se efectuó (Observaciones).");
+        if (!form.periodicidad)
+            errs.push("Seleccione la periodicidad (Trimestral o Anual).");
+        if (!form.tecnico?.trim())
+            errs.push("El campo Técnico es requerido.");
+        if (!form.ejecutado)
+            errs.push("Indique si se va a efectuar el mantenimiento.");
+        if (form.ejecutado === "NO" && !form.observaciones.trim())
+            errs.push("Explique por qué NO se efectuó (Observaciones).");
         if (form.ejecutado === "SI") {
-            const list = form.periodicidad === "TRIMESTRAL" ? Q_TRIMESTRAL : Q_ANUAL;
-            list.forEach(q => { if (!form.items[q.key]?.respuesta) errs.push(`Responda: ${q.label}`); });
+            const list = getQuestionsByPeriodo(form.periodicidad);
+            list.forEach((q) => {
+                if (!form.items[q.key]?.respuesta)
+                    errs.push(`Responda: ${q.label}`);
+            });
         }
         return errs;
     };
 
-    /* ----------- guardado ----------- */
+    /* ----------- guardado (insert / update) ----------- */
     const save = async () => {
         setSubmitted(true);
         const errs = validate();
-        if (errs.length) { showToast("warn", "Validación", errs[0]); return; }
+        if (errs.length) {
+            showToast("warn", "Validación", errs[0]);
+            return;
+        }
 
         try {
             const baseDate = form.fecha_registro || toDateISO();
             const proximo =
                 form.ejecutado === "NO"
                     ? addDays(baseDate, 7)
-                    : (form.periodicidad === "TRIMESTRAL" ? addMonths(baseDate, 3) : addMonths(baseDate, 12));
+                    : form.periodicidad === "TRIMESTRAL"
+                        ? addMonths(baseDate, 3)
+                        : addMonths(baseDate, 12);
+
+            const cantidadNumero = form.cantidad
+                ? parseInt(form.cantidad, 10)
+                : null;
 
             const payload = {
                 fecha_registro: form.fecha_registro,
                 hora_registro: form.hora_registro,
-                posicion_id: POSICION_ID,
-                equipo: EQUIPO,
-                registro: REGISTRO,
-                cantidad: form.cantidad ? Number(String(form.cantidad).replace(/\D/g, "")) : null,
+                posicion_id: form.posicion_id || `${POSICION_ID_BASE}-01`,
+                equipo: form.equipo || EQUIPO,
+                registro: form.registro || REGISTRO,
+                cantidad: Number.isNaN(cantidadNumero)
+                    ? null
+                    : cantidadNumero,
                 tecnico: form.tecnico,
                 ejecutado: form.ejecutado,
                 observaciones: form.observaciones || null,
                 periodicidad: form.periodicidad,
                 ...Object.fromEntries(
-                    Array.from({ length: 14 }, (_, i) => [`respuesta_q${i + 1}`, form.ejecutado === "SI" ? (form.items[`q${i + 1}`]?.respuesta || null) : null])
+                    Array.from({ length: 14 }, (_, i) => [
+                        `respuesta_q${i + 1}`,
+                        form.ejecutado === "SI"
+                            ? form.items[`q${i + 1}`]?.respuesta || null
+                            : null,
+                    ])
                 ),
-                ultimo_mantenimiento: form.ejecutado === "SI" ? baseDate : null,
+                ultimo_mantenimiento:
+                    form.ejecutado === "SI" ? baseDate : null,
                 proximo_mantenimiento: proximo,
             };
 
-            const { error } = await supabase.from(TABLE).insert([payload]);
+            let error;
+            if (editingId) {
+                ({ error } = await supabase
+                    .from(TABLE)
+                    .update(payload)
+                    .eq("id", editingId));
+            } else {
+                ({ error } = await supabase.from(TABLE).insert([payload]));
+            }
+
             if (error) throw error;
 
-            showToast("success", "Éxito", "Registro guardado");
+            showToast(
+                "success",
+                "Éxito",
+                editingId ? "Registro actualizado" : "Registro guardado"
+            );
             setDialogOpen(false);
+            setEditingId(null);
             await fetchRows();
         } catch (e) {
             console.error(e);
-            showToast("error", "Error", e.message || "No se pudo guardar");
+            showToast(
+                "error",
+                "Error",
+                e.message || "No se pudo guardar"
+            );
         }
     };
 
     /* ----------- revisado ----------- */
-    const { canReview: canR, username: user } = useCanReview(); // compat
     const revisadoTemplate = (row) => {
-        const allow = canR ?? canReview;
-        const uname = user ?? username;
-        if (!allow) return <span>{row.revisado ? "Sí" : "No"}</span>;
+        if (!canReview) return <span>{row.revisado ? "Sí" : "No"}</span>;
         const onToggle = async (next) => {
-            const { error } = await supabase.from(TABLE).update({
-                revisado: next,
-                revisado_por_username: next ? uname : null,
-                revisado_fecha: next ? new Date().toISOString() : null,
-            }).eq("id", row.id);
-            if (error) { showToast("error", "No se guardó", error.message); return; }
-            setRows(prev => prev.map(r => r.id === row.id ? {
-                ...r, revisado: next,
-                revisado_por_username: next ? uname : null,
-                revisado_fecha: next ? new Date().toISOString() : null
-            } : r));
-            showToast("success", "OK", next ? "Marcado revisado" : "Marcado no revisado");
+            const { error } = await supabase
+                .from(TABLE)
+                .update({
+                    revisado: next,
+                    revisado_por_username: next ? username : null,
+                    revisado_fecha: next ? new Date().toISOString() : null,
+                })
+                .eq("id", row.id);
+            if (error) {
+                showToast("error", "No se guardó", error.message);
+                return;
+            }
+            setRows((prev) =>
+                prev.map((r) =>
+                    r.id === row.id
+                        ? {
+                            ...r,
+                            revisado: next,
+                            revisado_por_username: next
+                                ? username
+                                : null,
+                            revisado_fecha: next
+                                ? new Date().toISOString()
+                                : null,
+                        }
+                        : r
+                )
+            );
+            showToast(
+                "success",
+                "OK",
+                next ? "Marcado revisado" : "Marcado no revisado"
+            );
         };
         return (
             <div className="flex align-items-center justify-content-center gap-2">
-                <Checkbox checked={!!row.revisado} onChange={(e) => onToggle(e.checked)} />
+                <Checkbox
+                    checked={!!row.revisado}
+                    onChange={(e) => onToggle(e.checked)}
+                />
                 <span className="text-sm">Revisado</span>
             </div>
         );
     };
 
+    /* ----------- acciones Ver / Editar ----------- */
+    const actionTemplate = (row) => (
+        <div className="flex align-items-center justify-content-center gap-2">
+            <Button
+                label="Ver"
+                icon="pi pi-eye"
+                outlined
+                size="small"
+                onClick={() => openView(row)}
+            />
+            <Button
+                label="Editar"
+                icon="pi pi-pencil"
+                size="small"
+                onClick={() => openEdit(row)}
+            />
+        </div>
+    );
+
     const header = (
         <div className="flex flex-wrap gap-2 align-items-center justify-content-between">
             <span className="p-input-icon-left">
                 <i className="pi pi-search" />
-                <InputText type="search" value={globalFilter} onInput={(e) => setGlobalFilter(e.target.value)} placeholder="Buscar (ej. H-ENL-MR, técnico, notas)" />
+                <InputText
+                    type="search"
+                    value={globalFilter}
+                    onInput={(e) => setGlobalFilter(e.target.value)}
+                    placeholder="Buscar (ej. H-ENF-MR-01, técnico, notas)"
+                />
             </span>
-            <div className="flex align-items-center gap-2">
+            <div className="flex align-items-center
+ gap-2">
                 <span className="text-sm font-medium">Filtro:</span>
                 <Dropdown
                     value={filtroRevisado}
@@ -281,12 +525,19 @@ export default function MotorReductorEnfriador() {
     );
 
     const countSiNo = (row, val) =>
-        Array.from({ length: 14 }, (_, i) => i + 1)
-            .reduce((acc, i) => acc + (((row[`respuesta_q${i}`] || "") === val) ? 1 : 0), 0);
+        Array.from({ length: 14 }, (_, i) => i + 1).reduce(
+            (acc, i) =>
+                acc +
+                ((row[`respuesta_q${i}`] || "") === val ? 1 : 0),
+            0
+        );
 
     const exportXlsx = () => {
-        if (!rows?.length) { showToast("warn", "Exportación", "No hay datos"); return; }
-        const out = rows.map(r => ({
+        if (!rows?.length) {
+            showToast("warn", "Exportación", "No hay datos");
+            return;
+        }
+        const out = rows.map((r) => ({
             posicion: r.posicion_id,
             equipo: r.equipo,
             registro: r.registro ?? "",
@@ -304,12 +555,24 @@ export default function MotorReductorEnfriador() {
         const ws = XLSX.utils.json_to_sheet(out);
         const wb = XLSX.utils.book_new();
         XLSX.utils.book_append_sheet(wb, ws, "MR Enfriador");
-        XLSX.writeFile(wb, `Horno_MotorReductorEnfriador_${new Date().toISOString().slice(0, 10)}.xlsx`);
+        XLSX.writeFile(
+            wb,
+            `Horno_MotorReductorEnfriador_${new Date()
+                .toISOString()
+                .slice(0, 10)}.xlsx`
+        );
     };
 
-    const activeQuestions = form.periodicidad === "TRIMESTRAL" ? Q_TRIMESTRAL
-        : form.periodicidad === "ANUAL" ? Q_ANUAL
-            : [];
+    const activeQuestions = getQuestionsByPeriodo(form.periodicidad);
+
+    const preguntasView = (row) => {
+        if (!row?.periodicidad) return [];
+        const base = getQuestionsByPeriodo(row.periodicidad);
+        return base.map((q, idx) => ({
+            label: q.label,
+            respuesta: row[`respuesta_q${idx + 1}`] || "",
+        }));
+    };
 
     return (
         <div className="controlrendcosechayfrass-container">
@@ -321,20 +584,50 @@ export default function MotorReductorEnfriador() {
 
             <div className="welcome-message">
                 <p>
-                    <b>Posición (ID):</b> {POSICION_ID} &nbsp; | &nbsp; <b>Equipo:</b> {EQUIPO} &nbsp; | &nbsp;
+                    <b>Posición (ID base):</b> {POSICION_ID_BASE} &nbsp; | &nbsp;{" "}
+                    <b>Equipo:</b> {EQUIPO} &nbsp; | &nbsp;
                     <b>Registro:</b> {REGISTRO}
+                </p>
+                <p>
+                    El ID final se muestra como{" "}
+                    <b>{`${POSICION_ID_BASE}-01`}</b> según el consecutivo de
+                    cantidad.
                 </p>
             </div>
 
             <div className="buttons-container">
-                <button onClick={() => navigate(-1)} className="return-button">Volver</button>
-                <button onClick={() => navigate(-2)} className="menu-button">Menú principal</button>
+                <button
+                    onClick={() => navigate(-1)}
+                    className="return-button"
+                >
+                    Volver
+                </button>
+                <button
+                    onClick={() => navigate(-2)}
+                    className="menu-button"
+                >
+                    Menú principal
+                </button>
             </div>
 
             <Toolbar
                 className="mb-4"
-                left={() => <Button label="Nuevo" icon="pi pi-plus" severity="success" onClick={openNew} />}
-                right={() => <Button label="Exportar a Excel" icon="pi pi-upload" className="p-button-help" onClick={exportXlsx} />}
+                left={() => (
+                    <Button
+                        label="Nuevo"
+                        icon="pi pi-plus"
+                        severity="success"
+                        onClick={openNew}
+                    />
+                )}
+                right={() => (
+                    <Button
+                        label="Exportar a Excel"
+                        icon="pi pi-upload"
+                        className="p-button-help"
+                        onClick={exportXlsx}
+                    />
+                )}
             />
 
             <DataTable
@@ -345,8 +638,11 @@ export default function MotorReductorEnfriador() {
                 selectionMode="multiple"
                 header={header}
                 globalFilter={globalFilter}
-                paginator rows={10} rowsPerPageOptions={[5, 10, 25]}
-                dataKey="id" showGridlines
+                paginator
+                rows={10}
+                rowsPerPageOptions={[5, 10, 25]}
+                dataKey="id"
+                showGridlines
                 paginatorTemplate="FirstPageLink PrevPageLink PageLinks NextPageLink LastPageLink CurrentPageReport RowsPerPageDropdown"
                 currentPageReportTemplate="Mostrando del {first} al {last} de {totalRecords} Registros"
             >
@@ -355,49 +651,128 @@ export default function MotorReductorEnfriador() {
                 <Column field="equipo" header="Equipo" sortable />
                 <Column field="registro" header="Registro" />
                 <Column field="periodicidad" header="Periodicidad" />
-                <Column header="Último Mto." body={(r) => fmtDMY(r.ultimo_mantenimiento)} sortable />
-                <Column header="Próximo Mto." body={(r) => fmtDMY(r.proximo_mantenimiento)} sortable />
+                <Column
+                    header="Último Mto."
+                    body={(r) => fmtDMY(r.ultimo_mantenimiento)}
+                    sortable
+                />
+                <Column
+                    header="Próximo Mto."
+                    body={(r) => fmtDMY(r.proximo_mantenimiento)}
+                    sortable
+                />
                 <Column field="tecnico" header="Técnico" sortable />
-                <Column header="Fecha de Registro" body={(r) => fmtDMYHM(r.created_at)} sortable />
-                <Column header="Revisado" body={revisadoTemplate} style={{ width: "10rem", textAlign: "center" }} />
+                <Column
+                    header="Fecha de Registro"
+                    body={(r) => fmtDMYHM(r.created_at)}
+                    sortable
+                />
+                <Column
+                    header="Revisado"
+                    body={revisadoTemplate}
+                    style={{ width: "10rem", textAlign: "center" }}
+                />
+                <Column
+                    header="Acciones"
+                    body={actionTemplate}
+                    exportable={false}
+                    style={{ width: "14rem", textAlign: "center" }}
+                />
             </DataTable>
 
+            {/* Dialogo de crear / editar */}
             <Dialog
                 visible={dialogOpen}
                 style={{ width: "72vw", maxWidth: 1100 }}
-                header="Nuevo registro — Motor Reductor (Enfriador de Larva)"
+                header={
+                    editingId
+                        ? "Editar registro — Motor Reductor (Enfriador de Larva)"
+                        : "Nuevo registro — Motor Reductor (Enfriador de Larva)"
+                }
                 modal
                 onHide={hideDialog}
                 footer={
                     <div className="flex gap-2 justify-content-end">
-                        <Button label="Cancelar" icon="pi pi-times" outlined onClick={hideDialog} />
-                        <Button label="Guardar" icon="pi pi-check" onClick={save} />
+                        <Button
+                            label="Cancelar"
+                            icon="pi pi-times"
+                            outlined
+                            onClick={hideDialog}
+                        />
+                        <Button
+                            label="Guardar"
+                            icon="pi pi-check"
+                            onClick={save}
+                        />
                     </div>
                 }
             >
                 <div className="p-fluid grid">
                     <div className="field col-12 md:col-4">
                         <label className="font-bold">
-                            Periodicidad* {submitted && !form.periodicidad && <small className="p-error"> Requerido</small>}
+                            Periodicidad*{" "}
+                            {submitted && !form.periodicidad && (
+                                <small className="p-error">
+                                    {" "}
+                                    Requerido
+                                </small>
+                            )}
                         </label>
-                        <Dropdown value={form.periodicidad} options={PERIODOS} onChange={(e) => onPeriodoChange(e.value)} placeholder="Seleccione" />
+                        <Dropdown
+                            value={form.periodicidad}
+                            options={PERIODOS}
+                            onChange={(e) =>
+                                onPeriodoChange(e.value)
+                            }
+                            placeholder="Seleccione"
+                        />
                         <small className="block mt-2">
-                            Si es <b>Trimestral</b> el próximo mto se programa a <b>3 meses</b>; si es <b>Anual</b>, a <b>12 meses</b>.
+                            Si es <b>Trimestral</b> el próximo mto se programa
+                            a <b>3 meses</b>; si es <b>Anual</b>, a{" "}
+                            <b>12 meses</b>. Si se marca NO, se programa a{" "}
+                            <b>7 días</b>.
                         </small>
                     </div>
 
                     <div className="field col-12 md:col-4">
-                        <label className="font-bold">Fecha intervención</label>
-                        <InputText type="date" value={form.fecha_registro} onChange={(e) => onChange("fecha_registro", e.target.value)} />
+                        <label className="font-bold">
+                            Fecha intervención
+                        </label>
+                        <InputText
+                            type="date"
+                            value={form.fecha_registro}
+                            onChange={(e) =>
+                                onChange(
+                                    "fecha_registro",
+                                    e.target.value
+                                )
+                            }
+                        />
                     </div>
                     <div className="field col-12 md:col-4">
-                        <label className="font-bold">Hora intervención</label>
-                        <InputText type="time" value={form.hora_registro} onChange={(e) => onChange("hora_registro", e.target.value)} />
+                        <label className="font-bold">
+                            Hora intervención
+                        </label>
+                        <InputText
+                            type="time"
+                            value={form.hora_registro}
+                            onChange={(e) =>
+                                onChange(
+                                    "hora_registro",
+                                    e.target.value
+                                )
+                            }
+                        />
                     </div>
 
                     <div className="field col-6 md:col-3">
-                        <label className="font-bold">Posición (ID)</label>
-                        <InputText value={form.posicion_id} disabled />
+                        <label className="font-bold">
+                            Posición (ID con consecutivo)
+                        </label>
+                        <InputText
+                            value={form.posicion_id}
+                            disabled
+                        />
                     </div>
                     <div className="field col-6 md:col-3">
                         <label className="font-bold">Equipo</label>
@@ -405,66 +780,295 @@ export default function MotorReductorEnfriador() {
                     </div>
 
                     <div className="field col-6 md:col-3">
-                        <label className="font-bold">Técnico* {submitted && !form.tecnico && <small className="p-error"> Requerido</small>}</label>
-                        <InputText value={form.tecnico} onChange={(e) => onChange("tecnico", e.target.value)} placeholder="Nombre del técnico" />
+                        <label className="font-bold">
+                            Técnico*{" "}
+                            {submitted && !form.tecnico && (
+                                <small className="p-error">
+                                    {" "}
+                                    Requerido
+                                </small>
+                            )}
+                        </label>
+                        <InputText
+                            value={form.tecnico}
+                            onChange={(e) =>
+                                onChange(
+                                    "tecnico",
+                                    e.target.value
+                                )
+                            }
+                            placeholder="Nombre del técnico"
+                        />
                     </div>
                     <div className="field col-6 md:col-3">
-                        <label className="font-bold">Cantidad (referencia)</label>
-                        <InputText value={form.cantidad} onChange={(e) => onChange("cantidad", e.target.value ? e.target.value.replace(/\D/g, "") : "")} placeholder="Ej. 1" />
+                        <label className="font-bold">
+                            Cantidad / Consecutivo
+                        </label>
+                        <Dropdown
+                            value={form.cantidad}
+                            options={CANTIDAD_OPCIONES}
+                            onChange={(e) =>
+                                onCantidadChange(e.value)
+                            }
+                            placeholder="01"
+                        />
+                        <small className="block mt-1">
+                            Se usa para formar el ID, p. ej.{" "}
+                            <b>{`${POSICION_ID_BASE}-01`}</b>.
+                        </small>
                     </div>
 
                     <div className="field col-12 md:col-6">
                         <label className="font-bold">
-                            ¿Se va a efectuar el mantenimiento?* {submitted && !form.ejecutado && <small className="p-error"> Requerido</small>}
+                            ¿Se va a efectuar el
+                            mantenimiento?*{" "}
+                            {submitted && !form.ejecutado && (
+                                <small className="p-error">
+                                    {" "}
+                                    Requerido
+                                </small>
+                            )}
                         </label>
-                        <Dropdown value={form.ejecutado} options={YESNO} onChange={(e) => onChange("ejecutado", e.value)} placeholder="Seleccione" />
+                        <Dropdown
+                            value={form.ejecutado}
+                            options={YESNO}
+                            onChange={(e) =>
+                                onChange(
+                                    "ejecutado",
+                                    e.value
+                                )
+                            }
+                            placeholder="Seleccione"
+                        />
                     </div>
 
                     {form.ejecutado === "NO" && (
                         <div className="field col-12">
                             <label className="font-bold">
-                                Observaciones (obligatorio si NO) {submitted && !form.observaciones.trim() && <small className="p-error"> Requerido</small>}
+                                Observaciones (obligatorio si NO){" "}
+                                {submitted &&
+                                    !form.observaciones.trim() && (
+                                        <small className="p-error">
+                                            {" "}
+                                            Requerido
+                                        </small>
+                                    )}
                             </label>
-                            <InputText value={form.observaciones} onChange={(e) => onChange("observaciones", e.target.value)} placeholder="Explique el motivo" />
-                            <small className="block mt-2">Se reprogramará automáticamente para dentro de <b>7 días</b>.</small>
+                            <InputText
+                                value={form.observaciones}
+                                onChange={(e) =>
+                                    onChange(
+                                        "observaciones",
+                                        e.target.value
+                                    )
+                                }
+                                placeholder="Explique el motivo"
+                            />
+                            <small className="block mt-2">
+                                Se reprogramará automáticamente para
+                                dentro de <b>7 días</b>.
+                            </small>
                         </div>
                     )}
 
-                    {form.ejecutado === "SI" && !!activeQuestions.length && (
-                        <div className="field col-12">
-                            <div style={{ border: "1px solid #d1d5db", borderRadius: 8, padding: 12 }}>
-                                <div style={{ fontWeight: 700, marginBottom: 8 }}>
-                                    {form.periodicidad === "TRIMESTRAL" ? "Checklist — TRIMESTRAL" : "Checklist — ANUAL"}
-                                </div>
-                                <div className="grid">
-                                    {activeQuestions.map(q => {
-                                        const val = form.items[q.key]?.respuesta || "";
-                                        return (
-                                            <div key={q.key} className="col-12 md:col-6">
-                                                <label className="font-bold">
-                                                    {q.label}* {submitted && !val && <small className="p-error"> Requerido</small>}
-                                                </label>
-                                                <Dropdown value={val} options={YESNO} onChange={(e) => onYesNoChange(q.key, e.value)} placeholder="Seleccione" />
-                                            </div>
-                                        );
-                                    })}
+                    {form.ejecutado === "SI" &&
+                        !!activeQuestions.length && (
+                            <div className="field col-12">
+                                <div
+                                    style={{
+                                        border:
+                                            "1px solid #d1d5db",
+                                        borderRadius: 8,
+                                        padding: 12,
+                                    }}
+                                >
+                                    <div
+                                        style={{
+                                            fontWeight: 700,
+                                            marginBottom: 8,
+                                        }}
+                                    >
+                                        {form.periodicidad ===
+                                            "TRIMESTRAL"
+                                            ? "Checklist — TRIMESTRAL"
+                                            : "Checklist — ANUAL"}
+                                    </div>
+                                    <div className="grid">
+                                        {activeQuestions.map(
+                                            (q) => {
+                                                const val =
+                                                    form.items[
+                                                        q.key
+                                                    ]?.respuesta ||
+                                                    "";
+                                                return (
+                                                    <div
+                                                        key={q.key}
+                                                        className="col-12 md:col-6"
+                                                    >
+                                                        <label className="font-bold">
+                                                            {q.label}
+                                                            *{" "}
+                                                            {submitted &&
+                                                                !val && (
+                                                                    <small className="p-error">
+                                                                        {" "}
+                                                                        Requerido
+                                                                    </small>
+                                                                )}
+                                                        </label>
+                                                        <Dropdown
+                                                            value={
+                                                                val
+                                                            }
+                                                            options={
+                                                                YESNO
+                                                            }
+                                                            onChange={(
+                                                                e
+                                                            ) =>
+                                                                onYesNoChange(
+                                                                    q.key,
+                                                                    e.value
+                                                                )
+                                                            }
+                                                            placeholder="Seleccione"
+                                                        />
+                                                    </div>
+                                                );
+                                            }
+                                        )}
+                                    </div>
                                 </div>
                             </div>
-                        </div>
-                    )}
+                        )}
 
                     {form.ejecutado === "SI" && (
                         <div className="field col-12">
-                            <label className="font-bold">Observaciones (opcional)</label>
-                            <InputText value={form.observaciones} onChange={(e) => onChange("observaciones", e.target.value)} />
+                            <label className="font-bold">
+                                Observaciones (opcional)
+                            </label>
+                            <InputText
+                                value={form.observaciones}
+                                onChange={(e) =>
+                                    onChange(
+                                        "observaciones",
+                                        e.target.value
+                                    )
+                                }
+                            />
                         </div>
                     )}
 
                     <div className="field col-12 md:col-4">
-                        <label className="font-bold">Fecha de Registro (auto)</label>
-                        <InputText value={form.fecha_correccion_preview} disabled />
+                        <label className="font-bold">
+                            Fecha de Registro (auto)
+                        </label>
+                        <InputText
+                            value={form.fecha_correccion_preview}
+                            disabled
+                        />
                     </div>
                 </div>
+            </Dialog>
+
+            {/* Diálogo de VER (solo lectura) */}
+            <Dialog
+                visible={viewDialogOpen}
+                style={{ width: "60vw", maxWidth: 900 }}
+                header="Detalle del registro — Motor Reductor (Enfriador de Larva)"
+                modal
+                onHide={() => setViewDialogOpen(false)}
+            >
+                {viewRow && (
+                    <div className="p-fluid grid">
+                        <div className="field col-12 md:col-4">
+                            <label className="font-bold">
+                                Posición (ID)
+                            </label>
+                            <p>{viewRow.posicion_id}</p>
+                        </div>
+                        <div className="field col-12 md:col-4">
+                            <label className="font-bold">
+                                Periodicidad
+                            </label>
+                            <p>{viewRow.periodicidad || "—"}</p>
+                        </div>
+                        <div className="field col-12 md:col-4">
+                            <label className="font-bold">
+                                Técnico
+                            </label>
+                            <p>{viewRow.tecnico || "—"}</p>
+                        </div>
+
+                        <div className="field col-12 md:col-4">
+                            <label className="font-bold">
+                                Fecha intervención
+                            </label>
+                            <p>{fmtDMY(viewRow.fecha_registro)}</p>
+                        </div>
+                        <div className="field col-12 md:col-4">
+                            <label className="font-bold">
+                                Hora intervención
+                            </label>
+                            <p>{viewRow.hora_registro || "—"}</p>
+                        </div>
+                        <div className="field col-12 md:col-4">
+                            <label className="font-bold">
+                                Ejecutado
+                            </label>
+                            <p>{viewRow.ejecutado || "—"}</p>
+                        </div>
+
+                        <div className="field col-12">
+                            <label className="font-bold">
+                                Observaciones
+                            </label>
+                            <p>{viewRow.observaciones || "—"}</p>
+                        </div>
+
+                        <div className="field col-12">
+                            <label className="font-bold">
+                                Checklist
+                            </label>
+                            <div
+                                style={{
+                                    border: "1px solid #d1d5db",
+                                    borderRadius: 8,
+                                    padding: 12,
+                                }}
+                            >
+                                {preguntasView(viewRow).length ===
+                                    0 ? (
+                                    <p>No hay preguntas asociadas.</p>
+                                ) : (
+                                    <div className="grid">
+                                        {preguntasView(
+                                            viewRow
+                                        ).map((pq, idx) => (
+                                            <div
+                                                key={idx}
+                                                className="col-12 md:col-6"
+                                            >
+                                                <p>
+                                                    <b>
+                                                        {
+                                                            pq.label
+                                                        }
+                                                    </b>
+                                                    <br />
+                                                    Respuesta:{" "}
+                                                    {pq.respuesta ||
+                                                        "—"}
+                                                </p>
+                                            </div>
+                                        ))}
+                                    </div>
+                                )}
+                            </div>
+                        </div>
+                    </div>
+                )}
             </Dialog>
         </div>
     );

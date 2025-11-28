@@ -59,8 +59,12 @@ const ALLOWED_TABLES = [
     "mto_horno_linea_gas_glp_horno_multilevel",
     "mto_horno_multilevel_sensor_pt100",
     "mto_horno_multilevel_lubricacion_bandas",
+    "mto_horno_multilevel_transmision_turbina",
+    "mto_horno_banda_entrada_general",
+    "mto_horno_banda_salida_general",
     //Horno - Selladora Banda 
     "mto_horno_selladora_banda_continua_general",
+
 
     // Dieta
     "mto_dieta_bomba_sumergible_general",
@@ -101,18 +105,40 @@ const FORM_MAP = {
     "COS-PC-G": "/MantenimientoAlertas/Cosecha/PanelControlGeneral",
     "COS-T-M": "/MantenimientoAlertas/Cosecha/TamizMotor",
     "COS-T-REM": "/MantenimientoAlertas/Cosecha/TamizRevisionEstructuraMalla",
-    //Horno
+
+    //Horno TODOS
+
+    // Empacadora
+    "H-EL-V": "/MantenimientoAlertas/Horno/Vibrador",
+    "H-EL-MR": "/MantenimientoAlertas/Horno/MotorReductor",
+    "H-EL-SN": "/MantenimientoAlertas/Horno/SistemaNeumatico",
+    //Multilevel
+    "H-HM-V": "/MantenimientoAlertas/Horno/VibradorHornoMultilevel",
+    "H-HM-LG": "/MantenimientoAlertas/Horno/LineaGasGLPHornoMultilevel",
+
+    "H-HM-LB": "/MantenimientoAlertas/Horno/LubricacionBandasHornoMultilevel",
+    "H-ML-SPT100": "/MantenimientoAlertas/HornoMultilevel/SensorPT100",
+    "H-ML-V": "/MantenimientoAlertas/Horno/Vibrador",
+    "H-HM-TT": "/MantenimientoAlertas/Horno/TransmisionTurbinaHornoMultilevel",
     "H-E-SN": "/MantenimientoAlertas/HornoEmpacadora/SistemaNeumatico",
     "H-E-MR": "/MantenimientoAlertas/HornoEmpacadora/MotorReductor",
     "H-E-V": "/MantenimientoAlertas/HornoEmpacadora/Vibrador",
-    "H-EN-MR": "/MantenimientoAlertas/HornoEnfriador/MotorReductor",
+    "H-EN-MR": "/MantenimientoAlertas/Horno/MotorReductor",
     "H-EN-LB": "/MantenimientoAlertas/HornoEnfriador/LubricacionBandas",
     "H-EN-V": "/MantenimientoAlertas/HornoEnfriador/Vibrador",
-    "H-ML-V": "/MantenimientoAlertas/Horno/Vibrador",
-    "H-HM-LB": "/MantenimientoAlertas/Horno/LubricacionBandasHornoMultilevel",
-    "H-LG-HML": "/MantenimientoAlertas/Horno/LineaGasGLP/HornoMultilevel",
-    "H-ML-SPT100": "/MantenimientoAlertas/HornoMultilevel/SensorPT100",
+
+
+
+    "H-BE-G": "/MantenimientoAlertas/Horno/BandaEntradaGeneral",
+    "H-BS-G": "/MantenimientoAlertas/Horno/BandaSalidaGeneral",
+
+
+
     "H-SBC-G": "/MantenimientoAlertas/Horno/SelladoraBandaContinuaGeneral",
+    "H-ENF-V": "/MantenimientoAlertas/Horno/VibradorEnfriador",
+    "H-ENF-LB": "/MantenimientoAlertas/Horno/LubricacionBandasEnfriador",
+    "H-ENF-MR": "/MantenimientoAlertas/Horno/MotorReductorEnfriador",
+
 
 
 
