@@ -62,9 +62,8 @@ const ALLOWED_TABLES = [
     "mto_horno_multilevel_transmision_turbina",
     "mto_horno_banda_entrada_general",
     "mto_horno_banda_salida_general",
-    //Horno - Selladora Banda 
+    // Horno - Selladora Banda
     "mto_horno_selladora_banda_continua_general",
-
 
     // Dieta
     "mto_dieta_bomba_sumergible_general",
@@ -85,9 +84,8 @@ const ALLOWED_TABLES = [
 ];
 
 /**
- * FORM_MAP:
- * Mapear POSICION_ID base → ruta del formulario.
- * Usa el ID base (sin el -01/-02) para que funcione con cantidades.
+ * Formularios:
+ * POSICION_ID base → ruta del formulario
  */
 const FORM_MAP = {
     // Crecimiento
@@ -106,13 +104,13 @@ const FORM_MAP = {
     "COS-T-M": "/MantenimientoAlertas/Cosecha/TamizMotor",
     "COS-T-REM": "/MantenimientoAlertas/Cosecha/TamizRevisionEstructuraMalla",
 
-    //Horno TODOS
+    // Horno TODOS
 
     // Empacadora
     "H-EL-V": "/MantenimientoAlertas/Horno/Vibrador",
     "H-EL-MR": "/MantenimientoAlertas/Horno/MotorReductor",
     "H-EL-SN": "/MantenimientoAlertas/Horno/SistemaNeumatico",
-    //Multilevel
+    // Multilevel
     "H-HM-V": "/MantenimientoAlertas/Horno/VibradorHornoMultilevel",
     "H-HM-LG": "/MantenimientoAlertas/Horno/LineaGasGLPHornoMultilevel",
     "H-HM-LB": "/MantenimientoAlertas/Horno/LubricacionBandasHornoMultilevel",
@@ -131,14 +129,14 @@ const FORM_MAP = {
     "H-ENF-V": "/MantenimientoAlertas/Horno/VibradorEnfriador",
     "H-ENF-LB": "/MantenimientoAlertas/Horno/LubricacionBandasEnfriador",
     "H-ENF-MR": "/MantenimientoAlertas/Horno/MotorReductorEnfriador",
-
-
-
-
-
-
-
 };
+
+/** Tablas que usan "I" (Incompleto) como bloqueo de completado */
+const TABLES_INCOMPLETO_I = [
+    "mto_crecimiento_carro_as",
+    "mto_crecimiento_carro_rs",
+    "mto_crecimiento_cadenas_conveyor_general",
+];
 
 /** Recorta un POSICION_ID con consecutivo, ej. COS-T-M-02 → COS-T-M */
 const getBasePosicionId = (posicion_id = "") =>
@@ -189,20 +187,14 @@ export default function NotificationBell() {
 
             if (error) throw error;
 
-            // 🔴 En la campanita NO queremos ver OK
-            // Solo VENCIDO, PROX7 y COMPLETADO que sigan pendientes de crear nuevo mantenimiento.
             const filtered = (data || []).filter((a) => {
-                if (a.estado === "VENCIDO" || a.estado === "PROX7") {
-                    return true;
-                }
+                if (a.estado === "VENCIDO" || a.estado === "PROX7") return true;
                 if (
                     a.estado === "COMPLETADO" &&
                     (a.pendiente_nuevo === true ||
                         a.pendiente_nuevo === null ||
                         a.pendiente_nuevo === undefined)
                 ) {
-                    // COMPLETADO aún marcado como pendiente_nuevo (el trigger se encargará de ponerlo en false
-                    // cuando se inserte un nuevo mantenimiento de la misma posición)
                     return true;
                 }
                 return false;
@@ -211,11 +203,7 @@ export default function NotificationBell() {
             setAlerts(filtered);
         } catch (e) {
             console.error(e);
-            showToast(
-                "error",
-                "Error",
-                "No se pudieron cargar las alertas"
-            );
+            showToast("error", "Error", "No se pudieron cargar las alertas");
         } finally {
             setLoading(false);
         }
@@ -251,12 +239,7 @@ export default function NotificationBell() {
         }
     };
 
-    /** Validar NO + bloquear completar + mostrar dialog si hay problemas.
-     *
-     * Si todo está en "SI" y ejecutado = "SI", marcamos el registro como COMPLETADO
-     * (pendiente de crear un nuevo mantenimiento) y mostramos el diálogo
-     * que obliga al técnico a ir a crear el registro nuevo.
-     */
+    /** Validar NO / I + bloquear completar + mostrar dialog si hay problemas. */
     const handleComplete = async (alerta) => {
         try {
             const { data, error } = await supabase
@@ -294,10 +277,17 @@ export default function NotificationBell() {
                 { length: 14 },
                 (_, i) => data[`respuesta_q${i + 1}`]
             );
-            const tieneNo = respuestas.some((v) => v === "NO");
 
-            if (data.ejecutado !== "SI" || tieneNo) {
-                // Tiene NO o no se ejecutó → no se puede marcar como completado todavía
+            let tienePendientes = false;
+            if (TABLES_INCOMPLETO_I.includes(alerta.tabla)) {
+                // Carro AS / RS → bloqueamos por "I"
+                tienePendientes = respuestas.some((v) => v === "I");
+            } else {
+                // Resto de registros → bloqueamos por "NO"
+                tienePendientes = respuestas.some((v) => v === "NO");
+            }
+
+            if (data.ejecutado !== "SI" || tienePendientes) {
                 setPendingEdit({
                     tabla: alerta.tabla,
                     id: alerta.id,
@@ -307,7 +297,6 @@ export default function NotificationBell() {
                 return;
             }
 
-            // Todo en SI y ejecutado = SI → marcamos como COMPLETADO (pendiente_nuevo = true)
             const today = toDateISO();
             const { error: updError } = await supabase
                 .from(alerta.tabla)
@@ -315,6 +304,7 @@ export default function NotificationBell() {
                     completado: true,
                     pendiente_nuevo: true,
                     fecha_completado: today,
+                    proximo_mantenimiento: null,
                 })
                 .eq("id", alerta.id);
 
@@ -335,11 +325,7 @@ export default function NotificationBell() {
             await fetchAlerts();
         } catch (e) {
             console.error(e);
-            showToast(
-                "error",
-                "Error",
-                "No se pudo completar el registro."
-            );
+            showToast("error", "Error", "No se pudo completar el registro.");
         }
     };
 
@@ -387,8 +373,6 @@ export default function NotificationBell() {
             return;
         }
 
-        // Lo enviamos al formulario del registro (Tamiz Motor en este caso).
-        // El técnico deberá crear el nuevo mantenimiento manualmente.
         navigate(ruta);
         setShowCompletedDialog(false);
     };
@@ -400,7 +384,7 @@ export default function NotificationBell() {
             case "PROX7":
                 return "#fef3c7";
             case "COMPLETADO":
-                return "#dcfce7"; // verde claro
+                return "#dcfce7";
             default:
                 return "#e0f2fe";
         }
@@ -412,6 +396,9 @@ export default function NotificationBell() {
             a.estado === "PROX7" ||
             a.estado === "COMPLETADO"
     ).length;
+
+    const pendingUsesI =
+        pendingEdit && TABLES_INCOMPLETO_I.includes(pendingEdit.tabla);
 
     return (
         <>
@@ -556,7 +543,7 @@ export default function NotificationBell() {
                 </div>
             )}
 
-            {/* Dialog cuando hay NO o no ejecutado */}
+            {/* Dialog cuando hay NO / I o no ejecutado */}
             <Dialog
                 visible={showHasNoDialog}
                 onHide={() => setShowHasNoDialog(false)}
@@ -565,9 +552,20 @@ export default function NotificationBell() {
                 modal
             >
                 <p>
-                    Este registro tiene respuestas en <b>NO</b> o no ha sido
-                    ejecutado. Debe corregir el registro antes de marcarlo como{" "}
-                    <b>Completado</b>.
+                    {pendingUsesI ? (
+                        <>
+                            Este registro tiene respuestas en{" "}
+                            <b>Incompleto (I)</b> o no ha sido ejecutado. Debe
+                            corregir el registro antes de marcarlo como{" "}
+                            <b>Completado</b>.
+                        </>
+                    ) : (
+                        <>
+                            Este registro tiene respuestas en <b>NO</b> o no ha
+                            sido ejecutado. Debe corregir el registro antes de
+                            marcarlo como <b>Completado</b>.
+                        </>
+                    )}
                 </p>
 
                 {pendingEdit && (
@@ -596,7 +594,6 @@ export default function NotificationBell() {
             {/* Dialog cuando el registro ya está COMPLETADO y debe crear uno nuevo */}
             <Dialog
                 visible={showCompletedDialog}
-                // 👇 No dejamos cerrarlo con la X ni con ESC, para "obligar" a ir a crear el nuevo registro
                 onHide={() => { }}
                 header="Registro completado"
                 style={{ width: "40vw", maxWidth: 600 }}

@@ -60,7 +60,7 @@ const addDays = (ymd, days) => {
 };
 
 /* ===== Constantes de este registro (CRE-C-RS) ===== */
-const POSICION_ID = "CRE-C-RS";
+const POSICION_BASE = "CRE-C-RS";
 const EQUIPO = "CARRO";
 const REGISTRO = "RS";
 const TABLE = "mto_crecimiento_carro_rs";
@@ -80,6 +80,19 @@ const ESTADOS_ACCION = [
 
 // Solo tiene periodicidad BISEMANAL
 const PERIODOS = [{ label: "Bisemanal", value: "BISEMANAL" }];
+
+/** Cantidades (4 carros): 01, 02, 03, 04 */
+const CANTIDADES = [
+    { label: "01", value: 1 },
+    { label: "02", value: 2 },
+    { label: "03", value: 3 },
+    { label: "04", value: 4 },
+];
+
+const buildPosicionId = (cantidad) => {
+    if (!cantidad) return POSICION_BASE;
+    return `${POSICION_BASE}-${String(cantidad).padStart(2, "0")}`;
+};
 
 /* ===== Preguntas BISEMANAL (texto literal de la OM RS - CARRO SATÉLITE) ===== */
 const Q_BISEMANAL = [
@@ -123,10 +136,10 @@ const Q_BISEMANAL = [
 const emptyForm = () => ({
     fecha_registro: toDateISO(),
     hora_registro: toHM(),
-    posicion_id: POSICION_ID,
+    posicion_id: POSICION_BASE, // base sin sufijo; el final se arma con buildPosicionId
     equipo: EQUIPO,
     registro: REGISTRO,
-    cantidad: "",
+    cantidad: null, // 1..4
     tecnico: "",
     ejecutado: "",
     observaciones: "",
@@ -141,18 +154,49 @@ const packRow = (r) => ({
     observaciones: r.observaciones ?? "",
 });
 
+const buildFormFromRow = (row) => {
+    const items = {};
+    Q_BISEMANAL.forEach((q, idx) => {
+        const col = `respuesta_q${idx + 1}`;
+        items[q.key] = { respuesta: row[col] || "" };
+    });
+
+    return {
+        fecha_registro: row.fecha_registro || toDateISO(),
+        hora_registro: row.hora_registro || toHM(),
+        posicion_id: row.posicion_id || POSICION_BASE,
+        equipo: row.equipo || EQUIPO,
+        registro: row.registro || REGISTRO,
+        cantidad: row.cantidad || null,
+        tecnico: row.tecnico || "",
+        ejecutado: row.ejecutado || "",
+        observaciones: row.observaciones || "",
+        periodicidad: row.periodicidad || "",
+        items,
+        fecha_correccion_preview: fmtDMYHM(row.created_at),
+    };
+};
+
 export default function CarroRS() {
     const navigate = useNavigate();
     const toast = useRef(null);
+    const { canReview, username } = useCanReview();
+
     const [rows, setRows] = useState([]);
     const [selected, setSelected] = useState([]);
     const [globalFilter, setGlobalFilter] = useState("");
     const [loading, setLoading] = useState(false);
+
     const [dialogOpen, setDialogOpen] = useState(false);
     const [submitted, setSubmitted] = useState(false);
     const [form, setForm] = useState(emptyForm());
+    const [editingId, setEditingId] = useState(null);
+
     const [filtroRevisado, setFiltroRevisado] = useState("all");
-    const { canReview, username } = useCanReview();
+
+    // Dialog de VER
+    const [viewDialogOpen, setViewDialogOpen] = useState(false);
+    const [viewRecord, setViewRecord] = useState(null);
 
     const showToast = (sev, sum, det, life = 3000) =>
         toast.current?.show({ severity: sev, summary: sum, detail: det, life });
@@ -199,13 +243,27 @@ export default function CarroRS() {
 
     const openNew = () => {
         setForm(emptyForm());
+        setEditingId(null);
         setSubmitted(false);
         setDialogOpen(true);
+    };
+
+    const openEdit = (row) => {
+        setForm(buildFormFromRow(row));
+        setEditingId(row.id);
+        setSubmitted(false);
+        setDialogOpen(true);
+    };
+
+    const openView = (row) => {
+        setViewRecord(row);
+        setViewDialogOpen(true);
     };
 
     const hideDialog = () => {
         setDialogOpen(false);
         setSubmitted(false);
+        setEditingId(null);
     };
 
     const onChange = (field, value) =>
@@ -229,9 +287,19 @@ export default function CarroRS() {
             items: { ...p.items, [key]: { respuesta: value } },
         }));
 
+    const onCantidadChange = (value) => {
+        const cantidadNum = value ?? null;
+        setForm((prev) => ({
+            ...prev,
+            cantidad: cantidadNum,
+            posicion_id: buildPosicionId(cantidadNum),
+        }));
+    };
+
     const validate = () => {
         const errs = [];
         if (!form.periodicidad) errs.push("Seleccione la periodicidad.");
+        if (!form.cantidad) errs.push("Seleccione la cantidad (Carro 01–04).");
         if (!form.tecnico?.trim())
             errs.push("El campo Técnico es requerido.");
         if (!form.ejecutado)
@@ -258,41 +326,66 @@ export default function CarroRS() {
 
         try {
             const baseDate = form.fecha_registro || toDateISO();
-            const proximo =
-                form.ejecutado === "NO"
-                    ? addDays(baseDate, 7) // si NO ejecutado → +7 días
-                    : addDays(baseDate, 14); // BISEMANAL → +14 días
+            const cantidadNum = form.cantidad ? Number(form.cantidad) : null;
+            const posicionConsecutiva = buildPosicionId(cantidadNum);
 
-            const payload = {
+            const respuestasPayload = Object.fromEntries(
+                Array.from({ length: 14 }, (_, i) => [
+                    `respuesta_q${i + 1}`,
+                    form.ejecutado === "SI"
+                        ? form.items[`q${i + 1}`]?.respuesta || null
+                        : null,
+                ])
+            );
+
+            const basePayload = {
                 fecha_registro: form.fecha_registro,
                 hora_registro: form.hora_registro,
-                posicion_id: POSICION_ID,
+                posicion_id: posicionConsecutiva,
                 equipo: EQUIPO,
                 registro: REGISTRO,
-                cantidad: form.cantidad
-                    ? Number(String(form.cantidad).replace(/\D/g, ""))
-                    : null,
+                cantidad: cantidadNum,
                 tecnico: form.tecnico,
                 ejecutado: form.ejecutado,
                 observaciones: form.observaciones || null,
                 periodicidad: form.periodicidad,
-                ...Object.fromEntries(
-                    Array.from({ length: 14 }, (_, i) => [
-                        `respuesta_q${i + 1}`,
-                        form.ejecutado === "SI"
-                            ? form.items[`q${i + 1}`]?.respuesta || null
-                            : null,
-                    ])
-                ),
-                ultimo_mantenimiento: form.ejecutado === "SI" ? baseDate : null,
-                proximo_mantenimiento: proximo,
+                ...respuestasPayload,
             };
 
-            const { error } = await supabase.from(TABLE).insert([payload]);
+            let error;
+
+            if (editingId) {
+                // EDICIÓN: no tocamos ultimo_mantenimiento / proximo_mantenimiento
+                ({ error } = await supabase
+                    .from(TABLE)
+                    .update(basePayload)
+                    .eq("id", editingId));
+            } else {
+                // NUEVO REGISTRO
+                const proximo =
+                    form.ejecutado === "NO"
+                        ? addDays(baseDate, 7) // si NO ejecutado → +7 días
+                        : addDays(baseDate, 14); // BISEMANAL → +14 días
+
+                const insertPayload = {
+                    ...basePayload,
+                    ultimo_mantenimiento:
+                        form.ejecutado === "SI" ? baseDate : null,
+                    proximo_mantenimiento: proximo,
+                };
+
+                ({ error } = await supabase.from(TABLE).insert([insertPayload]));
+            }
+
             if (error) throw error;
 
-            showToast("success", "Éxito", "Registro guardado");
+            showToast(
+                "success",
+                "Éxito",
+                editingId ? "Registro actualizado" : "Registro guardado"
+            );
             setDialogOpen(false);
+            setEditingId(null);
             await fetchRows();
         } catch (e) {
             console.error(e);
@@ -325,7 +418,9 @@ export default function CarroRS() {
                             ...r,
                             revisado: next,
                             revisado_por_username: next ? username : null,
-                            revisado_fecha: next ? new Date().toISOString() : null,
+                            revisado_fecha: next
+                                ? new Date().toISOString()
+                                : null,
                         }
                         : r
                 )
@@ -356,7 +451,7 @@ export default function CarroRS() {
                     type="search"
                     value={globalFilter}
                     onInput={(e) => setGlobalFilter(e.target.value)}
-                    placeholder="Buscar (ej. CRE-C-RS, técnico, notas)"
+                    placeholder="Buscar (ej. CRE-C-RS-01, técnico, notas)"
                 />
             </span>
             <div className="flex align-items-center gap-2">
@@ -414,7 +509,25 @@ export default function CarroRS() {
         );
     };
 
+    const accionesTemplate = (row) => (
+        <div className="flex gap-2">
+            <Button
+                label="Ver"
+                icon="pi pi-eye"
+                text
+                onClick={() => openView(row)}
+            />
+            <Button
+                label="Editar"
+                icon="pi pi-pencil"
+                text
+                onClick={() => openEdit(row)}
+            />
+        </div>
+    );
+
     const activeQuestions = Q_BISEMANAL;
+    const viewQuestionsForRow = () => Q_BISEMANAL;
 
     return (
         <div className="controlrendcosechayfrass-container">
@@ -426,9 +539,14 @@ export default function CarroRS() {
 
             <div className="welcome-message">
                 <p>
-                    <b>Posición (ID):</b> {POSICION_ID} &nbsp; | &nbsp;{" "}
+                    <b>Posición base:</b> {POSICION_BASE} &nbsp; | &nbsp;{" "}
                     <b>Equipo:</b> {EQUIPO} &nbsp; | &nbsp;
                     <b>Registro:</b> {REGISTRO}
+                </p>
+                <p>
+                    <b>ID final de ejemplo:</b>{" "}
+                    {buildPosicionId(form.cantidad) ||
+                        "Seleccione cantidad (01–04) para ver el ID"}
                 </p>
             </div>
 
@@ -481,17 +599,9 @@ export default function CarroRS() {
                 <Column field="posicion_id" header="Posición" sortable />
                 <Column field="equipo" header="Equipo" sortable />
                 <Column field="registro" header="Registro" />
+                <Column field="cantidad" header="Cantidad" sortable />
                 <Column field="periodicidad" header="Periodicidad" />
-                <Column
-                    header="Último Mto."
-                    body={(r) => fmtDMY(r.ultimo_mantenimiento)}
-                    sortable
-                />
-                <Column
-                    header="Próximo Mto."
-                    body={(r) => fmtDMY(r.proximo_mantenimiento)}
-                    sortable
-                />
+
                 <Column field="tecnico" header="Técnico" sortable />
                 <Column
                     header="Fecha de Registro"
@@ -503,12 +613,23 @@ export default function CarroRS() {
                     body={revisadoTemplate}
                     style={{ width: "10rem", textAlign: "center" }}
                 />
+                <Column
+                    header="Acciones"
+                    body={accionesTemplate}
+                    exportable={false}
+                    style={{ width: "18rem" }}
+                />
             </DataTable>
 
+            {/* Dialog NUEVO / EDITAR */}
             <Dialog
                 visible={dialogOpen}
                 style={{ width: "72vw", maxWidth: 1100 }}
-                header="Nuevo registro — Carro (RS)"
+                header={
+                    editingId
+                        ? "Editar registro — Carro (RS)"
+                        : "Nuevo registro — Carro (RS)"
+                }
                 modal
                 onHide={hideDialog}
                 footer={
@@ -564,17 +685,17 @@ export default function CarroRS() {
                     </div>
 
                     <div className="field col-6 md:col-3">
-                        <label className="font-bold">Posición (ID)</label>
-                        <InputText value={form.posicion_id} disabled />
+                        <label className="font-bold">Posición ID</label>
+                        <InputText value={POSICION_BASE} disabled />
                     </div>
                     <div className="field col-6 md:col-3">
                         <label className="font-bold">Equipo</label>
-                        <InputText value={form.equipo} disabled />
+                        <InputText value={EQUIPO} disabled />
                     </div>
 
                     <div className="field col-6 md:col-3">
                         <label className="font-bold">
-                            Técnico*{" "}
+                            Técnico{" "}
                             {submitted && !form.tecnico && (
                                 <small className="p-error"> Requerido</small>
                             )}
@@ -587,19 +708,19 @@ export default function CarroRS() {
                             placeholder="Nombre del técnico"
                         />
                     </div>
+
                     <div className="field col-6 md:col-3">
-                        <label className="font-bold">Cantidad (referencia)</label>
-                        <InputText
+                        <label className="font-bold">
+                            Cantidad{" "}
+                            {submitted && !form.cantidad && (
+                                <small className="p-error"> Requerido</small>
+                            )}
+                        </label>
+                        <Dropdown
                             value={form.cantidad}
-                            onChange={(e) =>
-                                onChange(
-                                    "cantidad",
-                                    e.target.value
-                                        ? e.target.value.replace(/\D/g, "")
-                                        : ""
-                                )
-                            }
-                            placeholder="Ej. 1"
+                            options={CANTIDADES}
+                            onChange={(e) => onCantidadChange(e.value)}
+                            placeholder="Seleccione cantidad"
                         />
                     </div>
 
@@ -622,7 +743,7 @@ export default function CarroRS() {
                         <div className="field col-12">
                             <label className="font-bold">
                                 Observaciones (obligatorio si NO){" "}
-                                {submitted && !form.observaciones.trim() && (
+                                {submitted && !form.observaciones?.trim() && (
                                     <small className="p-error"> Requerido</small>
                                 )}
                             </label>
@@ -716,6 +837,75 @@ export default function CarroRS() {
                         />
                     </div>
                 </div>
+            </Dialog>
+
+            {/* Dialog VER (solo lectura) */}
+            <Dialog
+                visible={viewDialogOpen}
+                onHide={() => setViewDialogOpen(false)}
+                header="Detalle del registro — Carro (RS)"
+                style={{ width: "60vw", maxWidth: 900 }}
+                modal
+            >
+                {!viewRecord ? (
+                    <p>No hay datos para mostrar.</p>
+                ) : (
+                    <>
+                        <p>
+                            <b>ID:</b> {viewRecord.posicion_id} &nbsp; | &nbsp;
+                            <b>Equipo:</b> {viewRecord.equipo} &nbsp; | &nbsp;
+                            <b>Registro:</b> {viewRecord.registro} &nbsp; | &nbsp;
+                            <b>Periodicidad:</b> {viewRecord.periodicidad}
+                        </p>
+                        <p>
+                            <b>Fecha intervención:</b>{" "}
+                            {fmtDMY(viewRecord.fecha_registro)} &nbsp; | &nbsp;
+                            <b>Hora:</b> {viewRecord.hora_registro || "—"}
+                        </p>
+                        <p>
+                            <b>Técnico:</b> {viewRecord.tecnico || "—"}
+                        </p>
+
+                        <hr />
+
+                        <div className="grid">
+                            {viewQuestionsForRow(viewRecord).map((q, idx) => {
+                                const col = `respuesta_q${idx + 1}`;
+                                const val = viewRecord[col] || "—";
+                                return (
+                                    <div
+                                        key={q.key}
+                                        className="col-12 md:col-6"
+                                        style={{ marginBottom: 8 }}
+                                    >
+                                        <div
+                                            style={{
+                                                fontSize: "0.85rem",
+                                                fontWeight: 600,
+                                            }}
+                                        >
+                                            {q.label}
+                                        </div>
+                                        <div
+                                            style={{
+                                                marginTop: 2,
+                                                fontSize: "0.85rem",
+                                            }}
+                                        >
+                                            Respuesta: <b>{val}</b>
+                                        </div>
+                                    </div>
+                                );
+                            })}
+                        </div>
+
+                        <hr />
+                        <p>
+                            <b>Observaciones:</b>{" "}
+                            {viewRecord.observaciones || "—"}
+                        </p>
+                    </>
+                )}
             </Dialog>
         </div>
     );

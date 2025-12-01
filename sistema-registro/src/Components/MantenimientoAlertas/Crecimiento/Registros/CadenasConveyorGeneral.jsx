@@ -60,21 +60,37 @@ const addDays = (ymd, days) => {
 };
 
 /* ===== Constantes de este registro (CRE-CC-G) ===== */
-const POSICION_ID = "CRE-CC-G";
+const POSICION_BASE = "CRE-CC-G";
 const EQUIPO = "CADENAS CONVEYOR";
 const REGISTRO = "GENERAL";
 const TABLE = "mto_crecimiento_cadenas_conveyor_general";
 
-/** Opciones para cada ítem (en vez de Sí / No) */
+const YESNO = [
+    { label: "Sí", value: "SI" },
+    { label: "No", value: "NO" },
+];
+
+/** Opciones para cada ítem (O / I / RD / RP) */
 const ESTADOS_CC = [
-    { label: "O — OK", value: "O" },
-    { label: "I — Incompleto", value: "I" },
-    { label: "RD — Reparado", value: "RD" },
-    { label: "RP — Reemplazado", value: "RP" },
+    { label: "O - OK", value: "O" },
+    { label: "I - Incompleto", value: "I" },
+    { label: "RD - Reparado", value: "RD" },
+    { label: "RP - Reemplazado", value: "RP" },
 ];
 
 // Solo tiene periodicidad BISEMANAL
 const PERIODOS = [{ label: "Bisemanal", value: "BISEMANAL" }];
+
+/** Cantidad = 18 → IDs CRE-CC-G-01 ... CRE-CC-G-18 */
+const CANTIDADES = Array.from({ length: 18 }, (_, i) => ({
+    label: String(i + 1).padStart(2, "0"),
+    value: i + 1,
+}));
+
+const buildPosicionId = (cantidad) => {
+    if (!cantidad) return POSICION_BASE;
+    return `${POSICION_BASE}-${String(cantidad).padStart(2, "0")}`;
+};
 
 /* ===== Preguntas BISEMANAL (texto de la OM) ===== */
 const Q_BISEMANAL = [
@@ -85,24 +101,22 @@ const Q_BISEMANAL = [
     { key: "q5", label: "Verificar y limpiar freno de motores (si aplica)" },
     {
         key: "q6",
-        label:
-            "Inspección de anclajes y estado estructura transportador",
+        label: "Inspección de anclajes y estado estructura transportador",
     },
     { key: "q7", label: "Control uniones por tornillo" },
     {
         key: "q8",
-        label:
-            "Comprobar y limpiar controles de presencia y gálibos",
+        label: "Comprobar y limpiar controles de presencia y gálibos",
     },
 ];
 
 const emptyForm = () => ({
     fecha_registro: toDateISO(),
     hora_registro: toHM(),
-    posicion_id: POSICION_ID,
+    posicion_id: POSICION_BASE,
     equipo: EQUIPO,
     registro: REGISTRO,
-    cantidad: "",
+    cantidad: null,
     tecnico: "",
     ejecutado: "",
     observaciones: "",
@@ -117,18 +131,53 @@ const packRow = (r) => ({
     observaciones: r.observaciones ?? "",
 });
 
+const buildFormFromRow = (row) => {
+    const items = {};
+    Q_BISEMANAL.forEach((q, idx) => {
+        const col = `respuesta_q${idx + 1}`;
+        items[q.key] = { respuesta: row[col] || "" };
+    });
+
+    return {
+        fecha_registro: row.fecha_registro || toDateISO(),
+        hora_registro: row.hora_registro || toHM(),
+        posicion_id: row.posicion_id || POSICION_BASE,
+        equipo: row.equipo || EQUIPO,
+        registro: row.registro || REGISTRO,
+        cantidad: row.cantidad || null,
+        tecnico: row.tecnico || "",
+        ejecutado: row.ejecutado || "",
+        observaciones: row.observaciones || "",
+        periodicidad: row.periodicidad || "",
+        items,
+        fecha_correccion_preview: fmtDMYHM(row.created_at),
+    };
+};
+
 export default function CadenasConveyorGeneral() {
     const navigate = useNavigate();
     const toast = useRef(null);
+    const { canReview, username } = useCanReview();
+
     const [rows, setRows] = useState([]);
     const [selected, setSelected] = useState([]);
     const [globalFilter, setGlobalFilter] = useState("");
     const [loading, setLoading] = useState(false);
+
     const [dialogOpen, setDialogOpen] = useState(false);
     const [submitted, setSubmitted] = useState(false);
     const [form, setForm] = useState(emptyForm());
+    const [editingId, setEditingId] = useState(null);
+
     const [filtroRevisado, setFiltroRevisado] = useState("all");
-    const { canReview, username } = useCanReview();
+
+    // Dialog VER
+    const [viewDialogOpen, setViewDialogOpen] = useState(false);
+    const [viewRecord, setViewRecord] = useState(null);
+
+    // Dialog "Registro con puntos pendientes (I - Incompleto)"
+    const [pendingDialogOpen, setPendingDialogOpen] = useState(false);
+    const [pendingDialogRecordId, setPendingDialogRecordId] = useState("");
 
     const showToast = (sev, sum, det, life = 3000) =>
         toast.current?.show({ severity: sev, summary: sum, detail: det, life });
@@ -144,11 +193,12 @@ export default function CadenasConveyorGeneral() {
           fecha_registro, hora_registro,
           posicion_id, equipo, registro, cantidad, tecnico,
           ejecutado, observaciones, periodicidad,
-          ${Array.from({ length: 14 }, (_, i) => `respuesta_q${i + 1}`).join(
+          ${Array.from({ length: 8 }, (_, i) => `respuesta_q${i + 1}`).join(
                         ", "
                     )},
           ultimo_mantenimiento, proximo_mantenimiento,
-          revisado, revisado_por_username, revisado_fecha
+          revisado, revisado_por_username, revisado_fecha,
+          completado, pendiente_nuevo, fecha_completado
         `
                 )
                 .order("fecha_registro", { ascending: false })
@@ -175,13 +225,27 @@ export default function CadenasConveyorGeneral() {
 
     const openNew = () => {
         setForm(emptyForm());
+        setEditingId(null);
         setSubmitted(false);
         setDialogOpen(true);
+    };
+
+    const openEdit = (row) => {
+        setForm(buildFormFromRow(row));
+        setEditingId(row.id);
+        setSubmitted(false);
+        setDialogOpen(true);
+    };
+
+    const openView = (row) => {
+        setViewRecord(row);
+        setViewDialogOpen(true);
     };
 
     const hideDialog = () => {
         setDialogOpen(false);
         setSubmitted(false);
+        setEditingId(null);
     };
 
     const onChange = (field, value) =>
@@ -191,8 +255,7 @@ export default function CadenasConveyorGeneral() {
         }));
 
     const onPeriodoChange = (value) => {
-        const base = Q_BISEMANAL;
-        const items = base.reduce(
+        const items = Q_BISEMANAL.reduce(
             (acc, q) => ({ ...acc, [q.key]: { respuesta: "" } }),
             {}
         );
@@ -205,9 +268,19 @@ export default function CadenasConveyorGeneral() {
             items: { ...p.items, [key]: { respuesta: value } },
         }));
 
+    const onCantidadChange = (value) => {
+        const cantidadNum = value ?? null;
+        setForm((prev) => ({
+            ...prev,
+            cantidad: cantidadNum,
+            posicion_id: buildPosicionId(cantidadNum),
+        }));
+    };
+
     const validate = () => {
         const errs = [];
         if (!form.periodicidad) errs.push("Seleccione la periodicidad.");
+        if (!form.cantidad) errs.push("Seleccione la cantidad (01–18).");
         if (!form.tecnico?.trim())
             errs.push("El campo Técnico es requerido.");
         if (!form.ejecutado)
@@ -215,8 +288,7 @@ export default function CadenasConveyorGeneral() {
         if (form.ejecutado === "NO" && !form.observaciones.trim())
             errs.push("Explique por qué NO se efectuó (Observaciones).");
         if (form.ejecutado === "SI") {
-            const list = Q_BISEMANAL;
-            list.forEach((q) => {
+            Q_BISEMANAL.forEach((q) => {
                 if (!form.items[q.key]?.respuesta)
                     errs.push(`Responda: ${q.label}`);
             });
@@ -234,45 +306,122 @@ export default function CadenasConveyorGeneral() {
 
         try {
             const baseDate = form.fecha_registro || toDateISO();
-            const proximo =
-                form.ejecutado === "NO"
-                    ? addDays(baseDate, 7) // si NO ejecutado → +7 días
-                    : addDays(baseDate, 14); // BISEMANAL → +14 días
+            const cantidadNum = form.cantidad ? Number(form.cantidad) : null;
+            const posicionConsecutiva = buildPosicionId(cantidadNum);
 
-            const payload = {
+            const respuestasPayload = Object.fromEntries(
+                Array.from({ length: 8 }, (_, i) => [
+                    `respuesta_q${i + 1}`,
+                    form.ejecutado === "SI"
+                        ? form.items[`q${i + 1}`]?.respuesta || null
+                        : null,
+                ])
+            );
+
+            const basePayload = {
                 fecha_registro: form.fecha_registro,
                 hora_registro: form.hora_registro,
-                posicion_id: POSICION_ID,
+                posicion_id: posicionConsecutiva,
                 equipo: EQUIPO,
                 registro: REGISTRO,
-                cantidad: form.cantidad
-                    ? Number(String(form.cantidad).replace(/\D/g, ""))
-                    : null,
+                cantidad: cantidadNum,
                 tecnico: form.tecnico,
                 ejecutado: form.ejecutado,
                 observaciones: form.observaciones || null,
                 periodicidad: form.periodicidad,
-                ...Object.fromEntries(
-                    Array.from({ length: 14 }, (_, i) => [
-                        `respuesta_q${i + 1}`,
-                        form.ejecutado === "SI"
-                            ? form.items[`q${i + 1}`]?.respuesta || null
-                            : null,
-                    ])
-                ),
-                ultimo_mantenimiento: form.ejecutado === "SI" ? baseDate : null,
-                proximo_mantenimiento: proximo,
+                ...respuestasPayload,
             };
 
-            const { error } = await supabase.from(TABLE).insert([payload]);
+            let error;
+
+            if (editingId) {
+                ({ error } = await supabase
+                    .from(TABLE)
+                    .update(basePayload)
+                    .eq("id", editingId));
+            } else {
+                const proximo =
+                    form.ejecutado === "NO"
+                        ? addDays(baseDate, 7)
+                        : addDays(baseDate, 14);
+
+                const insertPayload = {
+                    ...basePayload,
+                    ultimo_mantenimiento:
+                        form.ejecutado === "SI" ? baseDate : null,
+                    proximo_mantenimiento: proximo,
+                    completado: false,
+                    pendiente_nuevo: false,
+                    fecha_completado: null,
+                };
+
+                ({ error } = await supabase.from(TABLE).insert([insertPayload]));
+            }
+
             if (error) throw error;
 
-            showToast("success", "Éxito", "Registro guardado");
+            showToast(
+                "success",
+                "Éxito",
+                editingId ? "Registro actualizado" : "Registro guardado"
+            );
             setDialogOpen(false);
+            setEditingId(null);
             await fetchRows();
         } catch (e) {
             console.error(e);
             showToast("error", "Error", e.message || "No se pudo guardar");
+        }
+    };
+
+    /* ===== Completar registro (desde este módulo) ===== */
+    const handleCompletar = async (row) => {
+        try {
+            // 1) Validación FRONT: si hay alguna respuesta "I", NO dejamos completar
+            const hasIncompleto = Array.from({ length: 8 }, (_, i) => {
+                const val = row[`respuesta_q${i + 1}`];
+                return val === "I";
+            }).some(Boolean);
+
+            if (hasIncompleto || row.ejecutado === "NO") {
+                setPendingDialogRecordId(row.posicion_id || row.id);
+                setPendingDialogOpen(true);
+                return;
+            }
+
+            // 2) Si pasa la validación, marcamos como completado
+            const { error } = await supabase
+                .from(TABLE)
+                .update({
+                    completado: true,
+                    pendiente_nuevo: true,
+                    proximo_mantenimiento: null,
+                    fecha_completado: new Date().toISOString(),
+                })
+                .eq("id", row.id);
+
+            if (error) {
+                showToast(
+                    "error",
+                    "No se pudo completar",
+                    error.message || "Error al completar el registro"
+                );
+                return;
+            }
+
+            showToast(
+                "success",
+                "Completado",
+                "El registro fue marcado como Completado."
+            );
+            await fetchRows();
+        } catch (e) {
+            console.error(e);
+            showToast(
+                "error",
+                "Error",
+                e.message || "No se pudo completar el registro"
+            );
         }
     };
 
@@ -301,7 +450,9 @@ export default function CadenasConveyorGeneral() {
                             ...r,
                             revisado: next,
                             revisado_por_username: next ? username : null,
-                            revisado_fecha: next ? new Date().toISOString() : null,
+                            revisado_fecha: next
+                                ? new Date().toISOString()
+                                : null,
                         }
                         : r
                 )
@@ -332,7 +483,7 @@ export default function CadenasConveyorGeneral() {
                     type="search"
                     value={globalFilter}
                     onInput={(e) => setGlobalFilter(e.target.value)}
-                    placeholder="Buscar (ej. CRE-CC-G, técnico, notas)"
+                    placeholder="Buscar (ej. CRE-CC-G-01, técnico, notas)"
                 />
             </span>
             <div className="flex align-items-center gap-2">
@@ -351,6 +502,12 @@ export default function CadenasConveyorGeneral() {
         </div>
     );
 
+    const countByVal = (row, val) =>
+        Array.from({ length: 8 }, (_, i) => i + 1).reduce(
+            (acc, i) => acc + ((row[`respuesta_q${i}`] || "") === val ? 1 : 0),
+            0
+        );
+
     const exportXlsx = () => {
         if (!rows?.length) {
             showToast("warn", "Exportación", "No hay datos");
@@ -366,7 +523,10 @@ export default function CadenasConveyorGeneral() {
             tecnico: r.tecnico ?? "",
             fecha_intervencion: fmtDMY(r.fecha_registro),
             hora_intervencion: r.hora_registro || "",
-            // aquí puedes contar por tipo (O/I/RD/RP) si luego lo necesitas
+            "#O": countByVal(r, "O"),
+            "#I": countByVal(r, "I"),
+            "#RD": countByVal(r, "RD"),
+            "#RP": countByVal(r, "RP"),
             revisado: r.revisado ? "Sí" : "No",
             creado: fmtDMYHM(r.created_at),
         }));
@@ -381,7 +541,26 @@ export default function CadenasConveyorGeneral() {
         );
     };
 
+    const accionesTemplate = (row) => (
+        <div className="flex gap-2">
+            <Button
+                label="Ver"
+                icon="pi pi-eye"
+                text
+                onClick={() => openView(row)}
+            />
+            <Button
+                label="Editar"
+                icon="pi pi-pencil"
+                text
+                onClick={() => openEdit(row)}
+            />
+
+        </div>
+    );
+
     const activeQuestions = Q_BISEMANAL;
+    const viewQuestionsForRow = () => Q_BISEMANAL;
 
     return (
         <div className="controlrendcosechayfrass-container">
@@ -393,9 +572,14 @@ export default function CadenasConveyorGeneral() {
 
             <div className="welcome-message">
                 <p>
-                    <b>Posición (ID):</b> {POSICION_ID} &nbsp; | &nbsp; <b>Equipo:</b>{" "}
-                    {EQUIPO} &nbsp; | &nbsp;
+                    <b>Posición base:</b> {POSICION_BASE} &nbsp; | &nbsp;{" "}
+                    <b>Equipo:</b> {EQUIPO} &nbsp; | &nbsp;
                     <b>Registro:</b> {REGISTRO}
+                </p>
+                <p>
+                    <b>ID final de ejemplo:</b>{" "}
+                    {buildPosicionId(form.cantidad) ||
+                        "Seleccione cantidad (01–18) para ver el ID"}
                 </p>
             </div>
 
@@ -448,17 +632,9 @@ export default function CadenasConveyorGeneral() {
                 <Column field="posicion_id" header="Posición" sortable />
                 <Column field="equipo" header="Equipo" sortable />
                 <Column field="registro" header="Registro" />
+                <Column field="cantidad" header="Cantidad" sortable />
                 <Column field="periodicidad" header="Periodicidad" />
-                <Column
-                    header="Último Mto."
-                    body={(r) => fmtDMY(r.ultimo_mantenimiento)}
-                    sortable
-                />
-                <Column
-                    header="Próximo Mto."
-                    body={(r) => fmtDMY(r.proximo_mantenimiento)}
-                    sortable
-                />
+
                 <Column field="tecnico" header="Técnico" sortable />
                 <Column
                     header="Fecha de Registro"
@@ -470,12 +646,23 @@ export default function CadenasConveyorGeneral() {
                     body={revisadoTemplate}
                     style={{ width: "10rem", textAlign: "center" }}
                 />
+                <Column
+                    header="Acciones"
+                    body={accionesTemplate}
+                    exportable={false}
+                    style={{ width: "22rem" }}
+                />
             </DataTable>
 
+            {/* Dialog NUEVO / EDITAR */}
             <Dialog
                 visible={dialogOpen}
                 style={{ width: "72vw", maxWidth: 1100 }}
-                header="Nuevo registro — Cadenas Conveyor (General)"
+                header={
+                    editingId
+                        ? "Editar registro — Cadenas Conveyor (General)"
+                        : "Nuevo registro — Cadenas Conveyor (General)"
+                }
                 modal
                 onHide={hideDialog}
                 footer={
@@ -531,12 +718,12 @@ export default function CadenasConveyorGeneral() {
                     </div>
 
                     <div className="field col-6 md:col-3">
-                        <label className="font-bold">Posición (ID)</label>
-                        <InputText value={form.posicion_id} disabled />
+                        <label className="font-bold">Posición ID</label>
+                        <InputText value={POSICION_BASE} disabled />
                     </div>
                     <div className="field col-6 md:col-3">
                         <label className="font-bold">Equipo</label>
-                        <InputText value={form.equipo} disabled />
+                        <InputText value={EQUIPO} disabled />
                     </div>
 
                     <div className="field col-6 md:col-3">
@@ -554,19 +741,19 @@ export default function CadenasConveyorGeneral() {
                             placeholder="Nombre del técnico"
                         />
                     </div>
+
                     <div className="field col-6 md:col-3">
-                        <label className="font-bold">Cantidad (referencia)</label>
-                        <InputText
+                        <label className="font-bold">
+                            Cantidad*{" "}
+                            {submitted && !form.cantidad && (
+                                <small className="p-error"> Requerido</small>
+                            )}
+                        </label>
+                        <Dropdown
                             value={form.cantidad}
-                            onChange={(e) =>
-                                onChange(
-                                    "cantidad",
-                                    e.target.value
-                                        ? e.target.value.replace(/\D/g, "")
-                                        : ""
-                                )
-                            }
-                            placeholder="Ej. 1"
+                            options={CANTIDADES}
+                            onChange={(e) => onCantidadChange(e.value)}
+                            placeholder="Seleccione cantidad (01–18)"
                         />
                     </div>
 
@@ -579,10 +766,7 @@ export default function CadenasConveyorGeneral() {
                         </label>
                         <Dropdown
                             value={form.ejecutado}
-                            options={[
-                                { label: "Sí", value: "SI" },
-                                { label: "No", value: "NO" },
-                            ]}
+                            options={YESNO}
                             onChange={(e) => onChange("ejecutado", e.value)}
                             placeholder="Seleccione"
                         />
@@ -592,7 +776,7 @@ export default function CadenasConveyorGeneral() {
                         <div className="field col-12">
                             <label className="font-bold">
                                 Observaciones (obligatorio si NO){" "}
-                                {submitted && !form.observaciones.trim() && (
+                                {submitted && !form.observaciones?.trim() && (
                                     <small className="p-error"> Requerido</small>
                                 )}
                             </label>
@@ -620,7 +804,10 @@ export default function CadenasConveyorGeneral() {
                                 }}
                             >
                                 <div
-                                    style={{ fontWeight: 700, marginBottom: 8 }}
+                                    style={{
+                                        fontWeight: 700,
+                                        marginBottom: 8,
+                                    }}
                                 >{`Checklist — BISEMANAL`}</div>
                                 <div className="grid">
                                     {activeQuestions.map((q) => {
@@ -682,6 +869,114 @@ export default function CadenasConveyorGeneral() {
                             disabled
                         />
                     </div>
+                </div>
+            </Dialog>
+
+            {/* Dialog VER (solo lectura) */}
+            <Dialog
+                visible={viewDialogOpen}
+                onHide={() => setViewDialogOpen(false)}
+                header="Detalle del registro — Cadenas Conveyor (General)"
+                style={{ width: "60vw", maxWidth: 900 }}
+                modal
+            >
+                {!viewRecord ? (
+                    <p>No hay datos para mostrar.</p>
+                ) : (
+                    <>
+                        <p>
+                            <b>ID:</b> {viewRecord.posicion_id} &nbsp; | &nbsp;
+                            <b>Equipo:</b> {viewRecord.equipo} &nbsp; | &nbsp;
+                            <b>Registro:</b> {viewRecord.registro} &nbsp; | &nbsp;
+                            <b>Periodicidad:</b> {viewRecord.periodicidad}
+                        </p>
+                        <p>
+                            <b>Fecha intervención:</b>{" "}
+                            {fmtDMY(viewRecord.fecha_registro)} &nbsp; | &nbsp;
+                            <b>Hora:</b> {viewRecord.hora_registro || "—"}
+                        </p>
+                        <p>
+                            <b>Técnico:</b> {viewRecord.tecnico || "—"}
+                        </p>
+
+                        <hr />
+
+                        <div className="grid">
+                            {viewQuestionsForRow(viewRecord).map((q, idx) => {
+                                const col = `respuesta_q${idx + 1}`;
+                                const val = viewRecord[col] || "—";
+                                return (
+                                    <div
+                                        key={q.key}
+                                        className="col-12 md:col-6"
+                                        style={{ marginBottom: 8 }}
+                                    >
+                                        <div
+                                            style={{
+                                                fontSize: "0.85rem",
+                                                fontWeight: 600,
+                                            }}
+                                        >
+                                            {q.label}
+                                        </div>
+                                        <div
+                                            style={{
+                                                marginTop: 2,
+                                                fontSize: "0.85rem",
+                                            }}
+                                        >
+                                            Respuesta: <b>{val}</b>
+                                        </div>
+                                    </div>
+                                );
+                            })}
+                        </div>
+
+                        <hr />
+                        <p>
+                            <b>Observaciones:</b>{" "}
+                            {viewRecord.observaciones || "—"}
+                        </p>
+                    </>
+                )}
+            </Dialog>
+
+            {/* Dialog: Registro con puntos pendientes (I - Incompleto) */}
+            <Dialog
+                visible={pendingDialogOpen}
+                onHide={() => setPendingDialogOpen(false)}
+                header="Registro con puntos pendientes"
+                style={{ width: "32rem", maxWidth: "90vw" }}
+                modal
+            >
+                <p>
+                    Este registro tiene respuestas en <b>Incompleto (I)</b> o no
+                    ha sido ejecutado correctamente. Debe corregir el registro
+                    antes de marcarlo como <b>Completado</b>.
+                </p>
+                <p className="mt-3">
+                    <b>ID:</b> {pendingDialogRecordId || "—"}
+                </p>
+                <div className="flex justify-content-end gap-2 mt-4">
+                    <Button
+                        label="Cerrar"
+                        icon="pi pi-times"
+                        outlined
+                        onClick={() => setPendingDialogOpen(false)}
+                    />
+                    <Button
+                        label="Ir al registro"
+                        icon="pi pi-external-link"
+                        onClick={() => {
+                            setPendingDialogOpen(false);
+                            const target = rows.find(
+                                (r) => r.posicion_id === pendingDialogRecordId
+                            );
+                            if (target) {
+                                openEdit(target);
+                            }
+                        }}
+                    />
                 </div>
             </Dialog>
         </div>

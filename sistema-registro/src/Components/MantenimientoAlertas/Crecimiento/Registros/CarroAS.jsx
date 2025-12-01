@@ -108,7 +108,8 @@ const Q_BISEMANAL = [
     },
     {
         key: "q8",
-        label: "Limpieza y/o sustitución de filtros. Funcionamiento ventiladores",
+        label:
+            "Limpieza y/o sustitución de filtros. Funcionamiento ventiladores",
     },
     {
         key: "q9",
@@ -153,6 +154,8 @@ const packRow = (r) => ({
 export default function CarroAS() {
     const navigate = useNavigate();
     const toast = useRef(null);
+    const { canReview, username } = useCanReview();
+
     const [rows, setRows] = useState([]);
     const [selected, setSelected] = useState([]);
     const [globalFilter, setGlobalFilter] = useState("");
@@ -164,11 +167,14 @@ export default function CarroAS() {
     const [editingId, setEditingId] = useState(null);
 
     const [filtroRevisado, setFiltroRevisado] = useState("all");
-    const { canReview, username } = useCanReview();
 
-    // Dialog de VER (como en TamizMotor)
+    // Dialog de VER
     const [viewDialogOpen, setViewDialogOpen] = useState(false);
     const [viewRecord, setViewRecord] = useState(null);
+
+    // Dialog de "Registro con puntos pendientes"
+    const [pendingDialogOpen, setPendingDialogOpen] = useState(false);
+    const [pendingDialogRecordId, setPendingDialogRecordId] = useState("");
 
     const showToast = (sev, sum, det, life = 3000) =>
         toast.current?.show({ severity: sev, summary: sum, detail: det, life });
@@ -188,7 +194,8 @@ export default function CarroAS() {
                         ", "
                     )},
           ultimo_mantenimiento, proximo_mantenimiento,
-          revisado, revisado_por_username, revisado_fecha
+          revisado, revisado_por_username, revisado_fecha,
+          completado, pendiente_nuevo, fecha_completado
         `
                 )
                 .order("fecha_registro", { ascending: false })
@@ -366,7 +373,8 @@ export default function CarroAS() {
 
                 const insertPayload = {
                     ...basePayload,
-                    ultimo_mantenimiento: form.ejecutado === "SI" ? baseDate : null,
+                    ultimo_mantenimiento:
+                        form.ejecutado === "SI" ? baseDate : null,
                     proximo_mantenimiento: proximo,
                     completado: false,
                     pendiente_nuevo: false,
@@ -389,6 +397,54 @@ export default function CarroAS() {
         } catch (e) {
             console.error(e);
             showToast("error", "Error", e.message || "No se pudo guardar");
+        }
+    };
+
+    /* ===== Completar registro (desde este módulo) ===== */
+    const handleCompletar = async (row) => {
+        try {
+            const { error } = await supabase
+                .from(TABLE)
+                .update({
+                    completado: true,
+                    pendiente_nuevo: true,
+                    proximo_mantenimiento: null,
+                    fecha_completado: new Date().toISOString(),
+                })
+                .eq("id", row.id);
+
+            if (error) {
+                // Si viene del trigger de "I - Incompleto"
+                if (
+                    error.message &&
+                    error.message.includes("Incompleto")
+                ) {
+                    setPendingDialogRecordId(row.posicion_id || row.id);
+                    setPendingDialogOpen(true);
+                    return;
+                }
+
+                showToast(
+                    "error",
+                    "No se pudo completar",
+                    error.message || "Error al completar el registro"
+                );
+                return;
+            }
+
+            showToast(
+                "success",
+                "Completado",
+                "El registro fue marcado como Completado."
+            );
+            await fetchRows();
+        } catch (e) {
+            console.error(e);
+            showToast(
+                "error",
+                "Error",
+                e.message || "No se pudo completar el registro"
+            );
         }
     };
 
@@ -523,6 +579,7 @@ export default function CarroAS() {
                 text
                 onClick={() => openEdit(row)}
             />
+
         </div>
     );
 
@@ -598,18 +655,9 @@ export default function CarroAS() {
                 <Column field="posicion_id" header="Posición" sortable />
                 <Column field="equipo" header="Equipo" sortable />
                 <Column field="registro" header="Registro" />
-                <Column field="cantidad" header="Cant." sortable />
+                <Column field="cantidad" header="Cantidad" sortable />
                 <Column field="periodicidad" header="Periodicidad" />
-                <Column
-                    header="Último Mto."
-                    body={(r) => fmtDMY(r.ultimo_mantenimiento)}
-                    sortable
-                />
-                <Column
-                    header="Próximo Mto."
-                    body={(r) => fmtDMY(r.proximo_mantenimiento)}
-                    sortable
-                />
+
                 <Column field="tecnico" header="Técnico" sortable />
                 <Column
                     header="Fecha de Registro"
@@ -625,11 +673,11 @@ export default function CarroAS() {
                     header="Acciones"
                     body={accionesTemplate}
                     exportable={false}
-                    style={{ width: "14rem" }}
+                    style={{ width: "18rem" }}
                 />
             </DataTable>
 
-            {/* Dialog NUEVO / EDITAR (igual patrón TamizMotor) */}
+            {/* Dialog NUEVO / EDITAR */}
             <Dialog
                 visible={dialogOpen}
                 style={{ width: "72vw", maxWidth: 1100 }}
@@ -671,7 +719,8 @@ export default function CarroAS() {
                             placeholder="Seleccione"
                         />
                         <small className="block mt-2">
-                            <b>Bisemanal</b>: +14 días (si NO ejecutado: +7 días).
+                            <b>Bisemanal</b>: +14 días (si NO ejecutado: +7
+                            días).
                         </small>
                     </div>
 
@@ -697,7 +746,7 @@ export default function CarroAS() {
                     </div>
 
                     <div className="field col-6 md:col-3">
-                        <label className="font-bold">Posición base</label>
+                        <label className="font-bold">Posición ID</label>
                         <InputText value={POSICION_BASE} disabled />
                     </div>
                     <div className="field col-6 md:col-3">
@@ -707,7 +756,7 @@ export default function CarroAS() {
 
                     <div className="field col-6 md:col-3">
                         <label className="font-bold">
-                            Técnico*{" "}
+                            Técnico{" "}
                             {submitted && !form.tecnico && (
                                 <small className="p-error"> Requerido</small>
                             )}
@@ -723,7 +772,7 @@ export default function CarroAS() {
 
                     <div className="field col-6 md:col-3">
                         <label className="font-bold">
-                            Cantidad (Carro)*{" "}
+                            Cantidad*{" "}
                             {submitted && !form.cantidad && (
                                 <small className="p-error"> Requerido</small>
                             )}
@@ -732,16 +781,14 @@ export default function CarroAS() {
                             value={form.cantidad}
                             options={CANTIDADES}
                             onChange={(e) => onCantidadChange(e.value)}
-                            placeholder="Seleccione (01–04)"
+                            placeholder="Seleccione cantidad"
                         />
-                        <small className="block mt-1">
-                            Se usará para el ID: {buildPosicionId(form.cantidad)}
-                        </small>
+
                     </div>
 
                     <div className="field col-12 md:col-6">
                         <label className="font-bold">
-                            ¿Se va a efectuar el mantenimiento?*{" "}
+                            ¿Se va a efectuar el mantenimiento?{" "}
                             {submitted && !form.ejecutado && (
                                 <small className="p-error"> Requerido</small>
                             )}
@@ -758,13 +805,12 @@ export default function CarroAS() {
                         <div className="field col-12">
                             <label className="font-bold">
                                 Observaciones (obligatorio si NO){" "}
-                                {submitted &&
-                                    !form.observaciones.trim() && (
-                                        <small className="p-error">
-                                            {" "}
-                                            Requerido
-                                        </small>
-                                    )}
+                                {submitted && !form.observaciones.trim() && (
+                                    <small className="p-error">
+                                        {" "}
+                                        Requerido
+                                    </small>
+                                )}
                             </label>
                             <InputText
                                 value={form.observaciones}
@@ -800,8 +846,7 @@ export default function CarroAS() {
                                 <div className="grid">
                                     {Q_BISEMANAL.map((q) => {
                                         const val =
-                                            form.items[q.key]?.respuesta ||
-                                            "";
+                                            form.items[q.key]?.respuesta || "";
                                         return (
                                             <div
                                                 key={q.key}
@@ -861,7 +906,7 @@ export default function CarroAS() {
                 </div>
             </Dialog>
 
-            {/* Dialog VER (solo lectura), mismo estilo que TamizMotor */}
+            {/* Dialog VER (solo lectura) */}
             <Dialog
                 visible={viewDialogOpen}
                 onHide={() => setViewDialogOpen(false)}
@@ -929,6 +974,46 @@ export default function CarroAS() {
                         </p>
                     </>
                 )}
+            </Dialog>
+
+            {/* Dialog: Registro con puntos pendientes (I - Incompleto) */}
+            <Dialog
+                visible={pendingDialogOpen}
+                onHide={() => setPendingDialogOpen(false)}
+                header="Registro con puntos pendientes"
+                style={{ width: "32rem", maxWidth: "90vw" }}
+                modal
+            >
+                <p>
+                    Este registro tiene respuestas en{" "}
+                    <b>Incompleto (I)</b> o no ha sido ejecutado. Debe corregir
+                    el registro antes de marcarlo como{" "}
+                    <b>Completado</b>.
+                </p>
+                <p className="mt-3">
+                    <b>ID:</b> {pendingDialogRecordId || "—"}
+                </p>
+                <div className="flex justify-content-end gap-2 mt-4">
+                    <Button
+                        label="Cerrar"
+                        icon="pi pi-times"
+                        outlined
+                        onClick={() => setPendingDialogOpen(false)}
+                    />
+                    <Button
+                        label="Ir al registro"
+                        icon="pi pi-external-link"
+                        onClick={() => {
+                            setPendingDialogOpen(false);
+                            const target = rows.find(
+                                (r) => r.posicion_id === pendingDialogRecordId
+                            );
+                            if (target) {
+                                openEdit(target);
+                            }
+                        }}
+                    />
+                </div>
             </Dialog>
         </div>
     );
