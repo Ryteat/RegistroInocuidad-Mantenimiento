@@ -18,10 +18,10 @@ import { Checkbox } from "primereact/checkbox";
 import * as XLSX from "xlsx";
 import useCanReview from "../../../Inocuidad/Registros/Hooks/useCanReview.js";
 
-/* ===== Helpers de fecha (seguros) ===== */
-const parseYMD = (iso) => {
-    if (!iso) return null;
-    const [y, m, d] = String(iso).split("-").map(Number);
+/* ===== Helpers de fecha ===== */
+const parseYMD = (isoDateStr) => {
+    if (!isoDateStr) return null;
+    const [y, m, d] = String(isoDateStr).split("-").map(Number);
     if (!y || !m || !d) return null;
     return new Date(y, m - 1, d, 0, 0, 0, 0);
 };
@@ -59,19 +59,19 @@ const toHM = (d = new Date()) =>
     });
 
 const addDays = (ymd, days) => {
-    const b = parseYMD(ymd);
-    b.setDate(b.getDate() + Number(days || 0));
-    return toDateISO(b);
+    const base = parseYMD(ymd);
+    base.setDate(base.getDate() + Number(days || 0));
+    return toDateISO(base);
 };
 
 const addMonths = (ymd, months) => {
-    const b = parseYMD(ymd);
-    b.setMonth(b.getMonth() + Number(months || 0));
-    return toDateISO(b);
+    const base = parseYMD(ymd);
+    base.setMonth(base.getMonth() + Number(months || 0));
+    return toDateISO(base);
 };
 
-/* ===== Constantes de este registro ===== */
-const BASE_POSICION_ID = "H-BE-G";
+/* ===== Constantes del registro ===== */
+const POSICION_ID_BASE = "H-BE-G";
 const EQUIPO = "BANDA DE ENTRADA";
 const REGISTRO = "GENERAL";
 const TABLE = "mto_horno_banda_entrada_general";
@@ -87,10 +87,10 @@ const PERIODOS = [
     { label: "Anual", value: "ANUAL" },
 ];
 
-// este registro solo tiene 1 → 01
-const CANTIDAD_OPCIONES = [{ label: "01", value: 1 }];
+/* Cantidad fija 1 → consecutivo 01 */
+const CANTIDAD_OPTIONS = [{ label: "01", value: 1 }];
 
-/* === Preguntas (idénticas a Banda de Salida — General) === */
+/* Preguntas por periodicidad (IGUAL que Banda de Salida) */
 // Semanal
 const Q_SEMANAL = [
     { key: "q1", label: "Revisar y lubricar todas las muñoneras" },
@@ -113,8 +113,14 @@ const Q_SEMANAL = [
 ];
 // Trimestral
 const Q_TRIMESTRAL = [
-    { key: "q1", label: "Revisar y verificar estado general del motor, limpieza" },
-    { key: "q2", label: "Revisar y verificar estado general del motor, pintura" },
+    {
+        key: "q1",
+        label: "Revisar y verificar estado general del motor, limpieza",
+    },
+    {
+        key: "q2",
+        label: "Revisar y verificar estado general del motor, pintura",
+    },
     {
         key: "q3",
         label: "Revisar estado del cable de alimentación, conector o manguito",
@@ -129,7 +135,10 @@ const Q_TRIMESTRAL = [
         label:
             "Verificar presencia de agua en la caja de conexión, si lo hay utilice desplazador de humedad",
     },
-    { key: "q6", label: "Realizar medición de aislamiento al bobinado, Reporte" },
+    {
+        key: "q6",
+        label: "Realizar medición de aislamiento al bobinado, Reporte",
+    },
     {
         key: "q7",
         label:
@@ -143,7 +152,7 @@ const Q_TRIMESTRAL = [
     {
         key: "q10",
         label:
-            "Verificar que el cobertor del motor y abandono se encuentre en su lugar, Reporte",
+            "Verificar que el cobertor del motor y abanico se encuentre en su lugar, Reporte",
     },
     { key: "q11", label: "Reducir fugas" },
     { key: "q12", label: "Revisar estado y nivel del aceite" },
@@ -179,7 +188,7 @@ const getQuestionsFor = (periodicidad) => {
 };
 
 const buildPosicionId = (consecutivo) =>
-    `${BASE_POSICION_ID}-${String(consecutivo || 1)
+    `${POSICION_ID_BASE}-${String(consecutivo || 1)
         .toString()
         .padStart(2, "0")}`;
 
@@ -189,7 +198,7 @@ const emptyForm = () => ({
     posicion_id: buildPosicionId(1),
     equipo: EQUIPO,
     registro: REGISTRO,
-    cantidad: 1,
+    cantidad: null,
     tecnico: "",
     ejecutado: "",
     observaciones: "",
@@ -235,17 +244,17 @@ export default function BandaEntradaGeneral() {
                 .from(TABLE)
                 .select(
                     `
-                id, created_at,
-                fecha_registro, hora_registro,
-                posicion_id, equipo, registro, cantidad, tecnico,
-                ejecutado, observaciones, periodicidad,
-                respuesta_q1, respuesta_q2, respuesta_q3, respuesta_q4, respuesta_q5,
-                respuesta_q6, respuesta_q7, respuesta_q8, respuesta_q9, respuesta_q10,
-                respuesta_q11, respuesta_q12, respuesta_q13, respuesta_q14,
-                ultimo_mantenimiento, proximo_mantenimiento,
-                revisado, revisado_por_username, revisado_fecha,
-                completado, pendiente_nuevo, fecha_completado
-            `
+          id, created_at,
+          fecha_registro, hora_registro,
+          posicion_id, equipo, registro, cantidad, tecnico,
+          ejecutado, observaciones, periodicidad,
+          respuesta_q1, respuesta_q2, respuesta_q3, respuesta_q4, respuesta_q5,
+          respuesta_q6, respuesta_q7, respuesta_q8, respuesta_q9, respuesta_q10,
+          respuesta_q11, respuesta_q12, respuesta_q13, respuesta_q14,
+          ultimo_mantenimiento, proximo_mantenimiento,
+          revisado, revisado_por_username, revisado_fecha,
+          completado, pendiente_nuevo, fecha_completado
+        `
                 )
                 .order("fecha_registro", { ascending: false })
                 .order("created_at", { ascending: false });
@@ -268,6 +277,19 @@ export default function BandaEntradaGeneral() {
         fetchRows();
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [filtroRevisado]);
+
+    const openNew = () => {
+        setForm(emptyForm());
+        setEditingId(null);
+        setSubmitted(false);
+        setDialogOpen(true);
+    };
+
+    const hideDialog = () => {
+        setDialogOpen(false);
+        setSubmitted(false);
+        setEditingId(null);
+    };
 
     const onChange = (field, value) =>
         setForm((p) => ({
@@ -299,20 +321,7 @@ export default function BandaEntradaGeneral() {
         }));
     };
 
-    /* ----------- diálogos ----------- */
-    const openNew = () => {
-        setForm(emptyForm());
-        setSubmitted(false);
-        setEditingId(null);
-        setDialogOpen(true);
-    };
-
-    const hideDialog = () => {
-        setDialogOpen(false);
-        setSubmitted(false);
-        setEditingId(null);
-    };
-
+    /* ----------- VER / EDITAR ----------- */
     const openView = (row) => {
         setViewRow(row);
         setViewDialogOpen(true);
@@ -349,16 +358,20 @@ export default function BandaEntradaGeneral() {
             items,
             fecha_correccion_preview: fmtDMYHM(row.created_at),
         });
-        setSubmitted(false);
+
         setEditingId(row.id);
+        setSubmitted(false);
         setDialogOpen(true);
     };
 
     /* ----------- validación ----------- */
     const validate = () => {
         const errs = [];
-        if (!form.periodicidad) errs.push("Seleccione la periodicidad.");
-        if (!form.tecnico?.trim()) errs.push("El campo Técnico es requerido.");
+        if (!form.periodicidad)
+            errs.push("Seleccione la periodicidad.");
+        if (!form.cantidad) errs.push("Seleccione la cantidad (01).");
+        if (!form.tecnico?.trim())
+            errs.push("El campo Técnico es requerido.");
         if (!form.ejecutado)
             errs.push("Indique si se va a efectuar el mantenimiento.");
         if (form.ejecutado === "NO" && !form.observaciones.trim())
@@ -373,7 +386,7 @@ export default function BandaEntradaGeneral() {
         return errs;
     };
 
-    /* ----------- guardado (insert / update) ----------- */
+    /* ----------- guardado (NUEVO / EDITAR) ----------- */
     const save = async () => {
         setSubmitted(true);
         const errs = validate();
@@ -387,7 +400,7 @@ export default function BandaEntradaGeneral() {
             const cantidadNum = Number(form.cantidad) || 1;
             const posicionCompleta = buildPosicionId(cantidadNum);
 
-            // payload de respuestas (hasta 14 preguntas)
+            // payload respuestas (hasta 14)
             const respuestasPayload = Object.fromEntries(
                 Array.from({ length: 14 }, (_, i) => [
                     `respuesta_q${i + 1}`,
@@ -426,7 +439,7 @@ export default function BandaEntradaGeneral() {
                 let updatePayload = { ...basePayload };
 
                 if (form.ejecutado === "SI" && todasSi) {
-                    // ✅ Todas en "SI" → COMPLETADO (verde en campanita)
+                    // ✅ Todo SI → COMPLETADO (verde en campanita)
                     updatePayload = {
                         ...updatePayload,
                         ultimo_mantenimiento: baseDate,
@@ -533,12 +546,7 @@ export default function BandaEntradaGeneral() {
                 })
                 .eq("id", row.id);
             if (error) {
-                console.error(error);
-                showToast(
-                    "error",
-                    "Error",
-                    "No se pudo actualizar 'revisado'"
-                );
+                showToast("error", "No se guardó", error.message);
                 return;
             }
             setRows((prev) =>
@@ -555,8 +563,12 @@ export default function BandaEntradaGeneral() {
                         : r
                 )
             );
+            showToast(
+                "success",
+                "OK",
+                next ? "Marcado revisado" : "Marcado no revisado"
+            );
         };
-
         return (
             <div className="flex align-items-center justify-content-center gap-2">
                 <Checkbox
@@ -597,6 +609,19 @@ export default function BandaEntradaGeneral() {
                     placeholder="Buscar (H-BE-G-01, técnico, notas)"
                 />
             </span>
+            <div className="flex align-items-center gap-2">
+                <span className="text-sm font-medium">Filtro:</span>
+                <Dropdown
+                    value={filtroRevisado}
+                    onChange={(e) => setFiltroRevisado(e.value)}
+                    options={[
+                        { label: "Todos", value: "all" },
+                        { label: "Revisado", value: "checked" },
+                        { label: "Sin revisar", value: "unchecked" },
+                    ]}
+                    style={{ minWidth: 160 }}
+                />
+            </div>
         </div>
     );
 
@@ -617,6 +642,10 @@ export default function BandaEntradaGeneral() {
             equipo: r.equipo,
             registro: r.registro ?? "",
             periodicidad: r.periodicidad ?? "",
+            cantidad:
+                r.cantidad !== null && r.cantidad !== undefined
+                    ? String(r.cantidad).padStart(2, "0")
+                    : "",
             ultimo_mantenimiento: fmtDMY(r.ultimo_mantenimiento),
             proximo_mantenimiento: fmtDMY(r.proximo_mantenimiento),
             tecnico: r.tecnico ?? "",
@@ -654,17 +683,14 @@ export default function BandaEntradaGeneral() {
 
             <div className="welcome-message">
                 <p>
-                    <b>Posición base:</b> {BASE_POSICION_ID} &nbsp; | &nbsp;
+                    <b>Posición base (ID):</b> {POSICION_ID_BASE} &nbsp; | &nbsp;{" "}
                     <b>Equipo:</b> {EQUIPO} &nbsp; | &nbsp;
                     <b>Registro:</b> {REGISTRO}
                 </p>
             </div>
 
             <div className="buttons-container">
-                <button
-                    onClick={() => navigate(-1)}
-                    className="return-button"
-                >
+                <button onClick={() => navigate(-1)} className="return-button">
                     Volver
                 </button>
                 <button
@@ -715,17 +741,16 @@ export default function BandaEntradaGeneral() {
                 <Column field="posicion_id" header="Posición" sortable />
                 <Column field="equipo" header="Equipo" sortable />
                 <Column field="registro" header="Registro" />
-                <Column field="periodicidad" header="Periodicidad" />
                 <Column
-                    header="Último Mto."
-                    body={(r) => fmtDMY(r.ultimo_mantenimiento)}
+                    header="Cantidad"
+                    body={(r) =>
+                        r.cantidad != null
+                            ? String(r.cantidad).padStart(2, "0")
+                            : ""
+                    }
                     sortable
                 />
-                <Column
-                    header="Próximo Mto."
-                    body={(r) => fmtDMY(r.proximo_mantenimiento)}
-                    sortable
-                />
+
                 <Column field="tecnico" header="Técnico" sortable />
                 <Column
                     header="Fecha de Registro"
@@ -741,11 +766,11 @@ export default function BandaEntradaGeneral() {
                     header="Acciones"
                     body={actionsTemplate}
                     exportable={false}
-                    style={{ minWidth: "10rem", textAlign: "center" }}
+                    style={{ width: "14rem" }}
                 />
             </DataTable>
 
-            {/* Dialog Nuevo / Editar */}
+            {/* Dialog NUEVO / EDITAR */}
             <Dialog
                 visible={dialogOpen}
                 style={{ width: "72vw", maxWidth: 1100 }}
@@ -773,6 +798,7 @@ export default function BandaEntradaGeneral() {
                 }
             >
                 <div className="p-fluid grid">
+                    {/* Periodicidad */}
                     <div className="field col-12 md:col-4">
                         <label className="font-bold">
                             Periodicidad*{" "}
@@ -814,8 +840,8 @@ export default function BandaEntradaGeneral() {
                     </div>
 
                     <div className="field col-6 md:col-3">
-                        <label className="font-bold">Posición (ID)</label>
-                        <InputText value={form.posicion_id} disabled />
+                        <label className="font-bold">Posición base</label>
+                        <InputText value={POSICION_ID_BASE} disabled />
                     </div>
                     <div className="field col-6 md:col-3">
                         <label className="font-bold">Equipo</label>
@@ -837,21 +863,20 @@ export default function BandaEntradaGeneral() {
                             placeholder="Nombre del técnico"
                         />
                     </div>
-
                     <div className="field col-6 md:col-3">
                         <label className="font-bold">
-                            Cantidad / consecutivo
+                            Cantidad{" "}
+                            {submitted && !form.cantidad && (
+                                <small className="p-error"> Requerido</small>
+                            )}
                         </label>
                         <Dropdown
                             value={form.cantidad}
-                            options={CANTIDAD_OPCIONES}
+                            options={CANTIDAD_OPTIONS}
                             onChange={(e) => onCantidadChange(e.value)}
-                            placeholder="01"
+                            placeholder="Seleccione"
                         />
-                        <small className="block mt-1">
-                            Se usará para generar la posición: {BASE_POSICION_ID}
-                            -01
-                        </small>
+
                     </div>
 
                     <div className="field col-12 md:col-6">

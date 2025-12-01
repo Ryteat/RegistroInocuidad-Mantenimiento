@@ -115,7 +115,6 @@ const FORM_MAP = {
     //Multilevel
     "H-HM-V": "/MantenimientoAlertas/Horno/VibradorHornoMultilevel",
     "H-HM-LG": "/MantenimientoAlertas/Horno/LineaGasGLPHornoMultilevel",
-
     "H-HM-LB": "/MantenimientoAlertas/Horno/LubricacionBandasHornoMultilevel",
     "H-ML-SPT100": "/MantenimientoAlertas/HornoMultilevel/SensorPT100",
     "H-ML-V": "/MantenimientoAlertas/Horno/Vibrador",
@@ -126,14 +125,8 @@ const FORM_MAP = {
     "H-EN-MR": "/MantenimientoAlertas/Horno/MotorReductor",
     "H-EN-LB": "/MantenimientoAlertas/HornoEnfriador/LubricacionBandas",
     "H-EN-V": "/MantenimientoAlertas/HornoEnfriador/Vibrador",
-
-
-
     "H-BE-G": "/MantenimientoAlertas/Horno/BandaEntradaGeneral",
     "H-BS-G": "/MantenimientoAlertas/Horno/BandaSalidaGeneral",
-
-
-
     "H-SBC-G": "/MantenimientoAlertas/Horno/SelladoraBandaContinuaGeneral",
     "H-ENF-V": "/MantenimientoAlertas/Horno/VibradorEnfriador",
     "H-ENF-LB": "/MantenimientoAlertas/Horno/LubricacionBandasEnfriador",

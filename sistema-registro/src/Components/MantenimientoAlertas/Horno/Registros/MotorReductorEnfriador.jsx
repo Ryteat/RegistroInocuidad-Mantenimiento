@@ -149,7 +149,6 @@ const getQuestionsByPeriodo = (periodicidad) =>
 const emptyForm = () => ({
     fecha_registro: toDateISO(),
     hora_registro: toHM(),
-    // Se mostrará ya con el consecutivo 01
     posicion_id: `${POSICION_ID_BASE}-01`,
     equipo: EQUIPO,
     registro: REGISTRO,
@@ -205,7 +204,8 @@ export default function MotorReductorEnfriador() {
         ejecutado, observaciones, periodicidad,
         ${Array.from({ length: 14 }, (_, i) => `respuesta_q${i + 1}`).join(", ")},
         ultimo_mantenimiento, proximo_mantenimiento,
-        revisado, revisado_por_username, revisado_fecha
+        revisado, revisado_por_username, revisado_fecha,
+        completado, pendiente_nuevo, fecha_completado
       `
                 )
                 .order("fecha_registro", { ascending: false })
@@ -295,7 +295,6 @@ export default function MotorReductorEnfriador() {
             };
         }, {});
 
-        // Intentar reconstruir cantidad y posicion_id
         let cantidadStr = "01";
         if (row.cantidad != null) {
             cantidadStr = String(row.cantidad).padStart(2, "0");
@@ -361,21 +360,27 @@ export default function MotorReductorEnfriador() {
 
         try {
             const baseDate = form.fecha_registro || toDateISO();
-            const proximo =
-                form.ejecutado === "NO"
-                    ? addDays(baseDate, 7)
-                    : form.periodicidad === "TRIMESTRAL"
-                        ? addMonths(baseDate, 3)
-                        : addMonths(baseDate, 12);
-
             const cantidadNumero = form.cantidad
                 ? parseInt(form.cantidad, 10)
-                : null;
+                : 1;
 
-            const payload = {
+            const respuestasPayload = Object.fromEntries(
+                Array.from({ length: 14 }, (_, i) => [
+                    `respuesta_q${i + 1}`,
+                    form.ejecutado === "SI"
+                        ? form.items[`q${i + 1}`]?.respuesta || null
+                        : null,
+                ])
+            );
+
+            const basePayload = {
                 fecha_registro: form.fecha_registro,
                 hora_registro: form.hora_registro,
-                posicion_id: form.posicion_id || `${POSICION_ID_BASE}-01`,
+                posicion_id:
+                    form.posicion_id ||
+                    `${POSICION_ID_BASE}-${String(cantidadNumero)
+                        .toString()
+                        .padStart(2, "0")}`,
                 equipo: form.equipo || EQUIPO,
                 registro: form.registro || REGISTRO,
                 cantidad: Number.isNaN(cantidadNumero)
@@ -385,27 +390,96 @@ export default function MotorReductorEnfriador() {
                 ejecutado: form.ejecutado,
                 observaciones: form.observaciones || null,
                 periodicidad: form.periodicidad,
-                ...Object.fromEntries(
-                    Array.from({ length: 14 }, (_, i) => [
-                        `respuesta_q${i + 1}`,
-                        form.ejecutado === "SI"
-                            ? form.items[`q${i + 1}`]?.respuesta || null
-                            : null,
-                    ])
-                ),
-                ultimo_mantenimiento:
-                    form.ejecutado === "SI" ? baseDate : null,
-                proximo_mantenimiento: proximo,
+                ...respuestasPayload,
             };
 
+            const preguntas = getQuestionsByPeriodo(form.periodicidad);
+            const todasSi =
+                preguntas.length > 0
+                    ? preguntas.every(
+                        (q) => form.items[q.key]?.respuesta === "SI"
+                    )
+                    : false;
+
             let error;
+
             if (editingId) {
+                // 🔵 EDICIÓN
+                let updatePayload = { ...basePayload };
+
+                if (form.ejecutado === "SI" && todasSi) {
+                    // ✅ Todo SI → COMPLETADO (verde en campanita)
+                    updatePayload = {
+                        ...updatePayload,
+                        ultimo_mantenimiento: baseDate,
+                        proximo_mantenimiento: null,
+                        completado: true,
+                        pendiente_nuevo: true,
+                        fecha_completado: new Date().toISOString(),
+                    };
+                } else if (form.ejecutado === "NO") {
+                    // ❌ NO ejecutado → +7 días
+                    updatePayload = {
+                        ...updatePayload,
+                        ultimo_mantenimiento: null,
+                        proximo_mantenimiento: addDays(baseDate, 7),
+                        completado: false,
+                        pendiente_nuevo: false,
+                        fecha_completado: null,
+                    };
+                } else {
+                    // ejecutado = "SI" pero con alguna "NO"
+                    let proximo = addDays(baseDate, 7);
+                    if (form.periodicidad === "TRIMESTRAL") {
+                        proximo = addMonths(baseDate, 3);
+                    } else if (form.periodicidad === "ANUAL") {
+                        proximo = addMonths(baseDate, 12);
+                    }
+
+                    updatePayload = {
+                        ...updatePayload,
+                        ultimo_mantenimiento: baseDate,
+                        proximo_mantenimiento: proximo,
+                        completado: false,
+                        pendiente_nuevo: false,
+                        fecha_completado: null,
+                    };
+                }
+
                 ({ error } = await supabase
                     .from(TABLE)
-                    .update(payload)
+                    .update(updatePayload)
                     .eq("id", editingId));
             } else {
-                ({ error } = await supabase.from(TABLE).insert([payload]));
+                // 🟢 NUEVO REGISTRO
+                let ultimo = null;
+                let proximo = null;
+
+                if (form.ejecutado === "NO") {
+                    proximo = addDays(baseDate, 7);
+                } else if (form.periodicidad === "TRIMESTRAL") {
+                    ultimo = baseDate;
+                    proximo = addMonths(baseDate, 3);
+                } else if (form.periodicidad === "ANUAL") {
+                    ultimo = baseDate;
+                    proximo = addMonths(baseDate, 12);
+                } else {
+                    ultimo = baseDate;
+                    proximo = addDays(baseDate, 7);
+                }
+
+                const insertPayload = {
+                    ...basePayload,
+                    ultimo_mantenimiento: ultimo,
+                    proximo_mantenimiento: proximo,
+                    completado: false,
+                    pendiente_nuevo: false,
+                    fecha_completado: null,
+                };
+
+                ({ error } = await supabase
+                    .from(TABLE)
+                    .insert([insertPayload]));
             }
 
             if (error) throw error;
@@ -507,8 +581,7 @@ export default function MotorReductorEnfriador() {
                     placeholder="Buscar (ej. H-ENF-MR-01, técnico, notas)"
                 />
             </span>
-            <div className="flex align-items-center
- gap-2">
+            <div className="flex align-items-center gap-2">
                 <span className="text-sm font-medium">Filtro:</span>
                 <Dropdown
                     value={filtroRevisado}

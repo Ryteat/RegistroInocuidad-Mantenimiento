@@ -362,7 +362,7 @@ export default function SistemaNeumatico() {
         return errs;
     };
 
-    /* ----------- guardado (insert / update) ----------- */
+    /* ----------- guardado (insert / update) con COMPLETADO ----------- */
     const save = async () => {
         setSubmitted(true);
         const errs = validate();
@@ -373,18 +373,22 @@ export default function SistemaNeumatico() {
 
         try {
             const baseDate = form.fecha_registro || toDateISO();
-            const proximo =
-                form.ejecutado === "NO"
-                    ? addDays(baseDate, 7)
-                    : form.periodicidad === "SEMANAL"
-                        ? addDays(baseDate, 7)
-                        : addMonths(baseDate, 2);
 
             const cantidadNumero = form.cantidad
                 ? parseInt(form.cantidad, 10)
                 : null;
 
-            const payload = {
+            // respuestas q1..q7
+            const respuestasPayload = Object.fromEntries(
+                Array.from({ length: 7 }, (_, i) => [
+                    `respuesta_q${i + 1}`,
+                    form.ejecutado === "SI"
+                        ? form.items[`q${i + 1}`]?.respuesta || null
+                        : null,
+                ])
+            );
+
+            const basePayload = {
                 fecha_registro: form.fecha_registro,
                 hora_registro: form.hora_registro,
                 posicion_id: form.posicion_id || `${POSICION_ID_BASE}-01`,
@@ -397,50 +401,97 @@ export default function SistemaNeumatico() {
                 ejecutado: form.ejecutado,
                 observaciones: form.observaciones || null,
                 periodicidad: form.periodicidad,
-
-                // respuestas q1..q7 (q7 se usa solo en semanal)
-                respuesta_q1:
-                    form.ejecutado === "SI"
-                        ? form.items.q1?.respuesta || null
-                        : null,
-                respuesta_q2:
-                    form.ejecutado === "SI"
-                        ? form.items.q2?.respuesta || null
-                        : null,
-                respuesta_q3:
-                    form.ejecutado === "SI"
-                        ? form.items.q3?.respuesta || null
-                        : null,
-                respuesta_q4:
-                    form.ejecutado === "SI"
-                        ? form.items.q4?.respuesta || null
-                        : null,
-                respuesta_q5:
-                    form.ejecutado === "SI"
-                        ? form.items.q5?.respuesta || null
-                        : null,
-                respuesta_q6:
-                    form.ejecutado === "SI"
-                        ? form.items.q6?.respuesta || null
-                        : null,
-                respuesta_q7:
-                    form.ejecutado === "SI"
-                        ? form.items.q7?.respuesta || null
-                        : null,
-
-                ultimo_mantenimiento:
-                    form.ejecutado === "SI" ? baseDate : null,
-                proximo_mantenimiento: proximo,
+                ...respuestasPayload,
             };
 
+            const preguntas = getQuestionsByPeriodo(form.periodicidad);
+            const todasSi =
+                preguntas.length > 0
+                    ? preguntas.every(
+                        (q) => form.items[q.key]?.respuesta === "SI"
+                    )
+                    : false;
+
             let error;
+
             if (editingId) {
+                // 🔵 EDICIÓN — desde campanita o módulo
+                let updatePayload = { ...basePayload };
+
+                if (form.ejecutado === "SI" && todasSi) {
+                    // ✅ Todo SI → COMPLETADO (tarjeta verde, pendiente nuevo)
+                    updatePayload = {
+                        ...updatePayload,
+                        ultimo_mantenimiento: baseDate,
+                        proximo_mantenimiento: null,
+                        completado: true,
+                        pendiente_nuevo: true,
+                        fecha_completado: new Date().toISOString(),
+                    };
+                } else if (form.ejecutado === "NO") {
+                    // ❌ NO ejecutado → se reprograma a +7 días
+                    updatePayload = {
+                        ...updatePayload,
+                        ultimo_mantenimiento: null,
+                        proximo_mantenimiento: addDays(baseDate, 7),
+                        completado: false,
+                        pendiente_nuevo: false,
+                        fecha_completado: null,
+                    };
+                } else {
+                    // ejecutado = "SI" pero hay alguna respuesta "NO"
+                    let proximo = addDays(baseDate, 7);
+                    if (form.periodicidad === "SEMANAL") {
+                        proximo = addDays(baseDate, 7);
+                    } else if (form.periodicidad === "BIMENSUAL") {
+                        proximo = addMonths(baseDate, 2);
+                    }
+
+                    updatePayload = {
+                        ...updatePayload,
+                        ultimo_mantenimiento: baseDate,
+                        proximo_mantenimiento: proximo,
+                        completado: false,
+                        pendiente_nuevo: false,
+                        fecha_completado: null,
+                    };
+                }
+
                 ({ error } = await supabase
                     .from(TABLE)
-                    .update(payload)
+                    .update(updatePayload)
                     .eq("id", editingId));
             } else {
-                ({ error } = await supabase.from(TABLE).insert([payload]));
+                // 🟢 NUEVO REGISTRO — creado desde el módulo de Horno
+                let ultimo = null;
+                let proximo = null;
+
+                if (form.ejecutado === "NO") {
+                    proximo = addDays(baseDate, 7);
+                } else if (form.periodicidad === "SEMANAL") {
+                    ultimo = baseDate;
+                    proximo = addDays(baseDate, 7);
+                } else if (form.periodicidad === "BIMENSUAL") {
+                    ultimo = baseDate;
+                    proximo = addMonths(baseDate, 2);
+                } else {
+                    // fallback por si acaso
+                    ultimo = baseDate;
+                    proximo = addDays(baseDate, 7);
+                }
+
+                const insertPayload = {
+                    ...basePayload,
+                    ultimo_mantenimiento: ultimo,
+                    proximo_mantenimiento: proximo,
+                    completado: false,
+                    pendiente_nuevo: false,
+                    fecha_completado: null,
+                };
+
+                ({ error } = await supabase
+                    .from(TABLE)
+                    .insert([insertPayload]));
             }
 
             if (error) throw error;
