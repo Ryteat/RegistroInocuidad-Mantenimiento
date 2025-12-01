@@ -48,7 +48,11 @@ const toDateISO = (d = new Date()) =>
         d.getDate()
     ).padStart(2, "0")}`;
 const toHM = (d = new Date()) =>
-    d.toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit", hour12: false });
+    d.toLocaleTimeString("en-GB", {
+        hour: "2-digit",
+        minute: "2-digit",
+        hour12: false,
+    });
 const addDays = (ymd, days) => {
     const b = parseYMD(ymd);
     b.setDate(b.getDate() + Number(days || 0));
@@ -61,15 +65,25 @@ const addMonths = (ymd, m) => {
 };
 
 /* ===== Constantes del registro ===== */
-const POSICION_ID = "H-HM-SPT";
+const POSICION_ID = "H-HM-SPT"; // base; se guardará como H-HM-SPT-01..08
 const EQUIPO = "HORNO MULTILEVEL";
 const REGISTRO = "SENSOR PT100";
 const TABLE = "mto_horno_multilevel_sensor_pt100";
 
-const YESNO = [{ label: "Sí", value: "SI" }, { label: "No", value: "NO" }];
+const YESNO = [
+    { label: "Sí", value: "SI" },
+    { label: "No", value: "NO" },
+];
 const PERIODOS = [{ label: "Trimestral", value: "TRIMESTRAL" }];
 
+// Cantidad fija 8 → consecutivo 01..08
+const CANTIDAD_OPTIONS = Array.from({ length: 8 }, (_, i) => {
+    const v = String(i + 1).padStart(2, "0");
+    return { label: v, value: v };
+});
+
 const emptyForm = () => ({
+    id: null,
     fecha_registro: toDateISO(),
     hora_registro: toHM(),
     posicion_id: POSICION_ID,
@@ -85,23 +99,81 @@ const emptyForm = () => ({
     medir_indicador: false,
 
     // RTD PT-100 (5 lecturas + patrón)
-    rtd_pt100_1: "", patron_rtd_1: "",
-    rtd_pt100_2: "", patron_rtd_2: "",
-    rtd_pt100_3: "", patron_rtd_3: "",
-    rtd_pt100_4: "", patron_rtd_4: "",
-    rtd_pt100_5: "", patron_rtd_5: "",
+    rtd_pt100_1: "",
+    patron_rtd_1: "",
+    rtd_pt100_2: "",
+    patron_rtd_2: "",
+    rtd_pt100_3: "",
+    patron_rtd_3: "",
+    rtd_pt100_4: "",
+    patron_rtd_4: "",
+    rtd_pt100_5: "",
+    patron_rtd_5: "",
 
     // Indicador digital (5 lecturas + patrón)
-    ind_dig_1: "", patron_ind_1: "",
-    ind_dig_2: "", patron_ind_2: "",
-    ind_dig_3: "", patron_ind_3: "",
-    ind_dig_4: "", patron_ind_4: "",
-    ind_dig_5: "", patron_ind_5: "",
+    ind_dig_1: "",
+    patron_ind_1: "",
+    ind_dig_2: "",
+    patron_ind_2: "",
+    ind_dig_3: "",
+    patron_ind_3: "",
+    ind_dig_4: "",
+    patron_ind_4: "",
+    ind_dig_5: "",
+    patron_ind_5: "",
 
     fecha_correccion_preview: fmtDMYHM(new Date()),
 });
 
-const packRow = (r) => ({ ...r, tecnico: r.tecnico ?? "", observaciones: r.observaciones ?? "" });
+const packRow = (r) => ({
+    ...r,
+    tecnico: r.tecnico ?? "",
+    observaciones: r.observaciones ?? "",
+});
+
+// Convertir un row de BD al formato de formulario (para Ver / Editar)
+const rowToForm = (r) => ({
+    id: r.id,
+    fecha_registro: r.fecha_registro || toDateISO(),
+    hora_registro: r.hora_registro || toHM(),
+    posicion_id: r.posicion_id || POSICION_ID,
+    equipo: r.equipo || EQUIPO,
+    registro: r.registro || REGISTRO,
+    cantidad: r.cantidad
+        ? String(r.cantidad).padStart(2, "0")
+        : "",
+    tecnico: r.tecnico ?? "",
+    ejecutado: r.ejecutado ?? "",
+    observaciones: r.observaciones ?? "",
+    periodicidad: r.periodicidad || "TRIMESTRAL",
+
+    medir_rtd: !!r.medir_rtd,
+    medir_indicador: !!r.medir_indicador,
+
+    rtd_pt100_1: r.rtd_pt100_1 ?? "",
+    patron_rtd_1: r.patron_rtd_1 ?? "",
+    rtd_pt100_2: r.rtd_pt100_2 ?? "",
+    patron_rtd_2: r.patron_rtd_2 ?? "",
+    rtd_pt100_3: r.rtd_pt100_3 ?? "",
+    patron_rtd_3: r.patron_rtd_3 ?? "",
+    rtd_pt100_4: r.rtd_pt100_4 ?? "",
+    patron_rtd_4: r.patron_rtd_4 ?? "",
+    rtd_pt100_5: r.rtd_pt100_5 ?? "",
+    patron_rtd_5: r.patron_rtd_5 ?? "",
+
+    ind_dig_1: r.ind_dig_1 ?? "",
+    patron_ind_1: r.patron_ind_1 ?? "",
+    ind_dig_2: r.ind_dig_2 ?? "",
+    patron_ind_2: r.patron_ind_2 ?? "",
+    ind_dig_3: r.ind_dig_3 ?? "",
+    patron_ind_3: r.patron_ind_3 ?? "",
+    ind_dig_4: r.ind_dig_4 ?? "",
+    patron_ind_4: r.patron_ind_4 ?? "",
+    ind_dig_5: r.ind_dig_5 ?? "",
+    patron_ind_5: r.patron_ind_5 ?? "",
+
+    fecha_correccion_preview: fmtDMYHM(r.created_at || new Date()),
+});
 
 export default function SensorPT100() {
     const navigate = useNavigate();
@@ -113,6 +185,9 @@ export default function SensorPT100() {
     const [loading, setLoading] = useState(false);
 
     const [dialogOpen, setDialogOpen] = useState(false);
+    const [dialogMode, setDialogMode] = useState("new"); // 'new' | 'view' | 'edit'
+    const isViewMode = dialogMode === "view";
+
     const [submitted, setSubmitted] = useState(false);
     const [form, setForm] = useState(emptyForm());
 
@@ -126,7 +201,10 @@ export default function SensorPT100() {
     const fetchRows = async () => {
         try {
             setLoading(true);
-            let q = supabase.from(TABLE).select(`
+            let q = supabase
+                .from(TABLE)
+                .select(
+                    `
         id, created_at,
         fecha_registro, hora_registro,
         posicion_id, equipo, registro, cantidad, tecnico,
@@ -138,7 +216,8 @@ export default function SensorPT100() {
         ind_dig_4, patron_ind_4, ind_dig_5, patron_ind_5,
         ultimo_mantenimiento, proximo_mantenimiento,
         revisado, revisado_por_username, revisado_fecha
-      `)
+      `
+                )
                 .order("fecha_registro", { ascending: false })
                 .order("created_at", { ascending: false });
 
@@ -155,102 +234,195 @@ export default function SensorPT100() {
             setLoading(false);
         }
     };
-    useEffect(() => { fetchRows(); /* eslint-disable-line */ }, [filtroRevisado]);
+    useEffect(() => {
+        fetchRows();
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [filtroRevisado]);
 
-    const openNew = () => { setForm(emptyForm()); setSubmitted(false); setDialogOpen(true); };
-    const hideDialog = () => { setDialogOpen(false); setSubmitted(false); };
-    const onChange = (f, v) => setForm(p => ({ ...p, [f]: v }));
+    const openNew = () => {
+        setForm(emptyForm());
+        setSubmitted(false);
+        setDialogMode("new");
+        setDialogOpen(true);
+    };
+
+    const openView = (row) => {
+        setForm(rowToForm(row));
+        setSubmitted(false);
+        setDialogMode("view");
+        setDialogOpen(true);
+    };
+
+    const openEdit = (row) => {
+        setForm(rowToForm(row));
+        setSubmitted(false);
+        setDialogMode("edit");
+        setDialogOpen(true);
+    };
+
+    const hideDialog = () => {
+        setDialogOpen(false);
+        setSubmitted(false);
+    };
+
+    const onChange = (f, v) =>
+        setForm((p) => ({
+            ...p,
+            [f]: v,
+        }));
+
+    // Cantidad 01..08 → también arma el ID con consecutivo
+    const onCantidadChange = (value) => {
+        setForm((prev) => ({
+            ...prev,
+            cantidad: value,
+            posicion_id: value ? `${POSICION_ID}-${value}` : POSICION_ID,
+        }));
+    };
 
     /* -------- validación -------- */
     const validate = () => {
         const errs = [];
-        if (!form.tecnico?.trim()) errs.push("El campo Técnico es requerido.");
-        if (!form.ejecutado) errs.push("Indique si se va a efectuar el mantenimiento.");
-        if (form.ejecutado === "NO" && !form.observaciones.trim()) errs.push("Explique por qué NO se efectuó (Observaciones).");
+        if (!form.tecnico?.trim())
+            errs.push("El campo Técnico es requerido.");
+        if (!form.cantidad)
+            errs.push("Seleccione la Cantidad (consecutivo 01–08).");
+        if (!form.ejecutado)
+            errs.push("Indique si se va a efectuar el mantenimiento.");
+        if (form.ejecutado === "NO" && !form.observaciones.trim())
+            errs.push("Explique por qué NO se efectuó (Observaciones).");
 
         if (form.ejecutado === "SI") {
             if (!form.medir_rtd && !form.medir_indicador) {
-                errs.push("Seleccione al menos una sección (Sensor PT100 o Indicador Digital).");
+                errs.push(
+                    "Seleccione al menos una sección (Sensor PT100 o Indicador Digital)."
+                );
             }
-            const needPair = (a, b, label) => { if (!a?.trim() || !b?.trim()) errs.push(`Complete ${label}`); };
+            const needPair = (a, b, label) => {
+                if (!a?.trim() || !b?.trim())
+                    errs.push(`Complete ${label}`);
+            };
             if (form.medir_rtd) {
-                [[form.rtd_pt100_1, form.patron_rtd_1, "RTD/Patrón #1"],
-                [form.rtd_pt100_2, form.patron_rtd_2, "RTD/Patrón #2"],
-                [form.rtd_pt100_3, form.patron_rtd_3, "RTD/Patrón #3"],
-                [form.rtd_pt100_4, form.patron_rtd_4, "RTD/Patrón #4"],
-                [form.rtd_pt100_5, form.patron_rtd_5, "RTD/Patrón #5"]].forEach(([a, b, l]) => needPair(a, b, l));
+                [
+                    [form.rtd_pt100_1, form.patron_rtd_1, "RTD/Patrón #1"],
+                    [form.rtd_pt100_2, form.patron_rtd_2, "RTD/Patrón #2"],
+                    [form.rtd_pt100_3, form.patron_rtd_3, "RTD/Patrón #3"],
+                    [form.rtd_pt100_4, form.patron_rtd_4, "RTD/Patrón #4"],
+                    [form.rtd_pt100_5, form.patron_rtd_5, "RTD/Patrón #5"],
+                ].forEach(([a, b, l]) => needPair(a, b, l));
             }
             if (form.medir_indicador) {
-                [[form.ind_dig_1, form.patron_ind_1, "Indicador/Patrón #1"],
-                [form.ind_dig_2, form.patron_ind_2, "Indicador/Patrón #2"],
-                [form.ind_dig_3, form.patron_ind_3, "Indicador/Patrón #3"],
-                [form.ind_dig_4, form.patron_ind_4, "Indicador/Patrón #4"],
-                [form.ind_dig_5, form.patron_ind_5, "Indicador/Patrón #5"]].forEach(([a, b, l]) => needPair(a, b, l));
+                [
+                    [form.ind_dig_1, form.patron_ind_1, "Indicador/Patrón #1"],
+                    [form.ind_dig_2, form.patron_ind_2, "Indicador/Patrón #2"],
+                    [form.ind_dig_3, form.patron_ind_3, "Indicador/Patrón #3"],
+                    [form.ind_dig_4, form.patron_ind_4, "Indicador/Patrón #4"],
+                    [form.ind_dig_5, form.patron_ind_5, "Indicador/Patrón #5"],
+                ].forEach(([a, b, l]) => needPair(a, b, l));
             }
         }
         return errs;
     };
 
-    /* -------- guardado -------- */
+    /* -------- guardado (insert / update) -------- */
+    const buildPayload = () => {
+        const baseDate = form.fecha_registro || toDateISO();
+        const proximo =
+            form.ejecutado === "NO"
+                ? addDays(baseDate, 7)
+                : addMonths(baseDate, 3);
+
+        const cantidadNum = form.cantidad
+            ? Number(form.cantidad)
+            : null;
+
+        const posicionCompleta = form.cantidad
+            ? `${POSICION_ID}-${form.cantidad}`
+            : POSICION_ID;
+
+        return {
+            fecha_registro: form.fecha_registro,
+            hora_registro: form.hora_registro,
+            posicion_id: posicionCompleta,
+            equipo: EQUIPO,
+            registro: REGISTRO,
+            cantidad: cantidadNum,
+            tecnico: form.tecnico,
+            ejecutado: form.ejecutado,
+            observaciones: form.observaciones || null,
+            periodicidad: "TRIMESTRAL",
+
+            medir_rtd: !!form.medir_rtd,
+            medir_indicador: !!form.medir_indicador,
+
+            rtd_pt100_1: form.medir_rtd ? form.rtd_pt100_1 : null,
+            patron_rtd_1: form.medir_rtd ? form.patron_rtd_1 : null,
+            rtd_pt100_2: form.medir_rtd ? form.rtd_pt100_2 : null,
+            patron_rtd_2: form.medir_rtd ? form.patron_rtd_2 : null,
+            rtd_pt100_3: form.medir_rtd ? form.rtd_pt100_3 : null,
+            patron_rtd_3: form.medir_rtd ? form.patron_rtd_3 : null,
+            rtd_pt100_4: form.medir_rtd ? form.rtd_pt100_4 : null,
+            patron_rtd_4: form.medir_rtd ? form.patron_rtd_4 : null,
+            rtd_pt100_5: form.medir_rtd ? form.rtd_pt100_5 : null,
+            patron_rtd_5: form.medir_rtd ? form.patron_rtd_5 : null,
+
+            ind_dig_1: form.medir_indicador ? form.ind_dig_1 : null,
+            patron_ind_1: form.medir_indicador ? form.patron_ind_1 : null,
+            ind_dig_2: form.medir_indicador ? form.ind_dig_2 : null,
+            patron_ind_2: form.medir_indicador ? form.patron_ind_2 : null,
+            ind_dig_3: form.medir_indicador ? form.ind_dig_3 : null,
+            patron_ind_3: form.medir_indicador ? form.patron_ind_3 : null,
+            ind_dig_4: form.medir_indicador ? form.ind_dig_4 : null,
+            patron_ind_4: form.medir_indicador ? form.patron_ind_4 : null,
+            ind_dig_5: form.medir_indicador ? form.ind_dig_5 : null,
+            patron_ind_5: form.medir_indicador ? form.patron_ind_5 : null,
+
+            ultimo_mantenimiento:
+                form.ejecutado === "SI" ? baseDate : null,
+            proximo_mantenimiento: proximo,
+        };
+    };
+
     const save = async () => {
+        if (isViewMode) {
+            hideDialog();
+            return;
+        }
+
         setSubmitted(true);
         const errs = validate();
-        if (errs.length) { showToast("warn", "Validación", errs[0]); return; }
+        if (errs.length) {
+            showToast("warn", "Validación", errs[0]);
+            return;
+        }
 
         try {
-            const baseDate = form.fecha_registro || toDateISO();
-            const proximo = form.ejecutado === "NO" ? addDays(baseDate, 7) : addMonths(baseDate, 3);
+            const payload = buildPayload();
 
-            const payload = {
-                fecha_registro: form.fecha_registro,
-                hora_registro: form.hora_registro,
-                posicion_id: POSICION_ID,
-                equipo: EQUIPO,
-                registro: REGISTRO,
-                cantidad: form.cantidad ? Number(String(form.cantidad).replace(/\D/g, "")) : null,
-                tecnico: form.tecnico,
-                ejecutado: form.ejecutado,
-                observaciones: form.observaciones || null,
-                periodicidad: "TRIMESTRAL",
+            if (dialogMode === "edit" && form.id) {
+                const { error } = await supabase
+                    .from(TABLE)
+                    .update(payload)
+                    .eq("id", form.id);
+                if (error) throw error;
+                showToast("success", "Éxito", "Registro actualizado");
+            } else {
+                const { error } = await supabase
+                    .from(TABLE)
+                    .insert([payload]);
+                if (error) throw error;
+                showToast("success", "Éxito", "Registro guardado");
+            }
 
-                medir_rtd: !!form.medir_rtd,
-                medir_indicador: !!form.medir_indicador,
-
-                rtd_pt100_1: form.medir_rtd ? form.rtd_pt100_1 : null,
-                patron_rtd_1: form.medir_rtd ? form.patron_rtd_1 : null,
-                rtd_pt100_2: form.medir_rtd ? form.rtd_pt100_2 : null,
-                patron_rtd_2: form.medir_rtd ? form.patron_rtd_2 : null,
-                rtd_pt100_3: form.medir_rtd ? form.rtd_pt100_3 : null,
-                patron_rtd_3: form.medir_rtd ? form.patron_rtd_3 : null,
-                rtd_pt100_4: form.medir_rtd ? form.rtd_pt100_4 : null,
-                patron_rtd_4: form.medir_rtd ? form.patron_rtd_4 : null,
-                rtd_pt100_5: form.medir_rtd ? form.rtd_pt100_5 : null,
-                patron_rtd_5: form.medir_rtd ? form.patron_rtd_5 : null,
-
-                ind_dig_1: form.medir_indicador ? form.ind_dig_1 : null,
-                patron_ind_1: form.medir_indicador ? form.patron_ind_1 : null,
-                ind_dig_2: form.medir_indicador ? form.ind_dig_2 : null,
-                patron_ind_2: form.medir_indicador ? form.patron_ind_2 : null,
-                ind_dig_3: form.medir_indicador ? form.ind_dig_3 : null,
-                patron_ind_3: form.medir_indicador ? form.patron_ind_3 : null,
-                ind_dig_4: form.medir_indicador ? form.ind_dig_4 : null,
-                patron_ind_4: form.medir_indicador ? form.patron_ind_4 : null,
-                ind_dig_5: form.medir_indicador ? form.ind_dig_5 : null,
-                patron_ind_5: form.medir_indicador ? form.patron_ind_5 : null,
-
-                ultimo_mantenimiento: form.ejecutado === "SI" ? baseDate : null,
-                proximo_mantenimiento: proximo,
-            };
-
-            const { error } = await supabase.from(TABLE).insert([payload]);
-            if (error) throw error;
-
-            showToast("success", "Éxito", "Registro guardado");
             setDialogOpen(false);
             await fetchRows();
         } catch (e) {
             console.error(e);
-            showToast("error", "Error", e.message || "No se pudo guardar");
+            showToast(
+                "error",
+                "Error",
+                e.message || "No se pudo guardar"
+            );
         }
     };
 
@@ -258,22 +430,44 @@ export default function SensorPT100() {
     const revisadoTemplate = (row) => {
         if (!canReview) return <span>{row.revisado ? "Sí" : "No"}</span>;
         const onToggle = async (next) => {
-            const { error } = await supabase.from(TABLE).update({
-                revisado: next,
-                revisado_por_username: next ? username : null,
-                revisado_fecha: next ? new Date().toISOString() : null,
-            }).eq("id", row.id);
-            if (error) { showToast("error", "No se guardó", error.message); return; }
-            setRows(prev => prev.map(r => r.id === row.id ? {
-                ...r, revisado: next,
-                revisado_por_username: next ? username : null,
-                revisado_fecha: next ? new Date().toISOString() : null
-            } : r));
-            showToast("success", "OK", next ? "Marcado revisado" : "Marcado no revisado");
+            const { error } = await supabase
+                .from(TABLE)
+                .update({
+                    revisado: next,
+                    revisado_por_username: next ? username : null,
+                    revisado_fecha: next ? new Date().toISOString() : null,
+                })
+                .eq("id", row.id);
+            if (error) {
+                showToast("error", "No se guardó", error.message);
+                return;
+            }
+            setRows((prev) =>
+                prev.map((r) =>
+                    r.id === row.id
+                        ? {
+                            ...r,
+                            revisado: next,
+                            revisado_por_username: next ? username : null,
+                            revisado_fecha: next
+                                ? new Date().toISOString()
+                                : null,
+                        }
+                        : r
+                )
+            );
+            showToast(
+                "success",
+                "OK",
+                next ? "Marcado revisado" : "Marcado no revisado"
+            );
         };
         return (
             <div className="flex align-items-center justify-content-center gap-2">
-                <Checkbox checked={!!row.revisado} onChange={(e) => onToggle(e.checked)} />
+                <Checkbox
+                    checked={!!row.revisado}
+                    onChange={(e) => onToggle(e.checked)}
+                />
                 <span className="text-sm">Revisado</span>
             </div>
         );
@@ -307,8 +501,11 @@ export default function SensorPT100() {
     );
 
     const exportXlsx = () => {
-        if (!rows?.length) { showToast("warn", "Exportación", "No hay datos"); return; }
-        const out = rows.map(r => ({
+        if (!rows?.length) {
+            showToast("warn", "Exportación", "No hay datos");
+            return;
+        }
+        const out = rows.map((r) => ({
             posicion: r.posicion_id,
             equipo: r.equipo,
             registro: r.registro ?? "",
@@ -323,8 +520,32 @@ export default function SensorPT100() {
         const ws = XLSX.utils.json_to_sheet(out);
         const wb = XLSX.utils.book_new();
         XLSX.utils.book_append_sheet(wb, ws, "Sensor PT100");
-        XLSX.writeFile(wb, `Horno_SensorPT100_${new Date().toISOString().slice(0, 10)}.xlsx`);
+        XLSX.writeFile(
+            wb,
+            `Horno_SensorPT100_${new Date()
+                .toISOString()
+                .slice(0, 10)}.xlsx`
+        );
     };
+
+    // Columna Acciones → Ver / Editar
+    const actionTemplate = (row) => (
+        <div className="flex gap-2 justify-content-center">
+            <Button
+                label="Ver"
+                icon="pi pi-search"
+                text
+                onClick={() => openView(row)}
+            />
+            <Button
+                label="Editar"
+                icon="pi pi-pencil"
+                text
+                severity="warning"
+                onClick={() => openEdit(row)}
+            />
+        </div>
+    );
 
     return (
         <div className="controlrendcosechayfrass-container">
@@ -336,20 +557,45 @@ export default function SensorPT100() {
 
             <div className="welcome-message">
                 <p>
-                    <b>Posición (ID):</b> {POSICION_ID} &nbsp; | &nbsp; <b>Equipo:</b> {EQUIPO} &nbsp; | &nbsp;
+                    <b>Posición (ID):</b> {POSICION_ID} &nbsp; | &nbsp;{" "}
+                    <b>Equipo:</b> {EQUIPO} &nbsp; | &nbsp;
                     <b>Registro:</b> {REGISTRO}
                 </p>
             </div>
 
             <div className="buttons-container">
-                <button onClick={() => navigate(-1)} className="return-button">Volver</button>
-                <button onClick={() => navigate(-2)} className="menu-button">Menú principal</button>
+                <button
+                    onClick={() => navigate(-1)}
+                    className="return-button"
+                >
+                    Volver
+                </button>
+                <button
+                    onClick={() => navigate(-2)}
+                    className="menu-button"
+                >
+                    Menú principal
+                </button>
             </div>
 
             <Toolbar
                 className="mb-4"
-                left={() => <Button label="Nuevo" icon="pi pi-plus" severity="success" onClick={openNew} />}
-                right={() => <Button label="Exportar a Excel" icon="pi pi-upload" className="p-button-help" onClick={exportXlsx} />}
+                left={() => (
+                    <Button
+                        label="Nuevo"
+                        icon="pi pi-plus"
+                        severity="success"
+                        onClick={openNew}
+                    />
+                )}
+                right={() => (
+                    <Button
+                        label="Exportar a Excel"
+                        icon="pi pi-upload"
+                        className="p-button-help"
+                        onClick={exportXlsx}
+                    />
+                )}
             />
 
             <DataTable
@@ -360,8 +606,11 @@ export default function SensorPT100() {
                 selectionMode="multiple"
                 header={header}
                 globalFilter={globalFilter}
-                paginator rows={10} rowsPerPageOptions={[5, 10, 25]}
-                dataKey="id" showGridlines
+                paginator
+                rows={10}
+                rowsPerPageOptions={[5, 10, 25]}
+                dataKey="id"
+                showGridlines
                 paginatorTemplate="FirstPageLink PrevPageLink PageLinks NextPageLink LastPageLink CurrentPageReport RowsPerPageDropdown"
                 currentPageReportTemplate="Mostrando del {first} al {last} de {totalRecords} Registros"
             >
@@ -370,40 +619,90 @@ export default function SensorPT100() {
                 <Column field="equipo" header="Equipo" sortable />
                 <Column field="registro" header="Registro" />
                 <Column field="periodicidad" header="Periodicidad" />
-                <Column header="Último Mto." body={(r) => fmtDMY(r.ultimo_mantenimiento)} sortable />
-                <Column header="Próximo Mto." body={(r) => fmtDMY(r.proximo_mantenimiento)} sortable />
+
                 <Column field="tecnico" header="Técnico" sortable />
-                <Column header="Fecha de Registro" body={(r) => fmtDMYHM(r.created_at)} sortable />
-                <Column header="Revisado" body={revisadoTemplate} style={{ width: "10rem", textAlign: "center" }} />
+                <Column
+                    header="Fecha de Registro"
+                    body={(r) => fmtDMYHM(r.created_at)}
+                    sortable
+                />
+                <Column
+                    header="Revisado"
+                    body={revisadoTemplate}
+                    style={{ width: "10rem", textAlign: "center" }}
+                />
+                <Column
+                    header="Acciones"
+                    body={actionTemplate}
+                    exportable={false}
+                    style={{ width: "10rem", textAlign: "center" }}
+                />
             </DataTable>
 
             <Dialog
                 visible={dialogOpen}
                 style={{ width: "72vw", maxWidth: 1100 }}
-                header="Nuevo registro — Sensor PT100 (Trimestral)"
+                header={
+                    dialogMode === "view"
+                        ? "Ver registro — Sensor PT100 (Trimestral)"
+                        : dialogMode === "edit"
+                            ? "Editar registro — Sensor PT100 (Trimestral)"
+                            : "Nuevo registro — Sensor PT100 (Trimestral)"
+                }
                 modal
                 onHide={hideDialog}
                 footer={
                     <div className="flex gap-2 justify-content-end">
-                        <Button label="Cancelar" icon="pi pi-times" outlined onClick={hideDialog} />
-                        <Button label="Guardar" icon="pi pi-check" onClick={save} />
+                        <Button
+                            label="Cerrar"
+                            icon="pi pi-times"
+                            outlined
+                            onClick={hideDialog}
+                        />
+                        {!isViewMode && (
+                            <Button
+                                label="Guardar"
+                                icon="pi pi-check"
+                                onClick={save}
+                            />
+                        )}
                     </div>
                 }
             >
                 <div className="p-fluid grid">
                     <div className="field col-12 md:col-4">
                         <label className="font-bold">Periodicidad*</label>
-                        <Dropdown value={"TRIMESTRAL"} options={PERIODOS} disabled />
-                        <small className="block mt-2">Próximo mantenimiento: +3 meses (o +7 días si NO).</small>
+                        <Dropdown
+                            value={"TRIMESTRAL"}
+                            options={PERIODOS}
+                            disabled
+                        />
+                        <small className="block mt-2">
+                            Próximo mantenimiento: +3 meses (o +7 días si NO).
+                        </small>
                     </div>
 
                     <div className="field col-12 md:col-4">
                         <label className="font-bold">Fecha intervención</label>
-                        <InputText type="date" value={form.fecha_registro} onChange={(e) => onChange("fecha_registro", e.target.value)} />
+                        <InputText
+                            type="date"
+                            value={form.fecha_registro}
+                            onChange={(e) =>
+                                onChange("fecha_registro", e.target.value)
+                            }
+                            disabled={isViewMode}
+                        />
                     </div>
                     <div className="field col-12 md:col-4">
                         <label className="font-bold">Hora intervención</label>
-                        <InputText type="time" value={form.hora_registro} onChange={(e) => onChange("hora_registro", e.target.value)} />
+                        <InputText
+                            type="time"
+                            value={form.hora_registro}
+                            onChange={(e) =>
+                                onChange("hora_registro", e.target.value)
+                            }
+                            disabled={isViewMode}
+                        />
                     </div>
 
                     <div className="field col-6 md:col-3">
@@ -416,50 +715,187 @@ export default function SensorPT100() {
                     </div>
 
                     <div className="field col-6 md:col-3">
-                        <label className="font-bold">Técnico* {submitted && !form.tecnico && <small className="p-error"> Requerido</small>}</label>
-                        <InputText value={form.tecnico} onChange={(e) => onChange("tecnico", e.target.value)} placeholder="Nombre del técnico" />
+                        <label className="font-bold">
+                            Técnico*{" "}
+                            {submitted && !form.tecnico && (
+                                <small className="p-error"> Requerido</small>
+                            )}
+                        </label>
+                        <InputText
+                            value={form.tecnico}
+                            onChange={(e) =>
+                                onChange("tecnico", e.target.value)
+                            }
+                            placeholder="Nombre del técnico"
+                            disabled={isViewMode}
+                        />
                     </div>
                     <div className="field col-6 md:col-3">
-                        <label className="font-bold">Cantidad (referencia)</label>
-                        <InputText value={form.cantidad} onChange={(e) => onChange("cantidad", e.target.value ? e.target.value.replace(/\D/g, "") : "")} placeholder="Ej. 1" />
+                        <label className="font-bold">
+                            Cantidad (consecutivo)*{" "}
+                            {submitted && !form.cantidad && (
+                                <small className="p-error"> Requerido</small>
+                            )}
+                        </label>
+                        <Dropdown
+                            value={form.cantidad}
+                            options={CANTIDAD_OPTIONS}
+                            onChange={(e) => onCantidadChange(e.value)}
+                            placeholder="Seleccione"
+                            disabled={isViewMode}
+                        />
                     </div>
 
                     <div className="field col-12 md:col-6">
                         <label className="font-bold">
-                            ¿Se va a efectuar el mantenimiento?* {submitted && !form.ejecutado && <small className="p-error"> Requerido</small>}
+                            ¿Se va a efectuar el mantenimiento?*{" "}
+                            {submitted && !form.ejecutado && (
+                                <small className="p-error"> Requerido</small>
+                            )}
                         </label>
-                        <Dropdown value={form.ejecutado} options={YESNO} onChange={(e) => onChange("ejecutado", e.value)} placeholder="Seleccione" />
+                        <Dropdown
+                            value={form.ejecutado}
+                            options={YESNO}
+                            onChange={(e) =>
+                                onChange("ejecutado", e.value)
+                            }
+                            placeholder="Seleccione"
+                            disabled={isViewMode}
+                        />
                     </div>
 
                     {form.ejecutado === "SI" && (
                         <>
                             <div className="field col-12 md:col-6">
                                 <div className="flex align-items-center gap-2">
-                                    <Checkbox inputId="chk-rtd" checked={form.medir_rtd} onChange={(e) => onChange("medir_rtd", e.checked)} />
-                                    <label htmlFor="chk-rtd" className="font-bold">Sensor PT100 (RTD PT-100)</label>
+                                    <Checkbox
+                                        inputId="chk-rtd"
+                                        checked={form.medir_rtd}
+                                        onChange={(e) =>
+                                            onChange(
+                                                "medir_rtd",
+                                                e.checked
+                                            )
+                                        }
+                                        disabled={isViewMode}
+                                    />
+                                    <label
+                                        htmlFor="chk-rtd"
+                                        className="font-bold"
+                                    >
+                                        Sensor PT100 (RTD PT-100)
+                                    </label>
                                 </div>
                             </div>
                             <div className="field col-12 md:col-6">
                                 <div className="flex align-items-center gap-2">
-                                    <Checkbox inputId="chk-ind" checked={form.medir_indicador} onChange={(e) => onChange("medir_indicador", e.checked)} />
-                                    <label htmlFor="chk-ind" className="font-bold">Indicador Digital</label>
+                                    <Checkbox
+                                        inputId="chk-ind"
+                                        checked={form.medir_indicador}
+                                        onChange={(e) =>
+                                            onChange(
+                                                "medir_indicador",
+                                                e.checked
+                                            )
+                                        }
+                                        disabled={isViewMode}
+                                    />
+                                    <label
+                                        htmlFor="chk-ind"
+                                        className="font-bold"
+                                    >
+                                        Indicador Digital
+                                    </label>
                                 </div>
                             </div>
 
                             {form.medir_rtd && (
                                 <div className="field col-12">
-                                    <div style={{ border: "1px solid #d1d5db", borderRadius: 8, padding: 12 }}>
-                                        <div style={{ fontWeight: 700, marginBottom: 8 }}>RTD PT-100 — mediciones y patrón</div>
+                                    <div
+                                        style={{
+                                            border: "1px solid #d1d5db",
+                                            borderRadius: 8,
+                                            padding: 12,
+                                        }}
+                                    >
+                                        <div
+                                            style={{
+                                                fontWeight: 700,
+                                                marginBottom: 8,
+                                            }}
+                                        >
+                                            RTD PT-100 — mediciones y patrón
+                                        </div>
                                         <div className="grid">
-                                            {[1, 2, 3, 4, 5].map(i => (
-                                                <React.Fragment key={`rtd-${i}`}>
+                                            {[1, 2, 3, 4, 5].map((i) => (
+                                                <React.Fragment
+                                                    key={`rtd-${i}`}
+                                                >
                                                     <div className="col-12 md:col-3">
-                                                        <label className="font-bold">RTD PT-100 #{i} {submitted && !form[`rtd_pt100_${i}`]?.trim() && <small className="p-error"> Requerido</small>}</label>
-                                                        <InputText value={form[`rtd_pt100_${i}`]} onChange={(e) => onChange(`rtd_pt100_${i}`, e.target.value)} placeholder="°C" />
+                                                        <label className="font-bold">
+                                                            RTD PT-100 #{i}{" "}
+                                                            {submitted &&
+                                                                !form[
+                                                                    `rtd_pt100_${i}`
+                                                                ]?.trim() &&
+                                                                !isViewMode && (
+                                                                    <small className="p-error">
+                                                                        {" "}
+                                                                        Requerido
+                                                                    </small>
+                                                                )}
+                                                        </label>
+                                                        <InputText
+                                                            value={
+                                                                form[
+                                                                `rtd_pt100_${i}`
+                                                                ]
+                                                            }
+                                                            onChange={(e) =>
+                                                                onChange(
+                                                                    `rtd_pt100_${i}`,
+                                                                    e.target
+                                                                        .value
+                                                                )
+                                                            }
+                                                            placeholder="°C"
+                                                            disabled={
+                                                                isViewMode
+                                                            }
+                                                        />
                                                     </div>
                                                     <div className="col-12 md:col-3">
-                                                        <label className="font-bold">Patrón #{i} {submitted && !form[`patron_rtd_${i}`]?.trim() && <small className="p-error"> Requerido</small>}</label>
-                                                        <InputText value={form[`patron_rtd_${i}`]} onChange={(e) => onChange(`patron_rtd_${i}`, e.target.value)} placeholder="°C" />
+                                                        <label className="font-bold">
+                                                            Patrón #{i}{" "}
+                                                            {submitted &&
+                                                                !form[
+                                                                    `patron_rtd_${i}`
+                                                                ]?.trim() &&
+                                                                !isViewMode && (
+                                                                    <small className="p-error">
+                                                                        {" "}
+                                                                        Requerido
+                                                                    </small>
+                                                                )}
+                                                        </label>
+                                                        <InputText
+                                                            value={
+                                                                form[
+                                                                `patron_rtd_${i}`
+                                                                ]
+                                                            }
+                                                            onChange={(e) =>
+                                                                onChange(
+                                                                    `patron_rtd_${i}`,
+                                                                    e.target
+                                                                        .value
+                                                                )
+                                                            }
+                                                            placeholder="°C"
+                                                            disabled={
+                                                                isViewMode
+                                                            }
+                                                        />
                                                     </div>
                                                 </React.Fragment>
                                             ))}
@@ -470,18 +906,92 @@ export default function SensorPT100() {
 
                             {form.medir_indicador && (
                                 <div className="field col-12">
-                                    <div style={{ border: "1px solid #d1d5db", borderRadius: 8, padding: 12 }}>
-                                        <div style={{ fontWeight: 700, marginBottom: 8 }}>Indicador Digital — mediciones y patrón</div>
+                                    <div
+                                        style={{
+                                            border: "1px solid #d1d5db",
+                                            borderRadius: 8,
+                                            padding: 12,
+                                        }}
+                                    >
+                                        <div
+                                            style={{
+                                                fontWeight: 700,
+                                                marginBottom: 8,
+                                            }}
+                                        >
+                                            Indicador Digital — mediciones y
+                                            patrón
+                                        </div>
                                         <div className="grid">
-                                            {[1, 2, 3, 4, 5].map(i => (
-                                                <React.Fragment key={`ind-${i}`}>
+                                            {[1, 2, 3, 4, 5].map((i) => (
+                                                <React.Fragment
+                                                    key={`ind-${i}`}
+                                                >
                                                     <div className="col-12 md:col-3">
-                                                        <label className="font-bold">Indicador #{i} {submitted && !form[`ind_dig_${i}`]?.trim() && <small className="p-error"> Requerido</small>}</label>
-                                                        <InputText value={form[`ind_dig_${i}`]} onChange={(e) => onChange(`ind_dig_${i}`, e.target.value)} placeholder="°C" />
+                                                        <label className="font-bold">
+                                                            Indicador #{i}{" "}
+                                                            {submitted &&
+                                                                !form[
+                                                                    `ind_dig_${i}`
+                                                                ]?.trim() &&
+                                                                !isViewMode && (
+                                                                    <small className="p-error">
+                                                                        {" "}
+                                                                        Requerido
+                                                                    </small>
+                                                                )}
+                                                        </label>
+                                                        <InputText
+                                                            value={
+                                                                form[
+                                                                `ind_dig_${i}`
+                                                                ]
+                                                            }
+                                                            onChange={(e) =>
+                                                                onChange(
+                                                                    `ind_dig_${i}`,
+                                                                    e.target
+                                                                        .value
+                                                                )
+                                                            }
+                                                            placeholder="°C"
+                                                            disabled={
+                                                                isViewMode
+                                                            }
+                                                        />
                                                     </div>
                                                     <div className="col-12 md:col-3">
-                                                        <label className="font-bold">Patrón #{i} {submitted && !form[`patron_ind_${i}`]?.trim() && <small className="p-error"> Requerido</small>}</label>
-                                                        <InputText value={form[`patron_ind_${i}`]} onChange={(e) => onChange(`patron_ind_${i}`, e.target.value)} placeholder="°C" />
+                                                        <label className="font-bold">
+                                                            Patrón #{i}{" "}
+                                                            {submitted &&
+                                                                !form[
+                                                                    `patron_ind_${i}`
+                                                                ]?.trim() &&
+                                                                !isViewMode && (
+                                                                    <small className="p-error">
+                                                                        {" "}
+                                                                        Requerido
+                                                                    </small>
+                                                                )}
+                                                        </label>
+                                                        <InputText
+                                                            value={
+                                                                form[
+                                                                `patron_ind_${i}`
+                                                                ]
+                                                            }
+                                                            onChange={(e) =>
+                                                                onChange(
+                                                                    `patron_ind_${i}`,
+                                                                    e.target
+                                                                        .value
+                                                                )
+                                                            }
+                                                            placeholder="°C"
+                                                            disabled={
+                                                                isViewMode
+                                                            }
+                                                        />
                                                     </div>
                                                 </React.Fragment>
                                             ))}
@@ -495,23 +1005,54 @@ export default function SensorPT100() {
                     {form.ejecutado === "NO" && (
                         <div className="field col-12">
                             <label className="font-bold">
-                                Observaciones (obligatorio si NO) {submitted && !form.observaciones.trim() && <small className="p-error"> Requerido</small>}
+                                Observaciones (obligatorio si NO){" "}
+                                {submitted &&
+                                    !form.observaciones.trim() &&
+                                    !isViewMode && (
+                                        <small className="p-error">
+                                            {" "}
+                                            Requerido
+                                        </small>
+                                    )}
                             </label>
-                            <InputText value={form.observaciones} onChange={(e) => onChange("observaciones", e.target.value)} placeholder="Explique el motivo" />
-                            <small className="block mt-2">Se reprogramará automáticamente para dentro de <b>7 días</b>.</small>
+                            <InputText
+                                value={form.observaciones}
+                                onChange={(e) =>
+                                    onChange("observaciones", e.target.value)
+                                }
+                                placeholder="Explique el motivo"
+                                disabled={isViewMode}
+                            />
+                            <small className="block mt-2">
+                                Se reprogramará automáticamente para dentro de{" "}
+                                <b>7 días</b>.
+                            </small>
                         </div>
                     )}
 
                     {form.ejecutado === "SI" && (
                         <div className="field col-12">
-                            <label className="font-bold">Observaciones (opcional)</label>
-                            <InputText value={form.observaciones} onChange={(e) => onChange("observaciones", e.target.value)} />
+                            <label className="font-bold">
+                                Observaciones (opcional)
+                            </label>
+                            <InputText
+                                value={form.observaciones}
+                                onChange={(e) =>
+                                    onChange("observaciones", e.target.value)
+                                }
+                                disabled={isViewMode}
+                            />
                         </div>
                     )}
 
                     <div className="field col-12 md:col-4">
-                        <label className="font-bold">Fecha de Registro (auto)</label>
-                        <InputText value={form.fecha_correccion_preview} disabled />
+                        <label className="font-bold">
+                            Fecha de Registro (auto)
+                        </label>
+                        <InputText
+                            value={form.fecha_correccion_preview}
+                            disabled
+                        />
                     </div>
                 </div>
             </Dialog>

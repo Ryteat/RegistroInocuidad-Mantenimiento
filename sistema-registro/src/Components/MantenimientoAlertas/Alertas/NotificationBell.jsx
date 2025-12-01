@@ -114,7 +114,7 @@ const FORM_MAP = {
     "H-HM-V": "/MantenimientoAlertas/Horno/VibradorHornoMultilevel",
     "H-HM-LG": "/MantenimientoAlertas/Horno/LineaGasGLPHornoMultilevel",
     "H-HM-LB": "/MantenimientoAlertas/Horno/LubricacionBandasHornoMultilevel",
-    "H-ML-SPT100": "/MantenimientoAlertas/HornoMultilevel/SensorPT100",
+    "H-HM-SPT": "/MantenimientoAlertas/Horno/SensorPT100",
     "H-ML-V": "/MantenimientoAlertas/Horno/Vibrador",
     "H-HM-TT": "/MantenimientoAlertas/Horno/TransmisionTurbinaHornoMultilevel",
     "H-E-SN": "/MantenimientoAlertas/HornoEmpacadora/SistemaNeumatico",
