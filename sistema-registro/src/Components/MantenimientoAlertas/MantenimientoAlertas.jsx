@@ -26,7 +26,7 @@ export default function MantenimientoAlertas() {
     };
 
     const secciones = [
-        { titulo: "Infraestructura de Planta", ruta: "/MantenimientoAlertas/Infraestructura" },
+        { titulo: "Infraestructura de Planta", ruta: "/MantenimientoAlertas/InfraestructuraDePlanta", },
         { titulo: "Horno", ruta: "/MantenimientoAlertas/Horno" },
         { titulo: "Dieta", ruta: "/MantenimientoAlertas/Dieta" },
         { titulo: "Crecimiento", ruta: "/MantenimientoAlertas/Crecimiento" },
@@ -43,9 +43,11 @@ export default function MantenimientoAlertas() {
                     </header>
 
                     <div className="welcome-message">
-                        <p>Este es el Menú de Registros del Sistema de Mantenimiento por Áreas.</p>
+                        <p>
+                            Este es el Menú de Registros del Sistema de
+                            Mantenimiento por Áreas.
+                        </p>
                     </div>
-
 
                     {/* Botonera principal (áreas) */}
                     <div className="grid-botones">
@@ -53,7 +55,9 @@ export default function MantenimientoAlertas() {
                             <button
                                 key={i}
                                 className="boton-grid cols-2"
-                                onClick={() => navigate(s.ruta, { state: { departamento } })}
+                                onClick={() =>
+                                    navigate(s.ruta, { state: { departamento } })
+                                }
                             >
                                 {s.titulo}
                             </button>
@@ -66,16 +70,23 @@ export default function MantenimientoAlertas() {
                         <div className="grid-botones">
                             <button
                                 className="boton-grid cols-2"
-                                onClick={() => navigate("/MantenimientoAlertas/Alertas")}
+                                onClick={() =>
+                                    navigate("/MantenimientoAlertas/Alertas")
+                                }
                             >
                                 Ver Sistema de Alertas
                             </button>
-                            <button className="boton-grid cols-2" onClick={goMenuPrincipal}>
+                            <button
+                                className="boton-grid cols-2"
+                                onClick={goMenuPrincipal}
+                            >
                                 Volver al Menú Principal
                             </button>
                             <button
                                 className="boton-grid logout-button cols-2"
-                                onClick={() => navigate("/", { replace: true })}
+                                onClick={() =>
+                                    navigate("/", { replace: true })
+                                }
                             >
                                 Cerrar sesión
                             </button>

@@ -674,11 +674,7 @@ export default function SistemaNeumatico() {
                     <b>Equipo:</b> {EQUIPO} &nbsp; | &nbsp;
                     <b>Registro:</b> {REGISTRO}
                 </p>
-                <p>
-                    El ID final se muestra como{" "}
-                    <b>{`${POSICION_ID_BASE}-01`}</b> según el consecutivo de
-                    cantidad.
-                </p>
+
             </div>
 
             <div className="buttons-container">
@@ -731,16 +727,7 @@ export default function SistemaNeumatico() {
                 <Column field="equipo" header="Equipo" sortable />
                 <Column field="registro" header="Registro" />
                 <Column field="periodicidad" header="Periodicidad" />
-                <Column
-                    header="Último Mto."
-                    body={(r) => fmtDMY(r.ultimo_mantenimiento)}
-                    sortable
-                />
-                <Column
-                    header="Próximo Mto."
-                    body={(r) => fmtDMY(r.proximo_mantenimiento)}
-                    sortable
-                />
+
                 <Column field="tecnico" header="Técnico" sortable />
                 <Column
                     header="Fecha de Registro"

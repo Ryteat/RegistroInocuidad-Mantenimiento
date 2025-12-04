@@ -1,4 +1,4 @@
-// src/Components/MantenimientoAlertas/InfraestructuraDePlanta/Registros/Iluminacion.jsx
+// src/Components/MantenimientoAlertas/Horno/Registros/MotorReductorHornoMultilevel.jsx
 import React, { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import supabase from "../../../../supabaseClient.js";
@@ -16,23 +16,19 @@ import { InputText } from "primereact/inputtext";
 import { Dropdown } from "primereact/dropdown";
 import { Checkbox } from "primereact/checkbox";
 import * as XLSX from "xlsx";
-
-// Hook de permisos de revisión
 import useCanReview from "../../../Inocuidad/Registros/Hooks/useCanReview.js";
 
-/* ===================== Helpers de fecha (seguros) ===================== */
+/* ===== Helpers de fecha (sin desfases de TZ) ===== */
 const parseYMD = (isoDateStr) => {
     if (!isoDateStr) return null;
     const [y, m, d] = String(isoDateStr).split("-").map(Number);
     if (!y || !m || !d) return null;
     return new Date(y, m - 1, d, 0, 0, 0, 0);
 };
-
 const toDateISO = (d = new Date()) =>
     `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(
         d.getDate()
     ).padStart(2, "0")}`;
-
 const toHM = (d = new Date()) =>
     d.toLocaleTimeString("en-GB", {
         hour: "2-digit",
@@ -40,8 +36,18 @@ const toHM = (d = new Date()) =>
         hour12: false,
     });
 
+const addDays = (ymd, days) => {
+    const base = parseYMD(ymd);
+    base.setDate(base.getDate() + Number(days || 0));
+    return toDateISO(base);
+};
+const addMonths = (ymd, months) => {
+    const base = parseYMD(ymd);
+    base.setMonth(base.getMonth() + Number(months || 0));
+    return toDateISO(base);
+};
+
 const fmtDMY = (iso) => {
-    if (!iso) return "—";
     const d = parseYMD(iso);
     if (!d) return "—";
     const dd = String(d.getDate()).padStart(2, "0");
@@ -49,7 +55,6 @@ const fmtDMY = (iso) => {
     const yy = d.getFullYear();
     return `${dd}/${mm}/${yy}`;
 };
-
 const fmtDMYHM = (isoOrDate) => {
     if (!isoOrDate) return "—";
     const d = isoOrDate instanceof Date ? isoOrDate : new Date(isoOrDate);
@@ -61,56 +66,73 @@ const fmtDMYHM = (isoOrDate) => {
     return `${dd}/${mm}/${yy} ${hh}:${mi}`;
 };
 
-const addDays = (iso, days) => {
-    const d = parseYMD(iso) ?? new Date();
-    d.setDate(d.getDate() + Number(days || 0));
-    return toDateISO(d);
-};
-
-const addMonths = (iso, months) => {
-    const d = parseYMD(iso) ?? new Date();
-    const origDay = d.getDate();
-    d.setMonth(d.getMonth() + Number(months || 0));
-    while (d.getDate() < origDay) d.setDate(d.getDate() - 1);
-    return toDateISO(d);
-};
-
-/* ===================== Constantes del registro ===================== */
-const POSICION_ID_BASE = "IN-I-G"; // base → se forma IN-I-G-01..08
-const EQUIPO = "Iluminación";
-const REGISTRO = "GENERAL";
-const PERIODICIDAD = "MENSUAL";
-const TABLE = "mto_iluminacion";
-
-// Consecutivos 01..08 (string, igual que PanelElectrico)
-const CANTIDAD_OPCIONES = Array.from({ length: 8 }, (_, idx) => {
-    const v = String(idx + 1).padStart(2, "0");
-    return { label: v, value: v };
-});
+/* ===== Constantes del registro ===== */
+const POSICION_ID_BASE = "H-HM-MR";
+const EQUIPO = "Horno Multilevel";
+const REGISTRO = "MOTOR REDUCTOR";
+const TABLE = "mto_horno_multilevel_motor_reductor";
 
 const YESNO = [
     { label: "Sí", value: "SI" },
     { label: "No", value: "NO" },
 ];
-
-const QUESTIONS = [
-    {
-        key: "q1",
-        label:
-            "Revisar funcionamiento de luminarias en el área; reparar si es necesario",
-    },
-    {
-        key: "q2",
-        label: "Desmontar difusores si aplica y limpiarlos",
-    },
-    {
-        key: "q3",
-        label:
-            "Verificar funcionamiento de los interruptores; reparar si es necesario",
-    },
+const PERIODOS = [
+    { label: "Trimestral", value: "TRIMESTRAL" },
+    { label: "Anual", value: "ANUAL" },
 ];
 
-/* ===================== Estado inicial ===================== */
+// Cantidad: 5 → consecutivos 01..05
+const CANTIDAD_OPCIONES = [
+    { label: "01", value: "01" },
+    { label: "02", value: "02" },
+    { label: "03", value: "03" },
+    { label: "04", value: "04" },
+    { label: "05", value: "05" },
+];
+
+/* ===== Checklists (texto EXACTO de las OMs – igual que Empacadora) ===== */
+/* TRIMESTRAL */
+const Q_TRIMESTRAL = [
+    { key: "q1", label: "Revisar y verificar estado general del motor, limpieza" },
+    { key: "q2", label: "Revisar y verificar estado general del motor, pintura" },
+    { key: "q3", label: "Revisar estado del cable de alimentación, conector o manguito" },
+    { key: "q4", label: "Abrir caja de coneciones y verificar estado y apriete de los bornes de conecion" },
+    { key: "q5", label: "Verificar presencia de agua en la caja de coneción, si lo hay utilice desplazador de humedad" },
+    { key: "q6", label: "Realizar medición de aislamiento al bobinado, Reporte" },
+    { key: "q7", label: "Tomar lecturas de amperaje y comparar con los datos de placa, Reporte" },
+    { key: "q8", label: "Revisar temperatura del motor, Reporte" },
+    { key: "q9", label: "Revisar que no halla presencia de vibraciones o ruidos extraños" },
+    { key: "q10", label: "Verificar que el cobertor del motor y abanico se encuentre en su lugar, Reporte" },
+    { key: "q11", label: "Revisar estado y nivel del aceite" },
+    { key: "q12", label: "Verificar que no existan fugas" },
+    { key: "q13", label: "Lubricar" },
+];
+
+/* ANUAL */
+const Q_ANUAL = [
+    { key: "q1", label: "Desarme el motor, no dañe el bobinado" },
+    { key: "q2", label: "Lavar, secar y barnizar el bobinado" },
+    { key: "q3", label: "Cambiar los rodamientos del rotor" },
+    { key: "q4", label: "Realizar medición de aislamiento al bobinado" },
+    { key: "q5", label: "Armar el motor" },
+    { key: "q6", label: "Pinte si se requiere" },
+    { key: "q7", label: "Desarme el reductor y realice lavado" },
+    { key: "q8", label: "Cambie todos los rodamientos" },
+    { key: "q9", label: "Cambie los retenedores" },
+    { key: "q10", label: "Cambie el oring" },
+    { key: "q11", label: "Armar el reductor con cuidado de no dañar los retenedores y los roles" },
+    { key: "q12", label: "Pinte si es necesario" },
+    { key: "q13", label: "Rellene con aceite nuevo" },
+];
+
+const getQuestionsByPeriodo = (periodicidad) =>
+    periodicidad === "TRIMESTRAL"
+        ? Q_TRIMESTRAL
+        : periodicidad === "ANUAL"
+            ? Q_ANUAL
+            : [];
+
+/* ===== Form vacío ===== */
 const emptyForm = () => ({
     fecha_registro: toDateISO(),
     hora_registro: toHM(),
@@ -121,11 +143,8 @@ const emptyForm = () => ({
     tecnico: "",
     ejecutado: "",
     observaciones: "",
-    periodicidad: PERIODICIDAD,
-    items: QUESTIONS.reduce(
-        (a, q) => ({ ...a, [q.key]: { respuesta: "" } }),
-        {}
-    ),
+    periodicidad: "",
+    items: {},
     fecha_correccion_preview: fmtDMYHM(new Date()),
 });
 
@@ -135,8 +154,7 @@ const packRow = (r) => ({
     observaciones: r.observaciones ?? "",
 });
 
-/* ===================== Componente ===================== */
-export default function Iluminacion() {
+export default function MotorReductorHornoMultilevel() {
     const navigate = useNavigate();
     const toast = useRef(null);
     const { canReview, username } = useCanReview();
@@ -156,10 +174,10 @@ export default function Iluminacion() {
 
     const [filtroRevisado, setFiltroRevisado] = useState("all");
 
-    const showToast = (severity, summary, detail, life = 3000) =>
-        toast.current?.show({ severity, summary, detail, life });
+    const showToast = (sev, sum, det, life = 3000) =>
+        toast.current?.show({ severity: sev, summary: sum, detail: det, life });
 
-    /* --------------------- Carga de registros --------------------- */
+    /* ----------- carga ----------- */
     const fetchRows = async () => {
         try {
             setLoading(true);
@@ -170,10 +188,9 @@ export default function Iluminacion() {
           id, created_at,
           fecha_registro, hora_registro,
           posicion_id, equipo, registro, cantidad, tecnico,
-          ejecutado, observaciones,
-          respuesta_q1, respuesta_q2, respuesta_q3,
-          periodicidad, ultimo_mantenimiento, proximo_mantenimiento,
-          semana_proximo, anio_proximo,
+          ejecutado, observaciones, periodicidad,
+          ${Array.from({ length: 13 }, (_, i) => `respuesta_q${i + 1}`).join(", ")},
+          ultimo_mantenimiento, proximo_mantenimiento,
           revisado, revisado_por_username, revisado_fecha,
           completado, pendiente_nuevo, fecha_completado
         `
@@ -200,7 +217,6 @@ export default function Iluminacion() {
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [filtroRevisado]);
 
-    /* --------------------- Helpers de formulario --------------------- */
     const openNew = () => {
         setForm(emptyForm());
         setSubmitted(false);
@@ -220,6 +236,19 @@ export default function Iluminacion() {
             [field]: value,
         }));
 
+    const onPeriodoChange = (value) => {
+        const base = getQuestionsByPeriodo(value);
+        const items = base.reduce(
+            (acc, q) => ({ ...acc, [q.key]: { respuesta: "" } }),
+            {}
+        );
+        setForm((p) => ({
+            ...p,
+            periodicidad: value,
+            items,
+        }));
+    };
+
     const onYesNoChange = (key, value) =>
         setForm((p) => ({
             ...p,
@@ -235,14 +264,16 @@ export default function Iluminacion() {
         }));
     };
 
-    /* --------------------- Ver / Editar --------------------- */
+    /* ----------- Ver / Editar ----------- */
     const openView = (row) => {
         setViewRow(row);
         setViewDialogOpen(true);
     };
 
     const openEdit = (row) => {
-        const items = QUESTIONS.reduce((acc, q, index) => {
+        const periodicidad = row.periodicidad || "";
+        const baseQuestions = getQuestionsByPeriodo(periodicidad);
+        const items = baseQuestions.reduce((acc, q, index) => {
             const idx = index + 1;
             return {
                 ...acc,
@@ -274,42 +305,37 @@ export default function Iluminacion() {
             tecnico: row.tecnico || "",
             ejecutado: row.ejecutado || "",
             observaciones: row.observaciones || "",
-            periodicidad: row.periodicidad || PERIODICIDAD,
+            periodicidad,
             items,
-            fecha_correccion_preview: fmtDMYHM(
-                row.created_at || new Date()
-            ),
+            fecha_correccion_preview: fmtDMYHM(row.created_at || new Date()),
         });
         setSubmitted(false);
         setEditingId(row.id);
         setDialogOpen(true);
     };
 
-    /* --------------------- Validación --------------------- */
+    /* ----------- validación ----------- */
     const validate = () => {
         const errs = [];
-        if (!form.cantidad) errs.push("Debe seleccionar el consecutivo (01–08).");
+        if (!form.periodicidad)
+            errs.push("Seleccione la periodicidad (Trimestral o Anual).");
         if (!form.tecnico?.trim())
             errs.push("El campo Técnico es requerido.");
         if (!form.ejecutado)
             errs.push("Indique si se va a efectuar el mantenimiento.");
-
-        if (form.ejecutado === "NO" && !form.observaciones.trim()) {
+        if (form.ejecutado === "NO" && !form.observaciones.trim())
             errs.push("Explique por qué NO se efectuó (Observaciones).");
-        }
-
         if (form.ejecutado === "SI") {
-            QUESTIONS.forEach((q) => {
-                if (!form.items[q.key]?.respuesta) {
+            const list = getQuestionsByPeriodo(form.periodicidad);
+            list.forEach((q) => {
+                if (!form.items[q.key]?.respuesta)
                     errs.push(`Responda: ${q.label}`);
-                }
             });
         }
-
         return errs;
     };
 
-    /* --------------------- Guardado (insert / update) --------------------- */
+    /* ----------- guardado (insert / update) con COMPLETADO ----------- */
     const save = async () => {
         setSubmitted(true);
         const errs = validate();
@@ -321,30 +347,23 @@ export default function Iluminacion() {
         try {
             const baseDate = form.fecha_registro || toDateISO();
 
-            const respuestasPayload = Object.fromEntries(
-                Array.from({ length: 3 }, (_, i) => {
-                    const key = `q${i + 1}`;
-                    return [
-                        `respuesta_q${i + 1}`,
-                        form.ejecutado === "SI"
-                            ? form.items[key]?.respuesta || null
-                            : null,
-                    ];
-                })
-            );
-
             const cantidadNumero = form.cantidad
                 ? parseInt(form.cantidad, 10)
                 : null;
 
-            const posicionFinal =
-                form.posicion_id ||
-                `${POSICION_ID_BASE}-${form.cantidad || "01"}`;
+            const respuestasPayload = Object.fromEntries(
+                Array.from({ length: 13 }, (_, i) => [
+                    `respuesta_q${i + 1}`,
+                    form.ejecutado === "SI"
+                        ? form.items[`q${i + 1}`]?.respuesta || null
+                        : null,
+                ])
+            );
 
             const basePayload = {
                 fecha_registro: form.fecha_registro,
                 hora_registro: form.hora_registro,
-                posicion_id: posicionFinal,
+                posicion_id: form.posicion_id || `${POSICION_ID_BASE}-01`,
                 equipo: form.equipo || EQUIPO,
                 registro: form.registro || REGISTRO,
                 cantidad: Number.isNaN(cantidadNumero)
@@ -353,22 +372,26 @@ export default function Iluminacion() {
                 tecnico: form.tecnico,
                 ejecutado: form.ejecutado,
                 observaciones: form.observaciones || null,
-                periodicidad: PERIODICIDAD,
+                periodicidad: form.periodicidad,
                 ...respuestasPayload,
             };
 
-            const todasSi = QUESTIONS.every(
-                (q) => form.items[q.key]?.respuesta === "SI"
-            );
+            const preguntas = getQuestionsByPeriodo(form.periodicidad);
+            const todasSi =
+                preguntas.length > 0
+                    ? preguntas.every(
+                        (q) => form.items[q.key]?.respuesta === "SI"
+                    )
+                    : false;
 
             let error;
 
             if (editingId) {
-                // 🔵 EDICIÓN (p. ej. al corregir un registro VENCIDO desde la campanita)
+                // 🔵 EDICIÓN
                 let updatePayload = { ...basePayload };
 
                 if (form.ejecutado === "SI" && todasSi) {
-                    // ✅ Todo SI → COMPLETADO (queda verde en campanita, pendiente_nuevo=true)
+                    // ✅ Todo SI → COMPLETADO
                     updatePayload = {
                         ...updatePayload,
                         ultimo_mantenimiento: baseDate,
@@ -378,7 +401,7 @@ export default function Iluminacion() {
                         fecha_completado: new Date().toISOString(),
                     };
                 } else if (form.ejecutado === "NO") {
-                    // ❌ NO ejecutado → se reprograma +7 días, no se completa
+                    // ❌ NO ejecutado → +7 días
                     updatePayload = {
                         ...updatePayload,
                         ultimo_mantenimiento: null,
@@ -389,7 +412,13 @@ export default function Iluminacion() {
                     };
                 } else {
                     // ejecutado = "SI" pero con alguna respuesta "NO"
-                    const proximo = addMonths(baseDate, 1);
+                    let proximo = addDays(baseDate, 7);
+                    if (form.periodicidad === "TRIMESTRAL") {
+                        proximo = addMonths(baseDate, 3);
+                    } else if (form.periodicidad === "ANUAL") {
+                        proximo = addMonths(baseDate, 12);
+                    }
+
                     updatePayload = {
                         ...updatePayload,
                         ultimo_mantenimiento: baseDate,
@@ -405,15 +434,22 @@ export default function Iluminacion() {
                     .update(updatePayload)
                     .eq("id", editingId));
             } else {
-                // 🟢 NUEVO REGISTRO (flujo normal desde el formulario)
+                // 🟢 NUEVO REGISTRO
                 let ultimo = null;
                 let proximo = null;
 
                 if (form.ejecutado === "NO") {
                     proximo = addDays(baseDate, 7);
-                } else {
+                } else if (form.periodicidad === "TRIMESTRAL") {
                     ultimo = baseDate;
-                    proximo = addMonths(baseDate, 1);
+                    proximo = addMonths(baseDate, 3);
+                } else if (form.periodicidad === "ANUAL") {
+                    ultimo = baseDate;
+                    proximo = addMonths(baseDate, 12);
+                } else {
+                    // fallback
+                    ultimo = baseDate;
+                    proximo = addDays(baseDate, 7);
                 }
 
                 const insertPayload = {
@@ -437,7 +473,8 @@ export default function Iluminacion() {
                 "Éxito",
                 editingId ? "Registro actualizado" : "Registro guardado"
             );
-            hideDialog();
+            setDialogOpen(false);
+            setEditingId(null);
             await fetchRows();
         } catch (e) {
             console.error(e);
@@ -449,36 +486,22 @@ export default function Iluminacion() {
         }
     };
 
-    const countSiNo = (row, val) =>
-        [1, 2, 3].reduce(
-            (acc, i) =>
-                acc +
-                ((row[`respuesta_q${i}`] || "") === val ? 1 : 0),
-            0
-        );
-
-    /* --------------------- Columna Revisado --------------------- */
+    /* ----------- revisado ----------- */
     const revisadoTemplate = (row) => {
-        if (!canReview)
-            return <span>{row.revisado ? "Sí" : "No"}</span>;
-
+        if (!canReview) return <span>{row.revisado ? "Sí" : "No"}</span>;
         const onToggle = async (next) => {
             const { error } = await supabase
                 .from(TABLE)
                 .update({
                     revisado: next,
                     revisado_por_username: next ? username : null,
-                    revisado_fecha: next
-                        ? new Date().toISOString()
-                        : null,
+                    revisado_fecha: next ? new Date().toISOString() : null,
                 })
                 .eq("id", row.id);
-
             if (error) {
                 showToast("error", "No se guardó", error.message);
                 return;
             }
-
             setRows((prev) =>
                 prev.map((r) =>
                     r.id === row.id
@@ -501,68 +524,18 @@ export default function Iluminacion() {
                 next ? "Marcado revisado" : "Marcado no revisado"
             );
         };
-
         return (
             <div className="flex align-items-center justify-content-center gap-2">
                 <Checkbox
-                    inputId={`chk-rev-${row.id}`}
                     checked={!!row.revisado}
                     onChange={(e) => onToggle(e.checked)}
                 />
-                <label
-                    htmlFor={`chk-rev-${row.id}`}
-                    className="text-sm"
-                >
-                    Revisado
-                </label>
+                <span className="text-sm">Revisado</span>
             </div>
         );
     };
 
-    /* --------------------- Header tabla --------------------- */
-    const header = (
-        <div className="flex flex-wrap gap-2 align-items-center justify-content-between">
-            <span className="p-input-icon-left">
-                <i className="pi pi-search" />
-                <InputText
-                    type="search"
-                    value={globalFilter}
-                    onInput={(e) =>
-                        setGlobalFilter(e.target.value)
-                    }
-                    placeholder="Buscar (ej. IN-I-G-01, técnico, notas)"
-                />
-            </span>
-            <div className="flex align-items-center gap-2">
-                <span className="text-sm font-medium">
-                    Filtro:
-                </span>
-                <Dropdown
-                    value={filtroRevisado}
-                    onChange={(e) =>
-                        setFiltroRevisado(e.value)
-                    }
-                    options={[
-                        { label: "Todos", value: "all" },
-                        { label: "Revisado", value: "checked" },
-                        { label: "Sin revisar", value: "unchecked" },
-                    ]}
-                    style={{ minWidth: 160 }}
-                />
-            </div>
-        </div>
-    );
-
-    const semanaBody = (r) =>
-        r.proximo_mantenimiento
-            ? `${r.semana_proximo} año ${r.anio_proximo}`
-            : "—";
-
-    const cantidadBody = (r) =>
-        r.cantidad != null
-            ? String(r.cantidad).padStart(2, "0")
-            : "";
-
+    /* ----------- acciones Ver / Editar ----------- */
     const actionTemplate = (row) => (
         <div className="flex align-items-center justify-content-center gap-2">
             <Button
@@ -581,85 +554,110 @@ export default function Iluminacion() {
         </div>
     );
 
-    const preguntasView = (row) =>
-        QUESTIONS.map((q, idx) => ({
-            label: q.label,
-            respuesta: row[`respuesta_q${idx + 1}`] || "",
-        }));
+    const header = (
+        <div className="flex flex-wrap gap-2 align-items-center justify-content-between">
+            <span className="p-input-icon-left">
+                <i className="pi pi-search" />
+                <InputText
+                    type="search"
+                    value={globalFilter}
+                    onInput={(e) => setGlobalFilter(e.target.value)}
+                    placeholder="Buscar (ej. H-HM-MR-01, técnico, notas)"
+                />
+            </span>
+            <div className="flex align-items-center gap-2">
+                <span className="text-sm font-medium">Filtro:</span>
+                <Dropdown
+                    value={filtroRevisado}
+                    onChange={(e) => setFiltroRevisado(e.value)}
+                    options={[
+                        { label: "Todos", value: "all" },
+                        { label: "Revisado", value: "checked" },
+                        { label: "Sin revisar", value: "unchecked" },
+                    ]}
+                    style={{ minWidth: 160 }}
+                />
+            </div>
+        </div>
+    );
 
-    /* --------------------- Exportar Excel --------------------- */
+    const countYN = (row, val) =>
+        Array.from({ length: 13 }, (_, i) => `respuesta_q${i + 1}`).reduce(
+            (acc, k) => acc + ((row[k] || "") === val ? 1 : 0),
+            0
+        );
+
     const exportXlsx = () => {
         if (!rows?.length) {
-            showToast(
-                "warn",
-                "Exportación",
-                "No hay datos"
-            );
+            showToast("warn", "Exportación", "No hay datos");
             return;
         }
         const out = rows.map((r) => ({
             posicion: r.posicion_id,
             equipo: r.equipo,
             registro: r.registro ?? "",
-            cantidad: cantidadBody(r),
             periodicidad: r.periodicidad ?? "",
             ultimo_mantenimiento: fmtDMY(r.ultimo_mantenimiento),
             proximo_mantenimiento: fmtDMY(r.proximo_mantenimiento),
-            semana: semanaBody(r),
             tecnico: r.tecnico ?? "",
             fecha_intervencion: fmtDMY(r.fecha_registro),
             hora_intervencion: r.hora_registro || "",
-            "#SI": countSiNo(r, "SI"),
-            "#NO": countSiNo(r, "NO"),
+            "#SI": countYN(r, "SI"),
+            "#NO": countYN(r, "NO"),
             revisado: r.revisado ? "Sí" : "No",
             creado: fmtDMYHM(r.created_at),
         }));
         const ws = XLSX.utils.json_to_sheet(out);
         const wb = XLSX.utils.book_new();
-        XLSX.utils.book_append_sheet(wb, ws, "Iluminacion");
+        XLSX.utils.book_append_sheet(wb, ws, "Motor Reductor HM");
         XLSX.writeFile(
             wb,
-            `Iluminacion_${new Date()
+            `Horno_MotorReductorMultilevel_${new Date()
                 .toISOString()
                 .slice(0, 10)}.xlsx`
         );
     };
 
-    /* --------------------- Render --------------------- */
+    const activeQuestions = getQuestionsByPeriodo(form.periodicidad);
+
+    const preguntasView = (row) => {
+        if (!row?.periodicidad) return [];
+        const base = getQuestionsByPeriodo(row.periodicidad);
+        return base.map((q, idx) => ({
+            label: q.label,
+            respuesta: row[`respuesta_q${idx + 1}`] || "",
+        }));
+    };
+
     return (
         <div className="controlrendcosechayfrass-container">
             <Toast ref={toast} />
-
             <h1 className="flex align-items-center gap-2">
                 <img src={logo2} alt="mosca" className="logo2" />
-                Registro de Mantenimiento – Iluminación (General)
+                Registro — Motor Reductor (Horno Multilevel)
             </h1>
 
             <div className="welcome-message">
                 <p>
-                    <b>Posición base (ID):</b> {POSICION_ID_BASE} &nbsp;
-                    | &nbsp;
+                    <b>Posición (ID base):</b> {POSICION_ID_BASE} &nbsp; | &nbsp;{" "}
                     <b>Equipo:</b> {EQUIPO} &nbsp; | &nbsp;
                     <b>Registro:</b> {REGISTRO} &nbsp; | &nbsp;
-                    <b>Periodicidad:</b> {PERIODICIDAD}
-
+                    <b>Cantidad:</b> 5 (consecutivos 01–05)
+                </p>
+                <p>
+                    El ID final se muestra como{" "}
+                    <b>{`${POSICION_ID_BASE}-01`}</b>,{" "}
+                    <b>{`${POSICION_ID_BASE}-02`}</b>, ...{" "}
+                    <b>{`${POSICION_ID_BASE}-05`}</b> según el consecutivo.
                 </p>
             </div>
 
             <div className="buttons-container">
-                <button
-                    onClick={() => navigate(-1)}
-                    className="return-button"
-                >
+                <button onClick={() => navigate(-1)} className="return-button">
                     Volver
                 </button>
-                <button
-                    onClick={() =>
-                        navigate("/MantenimientoAlertas")
-                    }
-                    className="menu-button"
-                >
-                    Menú Principal
+                <button onClick={() => navigate(-2)} className="menu-button">
+                    Menú principal
                 </button>
             </div>
 
@@ -687,9 +685,7 @@ export default function Iluminacion() {
                 value={rows}
                 loading={loading}
                 selection={selected}
-                onSelectionChange={(e) =>
-                    setSelected(e.value)
-                }
+                onSelectionChange={(e) => setSelected(e.value)}
                 selectionMode="multiple"
                 header={header}
                 globalFilter={globalFilter}
@@ -701,44 +697,23 @@ export default function Iluminacion() {
                 paginatorTemplate="FirstPageLink PrevPageLink PageLinks NextPageLink LastPageLink CurrentPageReport RowsPerPageDropdown"
                 currentPageReportTemplate="Mostrando del {first} al {last} de {totalRecords} Registros"
             >
+                <Column selectionMode="multiple" exportable={false} />
+                <Column field="posicion_id" header="Posición" sortable />
+                <Column field="equipo" header="Equipo" sortable />
+                <Column field="registro" header="Registro" />
+                <Column field="periodicidad" header="Periodicidad" />
                 <Column
-                    selectionMode="multiple"
-                    exportable={false}
-                />
-                <Column
-                    field="posicion_id"
-                    header="Posición"
+                    header="Último Mto."
+                    body={(r) => fmtDMY(r.ultimo_mantenimiento)}
                     sortable
                 />
                 <Column
-                    header="Cantidad"
-                    body={cantidadBody}
-                />
-                <Column
-                    field="equipo"
-                    header="Equipo"
+                    header="Próximo Mto."
+                    body={(r) => fmtDMY(r.proximo_mantenimiento)}
                     sortable
                 />
+                <Column field="tecnico" header="Técnico" sortable />
                 <Column
-                    field="registro"
-                    header="Registro"
-                />
-                <Column
-                    field="periodicidad"
-                    header="Periodicidad"
-                />
-
-                <Column
-                    header="Semana"
-                    body={semanaBody}
-                />
-                <Column
-                    field="tecnico"
-                    header="Técnico"
-                    sortable
-                />
-                <Column
-                    field="created_at"
                     header="Fecha de Registro"
                     body={(r) => fmtDMYHM(r.created_at)}
                     sortable
@@ -746,10 +721,7 @@ export default function Iluminacion() {
                 <Column
                     header="Revisado"
                     body={revisadoTemplate}
-                    style={{
-                        width: "10rem",
-                        textAlign: "center",
-                    }}
+                    style={{ width: "10rem", textAlign: "center" }}
                 />
                 <Column
                     header="Acciones"
@@ -765,8 +737,8 @@ export default function Iluminacion() {
                 style={{ width: "72vw", maxWidth: 1100 }}
                 header={
                     editingId
-                        ? "Editar registro – Iluminación"
-                        : "Nuevo registro – Iluminación"
+                        ? "Editar registro — Motor Reductor (Horno Multilevel)"
+                        : "Nuevo registro — Motor Reductor (Horno Multilevel)"
                 }
                 modal
                 onHide={hideDialog}
@@ -786,137 +758,102 @@ export default function Iluminacion() {
                     </div>
                 }
             >
-                {/* Periodicidad fija mensual (solo visual) */}
-                <div className="field col-12 md:col-3">
-                    <label className="font-bold">
-                        Periodicidad
-                    </label>
-                    <InputText
-                        value="Mensual"
-                        disabled
-                    />
-                </div>
                 <div className="p-fluid grid">
-                    {/* Intervención */}
-                    <div className="field col-12 md:col-3">
+                    {/* Periodicidad */}
+                    <div className="field col-12 md:col-4">
                         <label className="font-bold">
-                            Fecha intervención
+                            Periodicidad*{" "}
+                            {submitted && !form.periodicidad && (
+                                <small className="p-error"> Requerido</small>
+                            )}
                         </label>
+                        <Dropdown
+                            value={form.periodicidad}
+                            options={PERIODOS}
+                            onChange={(e) => onPeriodoChange(e.value)}
+                            placeholder="Seleccione"
+                        />
+                        <small className="block mt-2">
+                            <b>Trimestral</b>: próximo mto en <b>3 meses</b>;{" "}
+                            <b>Anual</b>: en <b>12 meses</b>. Si NO se ejecuta:{" "}
+                            <b>+7 días</b>.
+                        </small>
+                    </div>
+
+                    <div className="field col-12 md:col-4">
+                        <label className="font-bold">Fecha intervención</label>
                         <InputText
                             type="date"
                             value={form.fecha_registro}
                             onChange={(e) =>
-                                onChange(
-                                    "fecha_registro",
-                                    e.target.value
-                                )
+                                onChange("fecha_registro", e.target.value)
                             }
                         />
                     </div>
-                    <div className="field col-12 md:col-3">
-                        <label className="font-bold">
-                            Hora intervención
-                        </label>
+                    <div className="field col-12 md:col-4">
+                        <label className="font-bold">Hora intervención</label>
                         <InputText
                             type="time"
                             value={form.hora_registro}
                             onChange={(e) =>
-                                onChange(
-                                    "hora_registro",
-                                    e.target.value
-                                )
+                                onChange("hora_registro", e.target.value)
                             }
                         />
                     </div>
+
                     <div className="field col-6 md:col-3">
                         <label className="font-bold">
-                            Posición ID
+                            Posición (ID con consecutivo)
                         </label>
-                        <InputText
-                            value={form.posicion_id}
-                            disabled
-                        />
+                        <InputText value={form.posicion_id} disabled />
                     </div>
                     <div className="field col-6 md:col-3">
-                        <label className="font-bold">
-                            Equipo
-                        </label>
-                        <InputText
-                            value={form.equipo}
-                            disabled
-                        />
+                        <label className="font-bold">Equipo</label>
+                        <InputText value={form.equipo} disabled />
                     </div>
 
-                    {/* Técnico */}
                     <div className="field col-6 md:col-3">
                         <label className="font-bold">
-                            Técnico{" "}
-                            {submitted &&
-                                !form.tecnico && (
-                                    <small className="p-error">
-                                        {" "}
-                                        Requerido
-                                    </small>
-                                )}
+                            Técnico*{" "}
+                            {submitted && !form.tecnico && (
+                                <small className="p-error"> Requerido</small>
+                            )}
                         </label>
                         <InputText
                             value={form.tecnico}
                             onChange={(e) =>
-                                onChange(
-                                    "tecnico",
-                                    e.target.value
-                                )
+                                onChange("tecnico", e.target.value)
                             }
                             placeholder="Nombre del técnico"
                         />
                     </div>
-
-                    {/* Consecutivo 01–08 */}
                     <div className="field col-6 md:col-3">
                         <label className="font-bold">
-                            Cantidad{" "}
-                            {submitted &&
-                                !form.cantidad && (
-                                    <small className="p-error">
-                                        {" "}
-                                        Requerido
-                                    </small>
-                                )}
+                            Cantidad / Consecutivo
                         </label>
                         <Dropdown
                             value={form.cantidad}
                             options={CANTIDAD_OPCIONES}
-                            onChange={(e) =>
-                                onCantidadChange(e.value)
-                            }
-                            placeholder="Seleccione"
+                            onChange={(e) => onCantidadChange(e.value)}
+                            placeholder="01"
                         />
-
+                        <small className="block mt-1">
+                            Se usa para formar el ID, p. ej.{" "}
+                            <b>{`${POSICION_ID_BASE}-01`}</b>.
+                        </small>
                     </div>
 
-
-
-                    {/* ¿Se ejecuta? */}
                     <div className="field col-12 md:col-6">
                         <label className="font-bold">
                             ¿Se va a efectuar el mantenimiento?*{" "}
-                            {submitted &&
-                                !form.ejecutado && (
-                                    <small className="p-error">
-                                        {" "}
-                                        Requerido
-                                    </small>
-                                )}
+                            {submitted && !form.ejecutado && (
+                                <small className="p-error"> Requerido</small>
+                            )}
                         </label>
                         <Dropdown
                             value={form.ejecutado}
                             options={YESNO}
-                            onChange={(e) =>
-                                onChange(
-                                    "ejecutado",
-                                    e.value
-                                )
-                            }
+                            onChange={(e) => onChange("ejecutado", e.value)}
                             placeholder="Seleccione"
                         />
                     </div>
@@ -924,8 +861,7 @@ export default function Iluminacion() {
                     {form.ejecutado === "NO" && (
                         <div className="field col-12">
                             <label className="font-bold">
-                                Observaciones (obligatorio si
-                                NO){" "}
+                                Observaciones (obligatorio si NO){" "}
                                 {submitted &&
                                     !form.observaciones.trim() && (
                                         <small className="p-error">
@@ -945,13 +881,13 @@ export default function Iluminacion() {
                                 placeholder="Explique el motivo"
                             />
                             <small className="block mt-2">
-                                Se reprogramará automáticamente
-                                para dentro de <b>7 días</b>.
+                                Se reprogramará automáticamente para dentro de{" "}
+                                <b>7 días</b>.
                             </small>
                         </div>
                     )}
 
-                    {form.ejecutado === "SI" && (
+                    {form.ejecutado === "SI" && !!activeQuestions.length && (
                         <div className="field col-12">
                             <div
                                 style={{
@@ -966,14 +902,15 @@ export default function Iluminacion() {
                                         marginBottom: 8,
                                     }}
                                 >
-                                    ILUMINACIÓN – Lista de
-                                    verificación
+                                    {form.periodicidad === "TRIMESTRAL"
+                                        ? "Checklist — TRIMESTRAL"
+                                        : "Checklist — ANUAL"}
                                 </div>
                                 <div className="grid">
-                                    {QUESTIONS.map((q) => {
+                                    {activeQuestions.map((q) => {
                                         const val =
-                                            form.items[q.key]
-                                                ?.respuesta || "";
+                                            form.items[q.key]?.respuesta ||
+                                            "";
                                         return (
                                             <div
                                                 key={q.key}
@@ -981,22 +918,17 @@ export default function Iluminacion() {
                                             >
                                                 <label className="font-bold">
                                                     {q.label}*{" "}
-                                                    {submitted &&
-                                                        !val && (
-                                                            <small className="p-error">
-                                                                {" "}
-                                                                Requerido
-                                                            </small>
-                                                        )}
+                                                    {submitted && !val && (
+                                                        <small className="p-error">
+                                                            {" "}
+                                                            Requerido
+                                                        </small>
+                                                    )}
                                                 </label>
                                                 <Dropdown
                                                     value={val}
-                                                    options={
-                                                        YESNO
-                                                    }
-                                                    onChange={(
-                                                        e
-                                                    ) =>
+                                                    options={YESNO}
+                                                    onChange={(e) =>
                                                         onYesNoChange(
                                                             q.key,
                                                             e.value
@@ -1045,7 +977,7 @@ export default function Iluminacion() {
             <Dialog
                 visible={viewDialogOpen}
                 style={{ width: "60vw", maxWidth: 900 }}
-                header="Detalle del registro – Iluminación"
+                header="Detalle del registro — Motor Reductor (Horno Multilevel)"
                 modal
                 onHide={() => setViewDialogOpen(false)}
             >
@@ -1107,9 +1039,13 @@ export default function Iluminacion() {
                                     padding: 12,
                                 }}
                             >
-                                <div className="grid">
-                                    {preguntasView(viewRow).map(
-                                        (pq, idx) => (
+                                {preguntasView(viewRow).length === 0 ? (
+                                    <p>No hay preguntas asociadas.</p>
+                                ) : (
+                                    <div className="grid">
+                                        {preguntasView(
+                                            viewRow
+                                        ).map((pq, idx) => (
                                             <div
                                                 key={idx}
                                                 className="col-12 md:col-6"
@@ -1122,9 +1058,9 @@ export default function Iluminacion() {
                                                         "—"}
                                                 </p>
                                             </div>
-                                        )
-                                    )}
-                                </div>
+                                        ))}
+                                    </div>
+                                )}
                             </div>
                         </div>
                     </div>

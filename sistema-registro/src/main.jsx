@@ -63,6 +63,7 @@ import TransmisionTurbinaHornoMultilevel from "./Components/MantenimientoAlertas
 import LubricacionBandasHornoMultilevel from "./Components/MantenimientoAlertas/Horno/Registros/LubricacionBandasHornoMultilevel.jsx";
 import SelladoraBandaContinuaGeneral from "./Components/MantenimientoAlertas/Horno/Registros/SelladoraBandaContinuaGeneral.jsx";
 import SensorPT100 from "./Components/MantenimientoAlertas/Horno/Registros/SensorPT100.jsx";
+import MotorReductorHornoMultilevel from "./Components/MantenimientoAlertas/Horno/Registros/MotorReductorHornoMultilevel.jsx";
 
 // Dieta alertas imports
 import DietaMA from './Components/MantenimientoAlertas/Dieta/DietaMA.jsx';
@@ -224,11 +225,13 @@ const router = createBrowserRouter(
             { path: `Alertas`, element: <ContenedorAlertas /> },
 
             // los path del sistema de alertas de Infraestructura de Planta JV
-
+            // ================= Infraestructura de Planta JV =================
+            { path: `InfraestructuraDePlanta`, element: <InfraestructuraDePlanta /> },
+            { path: `InfraestructuraDePlanta/PanelElectrico`, element: <PanelElectrico /> },
+            { path: `InfraestructuraDePlanta/Iluminacion`, element: <Iluminacion /> },
+            { path: `InfraestructuraDePlanta/CuartosElectricos`, element: <CuartosElectricos /> },
+            // (alias opcional para compatibilidad con rutas viejas: /MantenimientoAlertas/Infraestructura)
             { path: `Infraestructura`, element: <InfraestructuraDePlanta /> },
-            { path: `PanelElectrico`, element: <PanelElectrico /> },
-            { path: `Iluminacion`, element: <Iluminacion /> },
-            { path: `CuartosElectricos`, element: <CuartosElectricos /> },
 
             // los path del sistema de alertas de Horno JV
             { path: `Horno`, element: <HornoMA /> },
@@ -245,6 +248,7 @@ const router = createBrowserRouter(
             { path: `Horno/LineaGasGLPHornoMultilevel`, element: <LineaGasGLPHornoMultilevel /> },
             { path: `Horno/TransmisionTurbinaHornoMultilevel`, element: <TransmisionTurbinaHornoMultilevel /> },
             { path: `Horno/LubricacionBandasHornoMultilevel`, element: <LubricacionBandasHornoMultilevel /> },
+            { path: `Horno/MotorReductorHornoMultilevel`, element: <MotorReductorHornoMultilevel /> },
             {
               path: `Horno/SelladoraBandaContinuaGeneral`,
               element: <SelladoraBandaContinuaGeneral />,

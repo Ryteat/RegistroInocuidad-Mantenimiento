@@ -52,9 +52,12 @@ const semanaIso = (isoStr) => {
 
 /* ================== Rutas de formularios ================== */
 const FORM_MAP = {
-    IN1: "/MantenimientoAlertas/PanelElectrico",
-    IN2: "/MantenimientoAlertas/Iluminacion",
-    IN3: "/MantenimientoAlertas/CuartosElectricos",
+
+
+    // Infraestructura
+    "IN-PN-G": "/MantenimientoAlertas/InfraestructuraDePlanta/PanelElectrico",
+    "IN-I-G": "/MantenimientoAlertas/InfraestructuraDePlanta/Iluminacion",
+    "IN-CE-G": "/MantenimientoAlertas/InfraestructuraDePlanta/CuartosElectricos",
 
     "H-EL-SN": "/MantenimientoAlertas/Horno/SistemaNeumatico",
     "H-EL-MR": "/MantenimientoAlertas/Horno/MotorReductor",
@@ -73,6 +76,7 @@ const FORM_MAP = {
     "H-HM-LB": "/MantenimientoAlertas/Horno/LubricacionBandasHornoMultilevel",
     "H-SBC-G": "/MantenimientoAlertas/Horno/SelladoraBandaContinuaGeneral",
     "H-HM-SPT": "/MantenimientoAlertas/Horno/SensorPT100",
+    "H-HM-MR": "/MantenimientoAlertas/Horno/MotorReductorHornoMultilevel",
 
     // Dieta
     "D-BS-G": "/MantenimientoAlertas/Dieta/BombaSumergibleGeneral",
@@ -390,7 +394,7 @@ export default function ContenedorAlertas() {
                 <Column header="Próximo Mantenimiento" body={proximoBody} sortable />
                 <Column header="Semana" body={semanaBody} />
                 <Column header="Estado" body={estadoBody} />
-                <Column header="Acciones" body={accionesBody} style={{ width: "10rem" }} />
+
             </DataTable>
         </div>
     );

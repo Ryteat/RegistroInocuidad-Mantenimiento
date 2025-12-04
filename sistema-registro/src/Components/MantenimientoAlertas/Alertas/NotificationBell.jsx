@@ -62,6 +62,8 @@ const ALLOWED_TABLES = [
     "mto_horno_multilevel_transmision_turbina",
     "mto_horno_banda_entrada_general",
     "mto_horno_banda_salida_general",
+    "mto_horno_multilevel_motor_reductor",
+
     // Horno - Selladora Banda
     "mto_horno_selladora_banda_continua_general",
 
@@ -115,6 +117,8 @@ const FORM_MAP = {
     "H-HM-LG": "/MantenimientoAlertas/Horno/LineaGasGLPHornoMultilevel",
     "H-HM-LB": "/MantenimientoAlertas/Horno/LubricacionBandasHornoMultilevel",
     "H-HM-SPT": "/MantenimientoAlertas/Horno/SensorPT100",
+    "H-HM-MR": "/MantenimientoAlertas/Horno/MotorReductorHornoMultilevel",
+
     "H-ML-V": "/MantenimientoAlertas/Horno/Vibrador",
     "H-HM-TT": "/MantenimientoAlertas/Horno/TransmisionTurbinaHornoMultilevel",
     "H-E-SN": "/MantenimientoAlertas/HornoEmpacadora/SistemaNeumatico",
@@ -129,6 +133,11 @@ const FORM_MAP = {
     "H-ENF-V": "/MantenimientoAlertas/Horno/VibradorEnfriador",
     "H-ENF-LB": "/MantenimientoAlertas/Horno/LubricacionBandasEnfriador",
     "H-ENF-MR": "/MantenimientoAlertas/Horno/MotorReductorEnfriador",
+
+    // Infraestructura
+    "IN-PN-G": "/MantenimientoAlertas/InfraestructuraDePlanta/PanelElectrico",
+    "IN-I-G": "/MantenimientoAlertas/InfraestructuraDePlanta/Iluminacion",
+    "IN-CE-G": "/MantenimientoAlertas/InfraestructuraDePlanta/CuartosElectricos",
 };
 
 /** Tablas que usan "I" (Incompleto) como bloqueo de completado */
@@ -137,6 +146,14 @@ const TABLES_INCOMPLETO_I = [
     "mto_crecimiento_carro_rs",
     "mto_crecimiento_cadenas_conveyor_general",
 ];
+
+/* 🔹 Tablas que tienen SOLO 13 preguntas (respuesta_q1..respuesta_q13) */
+const TABLES_WITH_13_QUESTIONS = [
+    "mto_horno_multilevel_motor_reductor",
+];
+
+const getMaxQuestionsForTable = (tabla) =>
+    TABLES_WITH_13_QUESTIONS.includes(tabla) ? 13 : 14;
 
 /** Recorta un POSICION_ID con consecutivo, ej. COS-T-M-02 → COS-T-M */
 const getBasePosicionId = (posicion_id = "") =>
@@ -242,6 +259,13 @@ export default function NotificationBell() {
     /** Validar NO / I + bloquear completar + mostrar dialog si hay problemas. */
     const handleComplete = async (alerta) => {
         try {
+            const maxQ = getMaxQuestionsForTable(alerta.tabla);
+
+            const columnasRespuestas = Array.from(
+                { length: maxQ },
+                (_, i) => `respuesta_q${i + 1}`
+            ).join(", ");
+
             const { data, error } = await supabase
                 .from(alerta.tabla)
                 .select(
@@ -256,9 +280,7 @@ export default function NotificationBell() {
           ejecutado,
           completado,
           pendiente_nuevo,
-          ${Array.from({ length: 14 }, (_, i) => `respuesta_q${i + 1}`).join(
-                        ", "
-                    )}
+          ${columnasRespuestas}
         `
                 )
                 .eq("id", alerta.id)
@@ -274,7 +296,7 @@ export default function NotificationBell() {
             }
 
             const respuestas = Array.from(
-                { length: 14 },
+                { length: maxQ },
                 (_, i) => data[`respuesta_q${i + 1}`]
             );
 

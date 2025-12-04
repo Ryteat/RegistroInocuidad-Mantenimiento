@@ -47,6 +47,7 @@ const CATEGORIES = [
             { titulo: "*H-HM-TT* Horno Multilevel - Transmisión de Turbina", ruta: "/MantenimientoAlertas/Horno/TransmisionTurbinaHornoMultilevel" },
             { titulo: "*H-HM-LB* Horno Multilevel - Lubricación de Bandas", ruta: "/MantenimientoAlertas/Horno/LubricacionBandasHornoMultilevel" },
             { titulo: "*H-HM-SPT* Horno Multilevel - Sensor PT100", ruta: "/MantenimientoAlertas/Horno/SensorPT100" },
+            { titulo: "*H-HM-MR* Horno Multilevel - Motor Reductor", ruta: "/MantenimientoAlertas/Horno/MotorReductorHornoMultilevel" },
         ],
     },
     {

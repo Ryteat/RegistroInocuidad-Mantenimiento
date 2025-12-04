@@ -629,16 +629,7 @@ export default function LubricacionBandasHornoMultilevel() {
                     sortable
                 />
                 <Column field="periodicidad" header="Periodicidad" />
-                <Column
-                    header="Último Mto."
-                    body={(r) => fmtDMY(r.ultimo_mantenimiento)}
-                    sortable
-                />
-                <Column
-                    header="Próximo Mto."
-                    body={(r) => fmtDMY(r.proximo_mantenimiento)}
-                    sortable
-                />
+
                 <Column field="tecnico" header="Técnico" sortable />
                 <Column
                     header="Fecha de Registro"
