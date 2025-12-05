@@ -619,15 +619,15 @@ export default function PanelesGeneral() {
                 <Column field="posicion_id" header="Posición" sortable />
                 <Column field="equipo" header="Equipo" sortable />
                 <Column field="registro" header="Registro" />
-                <Column field="cantidad" header="Cant." sortable />
+                <Column field="cantidad" header="Cantidad" sortable />
                 <Column field="periodicidad" header="Periodicidad" />
                 <Column
-                    header="Último Mto."
+                    header="Último Mantenimiento"
                     body={(r) => fmtDMY(r.ultimo_mantenimiento)}
                     sortable
                 />
                 <Column
-                    header="Próximo Mto."
+                    header="Próximo Mantenimiento"
                     body={(r) => fmtDMY(r.proximo_mantenimiento)}
                     sortable
                 />
@@ -743,7 +743,7 @@ export default function PanelesGeneral() {
                     </div>
                     <div className="field col-6 md:col-3">
                         <label className="font-bold">
-                            Cantidad* (Panel 1–6){" "}
+                            Cantidad{" "}
                             {submitted && !form.cantidad && (
                                 <small className="p-error"> Requerido</small>
                             )}

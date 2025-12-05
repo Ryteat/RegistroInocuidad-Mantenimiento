@@ -637,11 +637,7 @@ export default function MotorReductor() {
                     <b>Equipo:</b> {EQUIPO} &nbsp; | &nbsp;
                     <b>Registro:</b> {REGISTRO}
                 </p>
-                <p>
-                    El ID final se muestra como{" "}
-                    <b>{`${POSICION_ID_BASE}-01`}</b> según el consecutivo de
-                    cantidad.
-                </p>
+
             </div>
 
             <div className="buttons-container">
@@ -693,14 +689,15 @@ export default function MotorReductor() {
                 <Column field="posicion_id" header="Posición" sortable />
                 <Column field="equipo" header="Equipo" sortable />
                 <Column field="registro" header="Registro" />
+                <Column field="cantidad" header="Cantidad" sortable />
                 <Column field="periodicidad" header="Periodicidad" />
                 <Column
-                    header="Último Mto."
+                    header="Último Mantenimiento"
                     body={(r) => fmtDMY(r.ultimo_mantenimiento)}
                     sortable
                 />
                 <Column
-                    header="Próximo Mto."
+                    header="Próximo Mantenimiento"
                     body={(r) => fmtDMY(r.proximo_mantenimiento)}
                     sortable
                 />
@@ -765,11 +762,7 @@ export default function MotorReductor() {
                             onChange={(e) => onPeriodoChange(e.value)}
                             placeholder="Seleccione"
                         />
-                        <small className="block mt-2">
-                            <b>Trimestral</b>: próximo mto en <b>3 meses</b>;{" "}
-                            <b>Anual</b>: en <b>12 meses</b>. Si NO se ejecuta:{" "}
-                            <b>+7 días</b>.
-                        </small>
+
                     </div>
 
                     <div className="field col-12 md:col-4">
@@ -795,7 +788,7 @@ export default function MotorReductor() {
 
                     <div className="field col-6 md:col-3">
                         <label className="font-bold">
-                            Posición (ID con consecutivo)
+                            Posición (ID)
                         </label>
                         <InputText value={form.posicion_id} disabled />
                     </div>
@@ -821,7 +814,7 @@ export default function MotorReductor() {
                     </div>
                     <div className="field col-6 md:col-3">
                         <label className="font-bold">
-                            Cantidad / Consecutivo
+                            Cantidad
                         </label>
                         <Dropdown
                             value={form.cantidad}
@@ -829,10 +822,7 @@ export default function MotorReductor() {
                             onChange={(e) => onCantidadChange(e.value)}
                             placeholder="01"
                         />
-                        <small className="block mt-1">
-                            Se usa para formar el ID, p. ej.{" "}
-                            <b>{`${POSICION_ID_BASE}-01`}</b>.
-                        </small>
+
                     </div>
 
                     <div className="field col-12 md:col-6">

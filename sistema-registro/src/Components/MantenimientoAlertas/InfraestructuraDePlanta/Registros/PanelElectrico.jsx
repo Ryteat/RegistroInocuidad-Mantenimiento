@@ -635,8 +635,8 @@ export default function PanelElectrico() {
                 <p>
                     <b>Posición base (ID):</b> {POSICION_ID_BASE} &nbsp; | &nbsp;
                     <b>Equipo:</b> {EQUIPO} &nbsp; | &nbsp;
-                    <b>Registro:</b> {REGISTRO} &nbsp; | &nbsp;
-                    <b>Periodicidad:</b> {PERIODICIDAD}
+                    <b>Registro:</b> {REGISTRO} &nbsp;
+
                 </p>
             </div>
 
@@ -695,6 +695,7 @@ export default function PanelElectrico() {
                 <Column field="posicion_id" header="Posición" sortable />
                 <Column field="equipo" header="Equipo" sortable />
                 <Column field="registro" header="Registro" />
+                <Column field="periodicidad" header="Periodicidad" />
                 <Column
                     header="Cantidad"
                     body={(r) =>
@@ -705,6 +706,16 @@ export default function PanelElectrico() {
                     sortable
                 />
 
+                <Column
+                    header="Último Mantenimiento"
+                    body={(r) => fmtDMY(r.ultimo_mantenimiento)}
+                    sortable
+                />
+                <Column
+                    header="Próximo Mantenimiento"
+                    body={(r) => fmtDMY(r.proximo_mantenimiento)}
+                    sortable
+                />
                 <Column header="Semana" body={semanaBody} />
                 <Column field="tecnico" header="Técnico" sortable />
                 <Column
@@ -783,7 +794,7 @@ export default function PanelElectrico() {
                     </div>
                     <div className="field col-6 md:col-3">
                         <label className="font-bold">
-                            Posición (ID con consecutivo)
+                            Posición (ID)
                         </label>
                         <InputText value={form.posicion_id} disabled />
                     </div>
@@ -812,7 +823,7 @@ export default function PanelElectrico() {
                     </div>
                     <div className="field col-6 md:col-3">
                         <label className="font-bold">
-                            Cantidad / Consecutivo
+                            Cantidad
                         </label>
                         <Dropdown
                             value={form.cantidad}
@@ -820,10 +831,7 @@ export default function PanelElectrico() {
                             onChange={(e) => onCantidadChange(e.value)}
                             placeholder="01"
                         />
-                        <small className="block mt-1">
-                            Se usa para formar el ID, p. ej.{" "}
-                            <b>{`${POSICION_ID_BASE}-01`}</b>.
-                        </small>
+
                     </div>
 
                     {/* ¿Se ejecuta? */}

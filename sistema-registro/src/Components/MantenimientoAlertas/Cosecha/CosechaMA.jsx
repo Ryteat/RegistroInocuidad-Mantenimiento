@@ -52,9 +52,9 @@ export default function CosechaMA() {
             <div className="infraestructura-container">
                 <header className="infraestructura-header">
                     <div className="logo-infraestructura-container">
-                        <img src={logo2} alt="Logo" className="logo2" />
+
                     </div>
-                    <h1>Registros de Cosecha</h1>
+                    <h1><img src={logo2} alt="Logo" className="logo2" />Registros de Cosecha</h1>
                 </header>
 
                 <div className="welcome-message">
@@ -96,9 +96,12 @@ export default function CosechaMA() {
         <div className="infraestructura-container">
             <header className="infraestructura-header">
                 <div className="logo-infraestructura-container">
-                    <img src={logo2} alt="Logo" className="logo2" />
+
                 </div>
-                <h1>Cosecha — {category ? category.titulo : "Categoría"}</h1>
+                <h1><img src={logo2} alt="Logo" className="logo2" />Cosecha — {category ? category.titulo : "Categoría"}</h1>
+                <div className="welcome-message">
+                    <p>Selecciona un registro a revisar:</p>
+                </div>
             </header>
 
             <div className="grid-botones">

@@ -641,15 +641,10 @@ export default function MotorReductorHornoMultilevel() {
                 <p>
                     <b>Posición (ID base):</b> {POSICION_ID_BASE} &nbsp; | &nbsp;{" "}
                     <b>Equipo:</b> {EQUIPO} &nbsp; | &nbsp;
-                    <b>Registro:</b> {REGISTRO} &nbsp; | &nbsp;
-                    <b>Cantidad:</b> 5 (consecutivos 01–05)
+                    <b>Registro:</b> {REGISTRO} &nbsp;
+
                 </p>
-                <p>
-                    El ID final se muestra como{" "}
-                    <b>{`${POSICION_ID_BASE}-01`}</b>,{" "}
-                    <b>{`${POSICION_ID_BASE}-02`}</b>, ...{" "}
-                    <b>{`${POSICION_ID_BASE}-05`}</b> según el consecutivo.
-                </p>
+
             </div>
 
             <div className="buttons-container">
@@ -701,14 +696,15 @@ export default function MotorReductorHornoMultilevel() {
                 <Column field="posicion_id" header="Posición" sortable />
                 <Column field="equipo" header="Equipo" sortable />
                 <Column field="registro" header="Registro" />
+                <Column field="cantidad" header="Cantidad" />
                 <Column field="periodicidad" header="Periodicidad" />
                 <Column
-                    header="Último Mto."
+                    header="Último Mantenimiento"
                     body={(r) => fmtDMY(r.ultimo_mantenimiento)}
                     sortable
                 />
                 <Column
-                    header="Próximo Mto."
+                    header="Próximo Mantenimiento"
                     body={(r) => fmtDMY(r.proximo_mantenimiento)}
                     sortable
                 />
@@ -803,7 +799,7 @@ export default function MotorReductorHornoMultilevel() {
 
                     <div className="field col-6 md:col-3">
                         <label className="font-bold">
-                            Posición (ID con consecutivo)
+                            Posición (ID)
                         </label>
                         <InputText value={form.posicion_id} disabled />
                     </div>
@@ -814,7 +810,7 @@ export default function MotorReductorHornoMultilevel() {
 
                     <div className="field col-6 md:col-3">
                         <label className="font-bold">
-                            Técnico*{" "}
+                            Técnico{" "}
                             {submitted && !form.tecnico && (
                                 <small className="p-error"> Requerido</small>
                             )}
@@ -829,7 +825,7 @@ export default function MotorReductorHornoMultilevel() {
                     </div>
                     <div className="field col-6 md:col-3">
                         <label className="font-bold">
-                            Cantidad / Consecutivo
+                            Cantidad
                         </label>
                         <Dropdown
                             value={form.cantidad}
@@ -837,10 +833,7 @@ export default function MotorReductorHornoMultilevel() {
                             onChange={(e) => onCantidadChange(e.value)}
                             placeholder="01"
                         />
-                        <small className="block mt-1">
-                            Se usa para formar el ID, p. ej.{" "}
-                            <b>{`${POSICION_ID_BASE}-01`}</b>.
-                        </small>
+
                     </div>
 
                     <div className="field col-12 md:col-6">

@@ -66,9 +66,9 @@ export default function CrecimientoMA() {
             <div className="infraestructura-container">
                 <header className="infraestructura-header">
                     <div className="logo-infraestructura-container">
-                        <img src={logo2} alt="Logo" className="logo2" />
+
                     </div>
-                    <h1>Registros de Crecimiento</h1>
+                    <h1>   <img src={logo2} alt="Logo" className="logo2" />Registros de Crecimiento</h1>
                 </header>
 
                 <div className="welcome-message">
@@ -109,10 +109,11 @@ export default function CrecimientoMA() {
     return (
         <div className="infraestructura-container">
             <header className="infraestructura-header">
-                <div className="logo-infraestructura-container">
-                    <img src={logo2} alt="Logo" className="logo2" />
+
+                <h1><img src={logo2} alt="Logo" className="logo2" />Crecimiento — {category ? category.titulo : "Categoría"}</h1>
+                <div className="welcome-message">
+                    <p>Selecciona un registro a revisar:</p>
                 </div>
-                <h1>Crecimiento — {category ? category.titulo : "Categoría"}</h1>
             </header>
 
             <div className="grid-botones">

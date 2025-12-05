@@ -42,9 +42,11 @@ function InfraestructuraDePlanta() {
                 <>
                     <header className="infraestructura-header">
                         <div className="logo-infraestructura-container">
-                            <img src={logo2} alt="Logo" className="logo2" />
+
                         </div>
-                        <h1>Infraestructura de Planta</h1>
+                        <h1> <img src={logo2} alt="Logo" className="logo2" />Infraestructura de Planta
+
+                        </h1>
                         <p className="welcome-message">
                             Selecciona el registro que deseas abrir.
                         </p>

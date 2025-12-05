@@ -204,14 +204,14 @@ export default function TamizRevisionEstructuraMalla() {
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [filtroRevisado]);
 
-    // Si venimos desde la campanita con un focusId, abrir directamente en editar
+    /*// Si venimos desde la campanita con un focusId, abrir directamente en editar
     useEffect(() => {
         const focusId = location.state?.focusId;
         if (!focusId || !rows.length) return;
         const row = rows.find((r) => r.id === focusId);
         if (row) openEdit(row);
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [location.state, rows]);
+    }, [location.state, rows]);*/
 
     const openNew = () => {
         setForm(emptyForm());
@@ -556,7 +556,7 @@ export default function TamizRevisionEstructuraMalla() {
 
             <div className="welcome-message">
                 <p>
-                    <b>Posición (ID base):</b> {POSICION_ID_BASE}-01..06 &nbsp; | &nbsp;{" "}
+                    <b>Posición (ID base):</b> {POSICION_ID_BASE}&nbsp; | &nbsp;{" "}
                     <b>Equipo:</b> {EQUIPO} &nbsp; | &nbsp;
                     <b>Registro:</b> {REGISTRO}
                 </p>
@@ -613,12 +613,12 @@ export default function TamizRevisionEstructuraMalla() {
                 <Column field="registro" header="Registro" />
                 <Column field="periodicidad" header="Periodicidad" />
                 <Column
-                    header="Último Mto."
+                    header="Último Mantenimiento"
                     body={(r) => fmtDMY(r.ultimo_mantenimiento)}
                     sortable
                 />
                 <Column
-                    header="Próximo Mto."
+                    header="Próximo Mantenimiento"
                     body={(r) => fmtDMY(r.proximo_mantenimiento)}
                     sortable
                 />
@@ -716,7 +716,7 @@ export default function TamizRevisionEstructuraMalla() {
 
                     <div className="field col-6 md:col-3">
                         <label className="font-bold">
-                            Técnico*{" "}
+                            Técnico{" "}
                             {submitted && !form.tecnico && (
                                 <small className="p-error"> Requerido</small>
                             )}
@@ -730,7 +730,7 @@ export default function TamizRevisionEstructuraMalla() {
 
                     <div className="field col-6 md:col-3">
                         <label className="font-bold">
-                            Cantidad (01..06)*{" "}
+                            Cantidad{" "}
                             {submitted && !form.cantidad && (
                                 <small className="p-error"> Requerido</small>
                             )}
@@ -745,7 +745,7 @@ export default function TamizRevisionEstructuraMalla() {
 
                     <div className="field col-12 md:col-6">
                         <label className="font-bold">
-                            ¿Se va a efectuar el mantenimiento?*{" "}
+                            ¿Se va a efectuar el mantenimiento?{" "}
                             {submitted && !form.ejecutado && (
                                 <small className="p-error"> Requerido</small>
                             )}

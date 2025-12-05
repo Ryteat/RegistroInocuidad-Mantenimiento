@@ -726,8 +726,18 @@ export default function SistemaNeumatico() {
                 <Column field="posicion_id" header="Posición" sortable />
                 <Column field="equipo" header="Equipo" sortable />
                 <Column field="registro" header="Registro" />
+                <Column field="cantidad" header="Cantidad" sortable />
                 <Column field="periodicidad" header="Periodicidad" />
-
+                <Column
+                    header="Último Mantenimiento"
+                    body={(r) => fmtDMY(r.ultimo_mantenimiento)}
+                    sortable
+                />
+                <Column
+                    header="Próximo Mantenimiento"
+                    body={(r) => fmtDMY(r.proximo_mantenimiento)}
+                    sortable
+                />
                 <Column field="tecnico" header="Técnico" sortable />
                 <Column
                     header="Fecha de Registro"
@@ -789,11 +799,7 @@ export default function SistemaNeumatico() {
                             onChange={(e) => onPeriodoChange(e.value)}
                             placeholder="Seleccione"
                         />
-                        <small className="block mt-2">
-                            Si es <b>Semanal</b> el próximo mto se programa a{" "}
-                            <b>7 días</b>; si es <b>Bimensual</b>, a{" "}
-                            <b>2 meses</b>. Si NO se ejecuta: <b>+7 días</b>.
-                        </small>
+
                     </div>
 
                     <div className="field col-12 md:col-4">
@@ -819,7 +825,7 @@ export default function SistemaNeumatico() {
 
                     <div className="field col-6 md:col-3">
                         <label className="font-bold">
-                            Posición (ID con consecutivo)
+                            Posición (ID)
                         </label>
                         <InputText value={form.posicion_id} disabled />
                     </div>
@@ -830,7 +836,7 @@ export default function SistemaNeumatico() {
 
                     <div className="field col-6 md:col-3">
                         <label className="font-bold">
-                            Técnico*{" "}
+                            Técnico{" "}
                             {submitted && !form.tecnico && (
                                 <small className="p-error"> Requerido</small>
                             )}
@@ -845,7 +851,7 @@ export default function SistemaNeumatico() {
                     </div>
                     <div className="field col-6 md:col-3">
                         <label className="font-bold">
-                            Cantidad / Consecutivo
+                            Cantidad
                         </label>
                         <Dropdown
                             value={form.cantidad}
@@ -853,10 +859,7 @@ export default function SistemaNeumatico() {
                             onChange={(e) => onCantidadChange(e.value)}
                             placeholder="01"
                         />
-                        <small className="block mt-1">
-                            Se usa para formar el ID, p. ej.{" "}
-                            <b>{`${POSICION_ID_BASE}-01`}</b>.
-                        </small>
+
                     </div>
 
                     <div className="field col-12 md:col-6">

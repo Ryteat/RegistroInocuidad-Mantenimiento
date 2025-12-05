@@ -131,7 +131,7 @@ const packRow = (r) => ({
     observaciones: r.observaciones ?? "",
 });
 
-// Convertir un row de BD al formato de formulario (para Ver / Editar)
+// Convertir un row de BD al formato de formulario (para Editar)
 const rowToForm = (r) => ({
     id: r.id,
     fecha_registro: r.fecha_registro || toDateISO(),
@@ -139,9 +139,7 @@ const rowToForm = (r) => ({
     posicion_id: r.posicion_id || POSICION_ID,
     equipo: r.equipo || EQUIPO,
     registro: r.registro || REGISTRO,
-    cantidad: r.cantidad
-        ? String(r.cantidad).padStart(2, "0")
-        : "",
+    cantidad: r.cantidad ? String(r.cantidad).padStart(2, "0") : "",
     tecnico: r.tecnico ?? "",
     ejecutado: r.ejecutado ?? "",
     observaciones: r.observaciones ?? "",
@@ -185,14 +183,17 @@ export default function SensorPT100() {
     const [loading, setLoading] = useState(false);
 
     const [dialogOpen, setDialogOpen] = useState(false);
-    const [dialogMode, setDialogMode] = useState("new"); // 'new' | 'view' | 'edit'
-    const isViewMode = dialogMode === "view";
-
+    const [dialogMode, setDialogMode] = useState("new"); // 'new' | 'edit'
+    const isViewMode = dialogMode === "view"; // nunca usamos 'view' ahora, se mantiene en false para no tocar lógica
     const [submitted, setSubmitted] = useState(false);
     const [form, setForm] = useState(emptyForm());
 
     const [filtroRevisado, setFiltroRevisado] = useState("all");
     const { canReview, username } = useCanReview();
+
+    // 🔵 Dialogo exclusivo para VER (igual patrón TamizMotor / PanelControlGeneral)
+    const [viewDialogOpen, setViewDialogOpen] = useState(false);
+    const [viewRecord, setViewRecord] = useState(null);
 
     const showToast = (sev, sum, det, life = 3000) =>
         toast.current?.show({ severity: sev, summary: sum, detail: det, life });
@@ -246,11 +247,10 @@ export default function SensorPT100() {
         setDialogOpen(true);
     };
 
+    // 🔵 Nuevo comportamiento de VER: abre diálogo aparte SOLO lectura
     const openView = (row) => {
-        setForm(rowToForm(row));
-        setSubmitted(false);
-        setDialogMode("view");
-        setDialogOpen(true);
+        setViewRecord(row);
+        setViewDialogOpen(true);
     };
 
     const openEdit = (row) => {
@@ -384,11 +384,7 @@ export default function SensorPT100() {
     };
 
     const save = async () => {
-        if (isViewMode) {
-            hideDialog();
-            return;
-        }
-
+        // en este archivo ya no usamos modo "view" para guardar, solo new/edit
         setSubmitted(true);
         const errs = validate();
         if (errs.length) {
@@ -528,12 +524,12 @@ export default function SensorPT100() {
         );
     };
 
-    // Columna Acciones → Ver / Editar
+    // 🔵 Columna Acciones → Ver / Editar (mismo estilo que TamizMotor)
     const actionTemplate = (row) => (
-        <div className="flex gap-2 justify-content-center">
+        <div className="flex gap-2">
             <Button
                 label="Ver"
-                icon="pi pi-search"
+                icon="pi pi-eye"
                 text
                 onClick={() => openView(row)}
             />
@@ -541,7 +537,6 @@ export default function SensorPT100() {
                 label="Editar"
                 icon="pi pi-pencil"
                 text
-                severity="warning"
                 onClick={() => openEdit(row)}
             />
         </div>
@@ -618,8 +613,18 @@ export default function SensorPT100() {
                 <Column field="posicion_id" header="Posición" sortable />
                 <Column field="equipo" header="Equipo" sortable />
                 <Column field="registro" header="Registro" />
+                <Column field="cantidad" header="Cantidad" />
                 <Column field="periodicidad" header="Periodicidad" />
-
+                <Column
+                    header="Último Mantenimiento"
+                    body={(r) => fmtDMY(r.ultimo_mantenimiento)}
+                    sortable
+                />
+                <Column
+                    header="Próximo Mantenimiento"
+                    body={(r) => fmtDMY(r.proximo_mantenimiento)}
+                    sortable
+                />
                 <Column field="tecnico" header="Técnico" sortable />
                 <Column
                     header="Fecha de Registro"
@@ -635,37 +640,34 @@ export default function SensorPT100() {
                     header="Acciones"
                     body={actionTemplate}
                     exportable={false}
-                    style={{ width: "10rem", textAlign: "center" }}
+                    style={{ width: "14rem" }}
                 />
             </DataTable>
 
+            {/* Dialog NUEVO / EDITAR (lógica igual) */}
             <Dialog
                 visible={dialogOpen}
                 style={{ width: "72vw", maxWidth: 1100 }}
                 header={
-                    dialogMode === "view"
-                        ? "Ver registro — Sensor PT100 (Trimestral)"
-                        : dialogMode === "edit"
-                            ? "Editar registro — Sensor PT100 (Trimestral)"
-                            : "Nuevo registro — Sensor PT100 (Trimestral)"
+                    dialogMode === "edit"
+                        ? "Editar registro — Sensor PT100 (Trimestral)"
+                        : "Nuevo registro — Sensor PT100 (Trimestral)"
                 }
                 modal
                 onHide={hideDialog}
                 footer={
                     <div className="flex gap-2 justify-content-end">
                         <Button
-                            label="Cerrar"
+                            label="Cancelar"
                             icon="pi pi-times"
                             outlined
                             onClick={hideDialog}
                         />
-                        {!isViewMode && (
-                            <Button
-                                label="Guardar"
-                                icon="pi pi-check"
-                                onClick={save}
-                            />
-                        )}
+                        <Button
+                            label="Guardar"
+                            icon="pi pi-check"
+                            onClick={save}
+                        />
                     </div>
                 }
             >
@@ -690,7 +692,6 @@ export default function SensorPT100() {
                             onChange={(e) =>
                                 onChange("fecha_registro", e.target.value)
                             }
-                            disabled={isViewMode}
                         />
                     </div>
                     <div className="field col-12 md:col-4">
@@ -701,7 +702,6 @@ export default function SensorPT100() {
                             onChange={(e) =>
                                 onChange("hora_registro", e.target.value)
                             }
-                            disabled={isViewMode}
                         />
                     </div>
 
@@ -716,7 +716,7 @@ export default function SensorPT100() {
 
                     <div className="field col-6 md:col-3">
                         <label className="font-bold">
-                            Técnico*{" "}
+                            Técnico{" "}
                             {submitted && !form.tecnico && (
                                 <small className="p-error"> Requerido</small>
                             )}
@@ -727,12 +727,11 @@ export default function SensorPT100() {
                                 onChange("tecnico", e.target.value)
                             }
                             placeholder="Nombre del técnico"
-                            disabled={isViewMode}
                         />
                     </div>
                     <div className="field col-6 md:col-3">
                         <label className="font-bold">
-                            Cantidad (consecutivo)*{" "}
+                            Cantidad{" "}
                             {submitted && !form.cantidad && (
                                 <small className="p-error"> Requerido</small>
                             )}
@@ -742,13 +741,12 @@ export default function SensorPT100() {
                             options={CANTIDAD_OPTIONS}
                             onChange={(e) => onCantidadChange(e.value)}
                             placeholder="Seleccione"
-                            disabled={isViewMode}
                         />
                     </div>
 
                     <div className="field col-12 md:col-6">
                         <label className="font-bold">
-                            ¿Se va a efectuar el mantenimiento?*{" "}
+                            ¿Se va a efectuar el mantenimiento?{" "}
                             {submitted && !form.ejecutado && (
                                 <small className="p-error"> Requerido</small>
                             )}
@@ -760,7 +758,6 @@ export default function SensorPT100() {
                                 onChange("ejecutado", e.value)
                             }
                             placeholder="Seleccione"
-                            disabled={isViewMode}
                         />
                     </div>
 
@@ -777,7 +774,6 @@ export default function SensorPT100() {
                                                 e.checked
                                             )
                                         }
-                                        disabled={isViewMode}
                                     />
                                     <label
                                         htmlFor="chk-rtd"
@@ -798,7 +794,6 @@ export default function SensorPT100() {
                                                 e.checked
                                             )
                                         }
-                                        disabled={isViewMode}
                                     />
                                     <label
                                         htmlFor="chk-ind"
@@ -837,8 +832,7 @@ export default function SensorPT100() {
                                                             {submitted &&
                                                                 !form[
                                                                     `rtd_pt100_${i}`
-                                                                ]?.trim() &&
-                                                                !isViewMode && (
+                                                                ]?.trim() && (
                                                                     <small className="p-error">
                                                                         {" "}
                                                                         Requerido
@@ -859,9 +853,6 @@ export default function SensorPT100() {
                                                                 )
                                                             }
                                                             placeholder="°C"
-                                                            disabled={
-                                                                isViewMode
-                                                            }
                                                         />
                                                     </div>
                                                     <div className="col-12 md:col-3">
@@ -870,8 +861,7 @@ export default function SensorPT100() {
                                                             {submitted &&
                                                                 !form[
                                                                     `patron_rtd_${i}`
-                                                                ]?.trim() &&
-                                                                !isViewMode && (
+                                                                ]?.trim() && (
                                                                     <small className="p-error">
                                                                         {" "}
                                                                         Requerido
@@ -892,9 +882,6 @@ export default function SensorPT100() {
                                                                 )
                                                             }
                                                             placeholder="°C"
-                                                            disabled={
-                                                                isViewMode
-                                                            }
                                                         />
                                                     </div>
                                                 </React.Fragment>
@@ -933,8 +920,7 @@ export default function SensorPT100() {
                                                             {submitted &&
                                                                 !form[
                                                                     `ind_dig_${i}`
-                                                                ]?.trim() &&
-                                                                !isViewMode && (
+                                                                ]?.trim() && (
                                                                     <small className="p-error">
                                                                         {" "}
                                                                         Requerido
@@ -955,9 +941,6 @@ export default function SensorPT100() {
                                                                 )
                                                             }
                                                             placeholder="°C"
-                                                            disabled={
-                                                                isViewMode
-                                                            }
                                                         />
                                                     </div>
                                                     <div className="col-12 md:col-3">
@@ -966,8 +949,7 @@ export default function SensorPT100() {
                                                             {submitted &&
                                                                 !form[
                                                                     `patron_ind_${i}`
-                                                                ]?.trim() &&
-                                                                !isViewMode && (
+                                                                ]?.trim() && (
                                                                     <small className="p-error">
                                                                         {" "}
                                                                         Requerido
@@ -988,9 +970,6 @@ export default function SensorPT100() {
                                                                 )
                                                             }
                                                             placeholder="°C"
-                                                            disabled={
-                                                                isViewMode
-                                                            }
                                                         />
                                                     </div>
                                                 </React.Fragment>
@@ -1007,8 +986,7 @@ export default function SensorPT100() {
                             <label className="font-bold">
                                 Observaciones (obligatorio si NO){" "}
                                 {submitted &&
-                                    !form.observaciones.trim() &&
-                                    !isViewMode && (
+                                    !form.observaciones.trim() && (
                                         <small className="p-error">
                                             {" "}
                                             Requerido
@@ -1021,7 +999,6 @@ export default function SensorPT100() {
                                     onChange("observaciones", e.target.value)
                                 }
                                 placeholder="Explique el motivo"
-                                disabled={isViewMode}
                             />
                             <small className="block mt-2">
                                 Se reprogramará automáticamente para dentro de{" "}
@@ -1040,7 +1017,6 @@ export default function SensorPT100() {
                                 onChange={(e) =>
                                     onChange("observaciones", e.target.value)
                                 }
-                                disabled={isViewMode}
                             />
                         </div>
                     )}
@@ -1055,6 +1031,106 @@ export default function SensorPT100() {
                         />
                     </div>
                 </div>
+            </Dialog>
+
+            {/* 🔵 Dialog VER (solo lectura, como PanelControlGeneral) */}
+            <Dialog
+                visible={viewDialogOpen}
+                onHide={() => setViewDialogOpen(false)}
+                header="Detalle del registro — Sensor PT100"
+                style={{ width: "60vw", maxWidth: 900 }}
+                modal
+            >
+                {!viewRecord ? (
+                    <p>No hay datos para mostrar.</p>
+                ) : (
+                    <div className="p-fluid">
+                        <p>
+                            <b>Posición:</b> {viewRecord.posicion_id} <br />
+                            <b>Equipo:</b> {viewRecord.equipo} <br />
+                            <b>Registro:</b> {viewRecord.registro} <br />
+                            <b>Técnico:</b> {viewRecord.tecnico || "—"} <br />
+                            <b>Fecha intervención:</b>{" "}
+                            {fmtDMY(viewRecord.fecha_registro)}{" "}
+                            {viewRecord.hora_registro &&
+                                ` ${viewRecord.hora_registro}`}{" "}
+                            <br />
+                            <b>Periodicidad:</b>{" "}
+                            {viewRecord.periodicidad || "TRIMESTRAL"}
+                        </p>
+
+                        {viewRecord.medir_rtd && (
+                            <>
+                                <h3 className="mt-3 mb-2">
+                                    RTD PT-100 — mediciones y patrón
+                                </h3>
+                                <div className="grid">
+                                    {[1, 2, 3, 4, 5].map((i) => {
+                                        const rtd =
+                                            viewRecord[`rtd_pt100_${i}`] ??
+                                            "—";
+                                        const pat =
+                                            viewRecord[`patron_rtd_${i}`] ??
+                                            "—";
+                                        return (
+                                            <div
+                                                key={`view-rtd-${i}`}
+                                                className="col-12 md:col-6 mb-2"
+                                            >
+                                                <p className="m-0">
+                                                    <b>
+                                                        RTD PT-100 #{i} /
+                                                        Patrón #{i}
+                                                    </b>
+                                                    <br />
+                                                    RTD: {rtd} &nbsp; | &nbsp;
+                                                    Patrón: {pat}
+                                                </p>
+                                            </div>
+                                        );
+                                    })}
+                                </div>
+                            </>
+                        )}
+
+                        {viewRecord.medir_indicador && (
+                            <>
+                                <h3 className="mt-3 mb-2">
+                                    Indicador Digital — mediciones y patrón
+                                </h3>
+                                <div className="grid">
+                                    {[1, 2, 3, 4, 5].map((i) => {
+                                        const ind =
+                                            viewRecord[`ind_dig_${i}`] ??
+                                            "—";
+                                        const pat =
+                                            viewRecord[`patron_ind_${i}`] ??
+                                            "—";
+                                        return (
+                                            <div
+                                                key={`view-ind-${i}`}
+                                                className="col-12 md:col-6 mb-2"
+                                            >
+                                                <p className="m-0">
+                                                    <b>
+                                                        Indicador #{i} /
+                                                        Patrón #{i}
+                                                    </b>
+                                                    <br />
+                                                    Indicador: {ind} &nbsp; |{" "}
+                                                    &nbsp; Patrón: {pat}
+                                                </p>
+                                            </div>
+                                        );
+                                    })}
+                                </div>
+                            </>
+                        )}
+
+                        <h3 className="mt-3 mb-2">Observaciones</h3>
+                        <p>{viewRecord.observaciones || "Sin observaciones."}</p>
+                    </div>
+                )}
             </Dialog>
         </div>
     );

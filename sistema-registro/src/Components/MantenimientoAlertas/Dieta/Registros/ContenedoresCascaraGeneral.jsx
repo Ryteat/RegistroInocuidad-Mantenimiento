@@ -558,7 +558,7 @@ export default function ContenedoresCascaraGeneral() {
 
             <div className="welcome-message">
                 <p>
-                    <b>Posición base (ID):</b> {POSICION_ID_BASE} &nbsp; | &nbsp;{" "}
+                    <b>Posición (ID):</b> {POSICION_ID_BASE} &nbsp; | &nbsp;{" "}
                     <b>Equipo:</b> {EQUIPO} &nbsp; | &nbsp;
                     <b>Registro:</b> {REGISTRO}
                 </p>
@@ -624,12 +624,12 @@ export default function ContenedoresCascaraGeneral() {
                 />
                 <Column field="periodicidad" header="Periodicidad" />
                 <Column
-                    header="Último Mto."
+                    header="Último Mantenimiento"
                     body={(r) => fmtDMY(r.ultimo_mantenimiento)}
                     sortable
                 />
                 <Column
-                    header="Próximo Mto."
+                    header="Próximo Mantenimiento"
                     body={(r) => fmtDMY(r.proximo_mantenimiento)}
                     sortable
                 />
@@ -678,7 +678,7 @@ export default function ContenedoresCascaraGeneral() {
                 <div className="p-fluid grid">
                     <div className="field col-12 md:col-4">
                         <label className="font-bold">
-                            Periodicidad*{" "}
+                            Periodicidad{" "}
                             {submitted && !form.periodicidad && (
                                 <small className="p-error"> Requerido</small>
                             )}
@@ -716,7 +716,7 @@ export default function ContenedoresCascaraGeneral() {
                     </div>
 
                     <div className="field col-6 md:col-3">
-                        <label className="font-bold">Posición base</label>
+                        <label className="font-bold">Posición (ID)</label>
                         <InputText value={POSICION_ID_BASE} disabled />
                     </div>
                     <div className="field col-6 md:col-3">
@@ -726,7 +726,7 @@ export default function ContenedoresCascaraGeneral() {
 
                     <div className="field col-6 md:col-3">
                         <label className="font-bold">
-                            Técnico*{" "}
+                            Técnico{" "}
                             {submitted && !form.tecnico && (
                                 <small className="p-error"> Requerido</small>
                             )}
@@ -753,7 +753,7 @@ export default function ContenedoresCascaraGeneral() {
 
                     <div className="field col-12 md:col-6">
                         <label className="font-bold">
-                            ¿Se va a efectuar el mantenimiento?*{" "}
+                            ¿Se va a efectuar el mantenimiento?{" "}
                             {submitted && !form.ejecutado && (
                                 <small className="p-error"> Requerido</small>
                             )}

@@ -700,12 +700,12 @@ export default function MezcladoraGeneral() {
                 <Column field="cantidad" header="Cantidad" />
                 <Column field="periodicidad" header="Periodicidad" />
                 <Column
-                    header="Último Mto."
+                    header="Último Mantenimiento"
                     body={(r) => fmtDMY(r.ultimo_mantenimiento)}
                     sortable
                 />
                 <Column
-                    header="Próximo Mto."
+                    header="Próximo Mantenimiento"
                     body={(r) => fmtDMY(r.proximo_mantenimiento)}
                     sortable
                 />
@@ -758,7 +758,7 @@ export default function MezcladoraGeneral() {
                 <div className="p-fluid grid">
                     <div className="field col-12 md:col-4">
                         <label className="font-bold">
-                            Periodicidad*{" "}
+                            Periodicidad{" "}
                             {submitted && !form.periodicidad && (
                                 <small className="p-error">
                                     {" "}
@@ -814,7 +814,7 @@ export default function MezcladoraGeneral() {
 
                     <div className="field col-6 md:col-3">
                         <label className="font-bold">
-                            Posición base
+                            Posición (ID)
                         </label>
                         <InputText
                             value={POSICION_ID_BASE}
@@ -861,7 +861,7 @@ export default function MezcladoraGeneral() {
 
                     <div className="field col-12 md:col-6">
                         <label className="font-bold">
-                            ¿Se va a efectuar el mantenimiento?*{" "}
+                            ¿Se va a efectuar el mantenimiento?{" "}
                             {submitted && !form.ejecutado && (
                                 <small className="p-error">
                                     {" "}

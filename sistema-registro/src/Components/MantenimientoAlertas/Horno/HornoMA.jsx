@@ -72,9 +72,9 @@ export default function HornoMA() {
             <div className="infraestructura-container">
                 <header className="infraestructura-header">
                     <div className="logo-infraestructura-container">
-                        <img src={logo2} alt="Logo" className="logo2" />
+
                     </div>
-                    <h1>Registros de Horno</h1>
+                    <h1><img src={logo2} alt="Logo" className="logo2" />Registros de Horno</h1>
                 </header>
 
                 <div className="welcome-message">
@@ -116,9 +116,9 @@ export default function HornoMA() {
         <div className="infraestructura-container">
             <header className="infraestructura-header">
                 <div className="logo-infraestructura-container">
-                    <img src={logo2} alt="Logo" className="logo2" />
+
                 </div>
-                <h1>Horno - {category ? category.titulo : "Categoría"}</h1>
+                <h1><img src={logo2} alt="Logo" className="logo2" />Horno - {category ? category.titulo : "Categoría"}</h1>
                 <div className="welcome-message">
                     <p>Estos son los registros que pertenecen a esta categoría de Horno:</p>
                 </div>

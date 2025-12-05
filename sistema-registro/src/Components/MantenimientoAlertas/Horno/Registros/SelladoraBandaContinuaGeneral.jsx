@@ -623,7 +623,7 @@ export default function SelladoraBandaContinuaGeneral() {
 
             <div className="welcome-message">
                 <p>
-                    <b>Posición base (ID):</b> {POSICION_ID_BASE} &nbsp; | &nbsp;{" "}
+                    <b>Posición (ID):</b> {POSICION_ID_BASE} &nbsp; | &nbsp;{" "}
                     <b>Equipo:</b> {EQUIPO} &nbsp; | &nbsp;
                     <b>Registro:</b> {REGISTRO}
                 </p>
@@ -679,7 +679,7 @@ export default function SelladoraBandaContinuaGeneral() {
                 <Column field="equipo" header="Equipo" sortable />
                 <Column field="registro" header="Registro" />
                 <Column
-                    header="Consecutivo"
+                    header="Cantidad"
                     body={(r) =>
                         r.cantidad != null
                             ? String(r.cantidad).padStart(2, "0")
@@ -689,12 +689,12 @@ export default function SelladoraBandaContinuaGeneral() {
                 />
                 <Column field="periodicidad" header="Periodicidad" />
                 <Column
-                    header="Último Mto."
+                    header="Último Mantenimiento"
                     body={(r) => fmtDMY(r.ultimo_mantenimiento)}
                     sortable
                 />
                 <Column
-                    header="Próximo Mto."
+                    header="Próximo Mantenimiento"
                     body={(r) => fmtDMY(r.proximo_mantenimiento)}
                     sortable
                 />
@@ -747,7 +747,7 @@ export default function SelladoraBandaContinuaGeneral() {
                 <div className="p-fluid grid">
                     <div className="field col-12 md:col-4">
                         <label className="font-bold">
-                            Periodicidad*{" "}
+                            Periodicidad{" "}
                             {submitted && !form.periodicidad && (
                                 <small className="p-error"> Requerido</small>
                             )}
@@ -787,7 +787,7 @@ export default function SelladoraBandaContinuaGeneral() {
                     </div>
 
                     <div className="field col-6 md:col-3">
-                        <label className="font-bold">Posición base</label>
+                        <label className="font-bold">Posición</label>
                         <InputText value={POSICION_ID_BASE} disabled />
                     </div>
                     <div className="field col-6 md:col-3">
@@ -797,7 +797,7 @@ export default function SelladoraBandaContinuaGeneral() {
 
                     <div className="field col-6 md:col-3">
                         <label className="font-bold">
-                            Técnico*{" "}
+                            Técnico{" "}
                             {submitted && !form.tecnico && (
                                 <small className="p-error"> Requerido</small>
                             )}
@@ -812,7 +812,7 @@ export default function SelladoraBandaContinuaGeneral() {
                     </div>
                     <div className="field col-6 md:col-3">
                         <label className="font-bold">
-                            Cantidad* (Selladora 01–02){" "}
+                            Cantidad{" "}
                             {submitted && !form.cantidad && (
                                 <small className="p-error"> Requerido</small>
                             )}
@@ -827,7 +827,7 @@ export default function SelladoraBandaContinuaGeneral() {
 
                     <div className="field col-12 md:col-6">
                         <label className="font-bold">
-                            ¿Se va a efectuar el mantenimiento?*{" "}
+                            ¿Se va a efectuar el mantenimiento?{" "}
                             {submitted && !form.ejecutado && (
                                 <small className="p-error"> Requerido</small>
                             )}

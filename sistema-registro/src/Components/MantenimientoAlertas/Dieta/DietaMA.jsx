@@ -67,9 +67,9 @@ export default function DietaMA() {
             <div className="infraestructura-container">
                 <header className="infraestructura-header">
                     <div className="logo-infraestructura-container">
-                        <img src={logo2} alt="Logo" className="logo2" />
+
                     </div>
-                    <h1>Registros de Dieta</h1>
+                    <h1><img src={logo2} alt="Logo" className="logo2" />Registros de Dieta</h1>
                 </header>
 
                 <div className="welcome-message">
@@ -112,9 +112,12 @@ export default function DietaMA() {
         <div className="infraestructura-container">
             <header className="infraestructura-header">
                 <div className="logo-infraestructura-container">
-                    <img src={logo2} alt="Logo" className="logo2" />
+
                 </div>
-                <h1>Dieta — {category ? category.titulo : "Categoría"}</h1>
+                <h1><img src={logo2} alt="Logo" className="logo2" />Dieta — {category ? category.titulo : "Categoría"}</h1>
+                <div className="welcome-message">
+                    <p>Selecciona un registro a revisar:</p>
+                </div>
             </header>
 
             <div className="grid-botones">

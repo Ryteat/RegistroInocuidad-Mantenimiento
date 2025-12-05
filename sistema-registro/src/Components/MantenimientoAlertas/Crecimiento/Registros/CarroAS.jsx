@@ -599,11 +599,7 @@ export default function CarroAS() {
                     <b>Equipo:</b> {EQUIPO} &nbsp; | &nbsp;
                     <b>Registro:</b> {REGISTRO}
                 </p>
-                <p>
-                    <b>ID final de ejemplo:</b>{" "}
-                    {buildPosicionId(form.cantidad) ||
-                        "Seleccione cantidad (01–04) para ver el ID"}
-                </p>
+
             </div>
 
             <div className="buttons-container">
@@ -657,7 +653,16 @@ export default function CarroAS() {
                 <Column field="registro" header="Registro" />
                 <Column field="cantidad" header="Cantidad" sortable />
                 <Column field="periodicidad" header="Periodicidad" />
-
+                <Column
+                    header="Último Mantenimiento"
+                    body={(r) => fmtDMY(r.ultimo_mantenimiento)}
+                    sortable
+                />
+                <Column
+                    header="Próximo Mantenimiento"
+                    body={(r) => fmtDMY(r.proximo_mantenimiento)}
+                    sortable
+                />
                 <Column field="tecnico" header="Técnico" sortable />
                 <Column
                     header="Fecha de Registro"

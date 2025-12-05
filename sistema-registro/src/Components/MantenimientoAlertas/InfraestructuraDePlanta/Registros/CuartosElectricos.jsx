@@ -649,8 +649,7 @@ export default function CuartosElectricos() {
                     <b>Posición base (ID):</b> {POSICION_ID_BASE} &nbsp;
                     | &nbsp;
                     <b>Equipo:</b> {EQUIPO} &nbsp; | &nbsp;
-                    <b>Registro:</b> {REGISTRO} &nbsp; | &nbsp;
-                    <b>Periodicidad:</b> {PERIODICIDAD}
+                    <b>Registro:</b> {REGISTRO} &nbsp;
 
                 </p>
             </div>
@@ -719,10 +718,7 @@ export default function CuartosElectricos() {
                     header="Posición"
                     sortable
                 />
-                <Column
-                    header="Cantidad"
-                    body={cantidadBody}
-                />
+
                 <Column
                     field="equipo"
                     header="Equipo"
@@ -733,8 +729,24 @@ export default function CuartosElectricos() {
                     header="Registro"
                 />
                 <Column
+                    header="Cantidad"
+                    body={cantidadBody}
+                />
+                <Column
                     field="periodicidad"
                     header="Periodicidad"
+                />
+                <Column
+                    field="ultimo_mantenimiento"
+                    header="Último Mantenimiento"
+                    body={(r) => fmtDMY(r.ultimo_mantenimiento)}
+                    sortable
+                />
+                <Column
+                    field="proximo_mantenimiento"
+                    header="Próximo Mantenimiento"
+                    body={(r) => fmtDMY(r.proximo_mantenimiento)}
+                    sortable
                 />
                 <Column
                     header="Semana"
@@ -839,7 +851,7 @@ export default function CuartosElectricos() {
                     </div>
                     <div className="field col-6 md:col-3">
                         <label className="font-bold">
-                            Posición ID
+                            Posición (ID)
                         </label>
                         <InputText
                             value={form.posicion_id}

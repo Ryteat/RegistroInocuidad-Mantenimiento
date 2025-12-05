@@ -53,23 +53,22 @@ const semanaIso = (isoStr) => {
 /* ================== Rutas de formularios ================== */
 const FORM_MAP = {
 
+    //aqui se agregan las rutas de los formularios para abrir desde las alertas JV
 
     // Infraestructura
     "IN-PN-G": "/MantenimientoAlertas/InfraestructuraDePlanta/PanelElectrico",
     "IN-I-G": "/MantenimientoAlertas/InfraestructuraDePlanta/Iluminacion",
     "IN-CE-G": "/MantenimientoAlertas/InfraestructuraDePlanta/CuartosElectricos",
 
+    // Horno
     "H-EL-SN": "/MantenimientoAlertas/Horno/SistemaNeumatico",
     "H-EL-MR": "/MantenimientoAlertas/Horno/MotorReductor",
     "H-EL-V": "/MantenimientoAlertas/Horno/Vibrador",
-
     "H-ENF-MR": "/MantenimientoAlertas/Horno/MotorReductorEnfriador",
     "H-ENF-LB": "/MantenimientoAlertas/Horno/LubricacionBandasEnfriador",
     "H-ENF-V": "/MantenimientoAlertas/Horno/VibradorEnfriador",
-
     "H-BS-G": "/MantenimientoAlertas/Horno/BandaSalidaGeneral",
     "H-BE-G": "/MantenimientoAlertas/Horno/BandaEntradaGeneral",
-
     "H-V-HM": "/MantenimientoAlertas/Horno/VibradorHornoMultilevel",
     "H-HM-LG": "/MantenimientoAlertas/Horno/LineaGasGLPHornoMultilevel",
     "H-HM-TT": "/MantenimientoAlertas/Horno/TransmisionTurbinaHornoMultilevel",
@@ -181,7 +180,7 @@ export default function ContenedorAlertas() {
         return () => clearTimeout(t);
     }, [searchInput]);
 
-    // 👇 Semana: si está completado, no mostramos nada
+    // Semana: si está completado, no mostramos nada
     const semanaBody = (r) => {
         const esCompletado =
             r.completado === true ||
@@ -194,7 +193,7 @@ export default function ContenedorAlertas() {
             : "—";
     };
 
-    // 👇 Próximo mantenimiento: si está completado, lo ocultamos (TU CAMBIO)
+    // Próximo mantenimiento: si está completado, lo ocultamos (TU CAMBIO)
     const proximoBody = (r) => {
         const esCompletado =
             r.completado === true ||
@@ -301,7 +300,7 @@ export default function ContenedorAlertas() {
                         style={{ width: 280, height: 44 }}
                     />
                     <Button
-                        label="⌂ Volver al Menú Principal"
+                        label="Menú Principal"
                         icon="pi pi-home"
                         className="p-button-secondary"
                         onClick={() =>
@@ -313,7 +312,7 @@ export default function ContenedorAlertas() {
                         style={{ width: 280, height: 44 }}
                     />
                     <Button
-                        label="Cerrar sesión"
+                        label="Cerrar Sesión"
                         icon="pi pi-sign-out"
                         severity="danger"
                         onClick={() => navigate("/", { replace: true })}

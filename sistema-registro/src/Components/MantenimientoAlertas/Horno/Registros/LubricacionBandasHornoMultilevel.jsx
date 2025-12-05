@@ -564,7 +564,7 @@ export default function LubricacionBandasHornoMultilevel() {
 
             <div className="welcome-message">
                 <p>
-                    <b>Posición base (ID):</b> {POSICION_ID_BASE} &nbsp; | &nbsp;{" "}
+                    <b>Posición (ID):</b> {POSICION_ID_BASE} &nbsp; | &nbsp;{" "}
                     <b>Equipo:</b> {EQUIPO} &nbsp; | &nbsp;
                     <b>Registro:</b> {REGISTRO}
                 </p>
@@ -629,7 +629,16 @@ export default function LubricacionBandasHornoMultilevel() {
                     sortable
                 />
                 <Column field="periodicidad" header="Periodicidad" />
-
+                <Column
+                    header="Último Mantenimiento"
+                    body={(r) => fmtDMY(r.ultimo_mantenimiento)}
+                    sortable
+                />
+                <Column
+                    header="Próximo Mantenimiento"
+                    body={(r) => fmtDMY(r.proximo_mantenimiento)}
+                    sortable
+                />
                 <Column field="tecnico" header="Técnico" sortable />
                 <Column
                     header="Fecha de Registro"
@@ -713,7 +722,7 @@ export default function LubricacionBandasHornoMultilevel() {
                     </div>
 
                     <div className="field col-6 md:col-3">
-                        <label className="font-bold">Posición base</label>
+                        <label className="font-bold">Posición (ID)</label>
                         <InputText value={POSICION_ID_BASE} disabled />
                     </div>
                     <div className="field col-6 md:col-3">
@@ -723,7 +732,7 @@ export default function LubricacionBandasHornoMultilevel() {
 
                     <div className="field col-6 md:col-3">
                         <label className="font-bold">
-                            Técnico*{" "}
+                            Técnico{" "}
                             {submitted && !form.tecnico && (
                                 <small className="p-error"> Requerido</small>
                             )}

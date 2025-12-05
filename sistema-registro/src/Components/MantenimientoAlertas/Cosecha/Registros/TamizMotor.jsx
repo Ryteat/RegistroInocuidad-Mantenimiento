@@ -640,15 +640,15 @@ export default function TamizMotor() {
                 <Column field="posicion_id" header="Posición" sortable />
                 <Column field="equipo" header="Equipo" sortable />
                 <Column field="registro" header="Registro" />
-                <Column field="cantidad" header="Cant." sortable />
+                <Column field="cantidad" header="Cantidad" sortable />
                 <Column field="periodicidad" header="Periodicidad" />
                 <Column
-                    header="Último Mto."
+                    header="Último Mantenimiento"
                     body={(r) => fmtDMY(r.ultimo_mantenimiento)}
                     sortable
                 />
                 <Column
-                    header="Próximo Mto."
+                    header="Próximo Mantenimiento"
                     body={(r) => fmtDMY(r.proximo_mantenimiento)}
                     sortable
                 />
@@ -751,7 +751,7 @@ export default function TamizMotor() {
 
                     <div className="field col-6 md:col-3">
                         <label className="font-bold">
-                            Técnico*{" "}
+                            Técnico{" "}
                             {submitted && !form.tecnico && (
                                 <small className="p-error"> Requerido</small>
                             )}
@@ -766,7 +766,7 @@ export default function TamizMotor() {
                     </div>
                     <div className="field col-6 md:col-3">
                         <label className="font-bold">
-                            Cantidad* (Tamiz 1–3){" "}
+                            Cantidad{" "}
                             {submitted && !form.cantidad && (
                                 <small className="p-error"> Requerido</small>
                             )}
@@ -781,7 +781,7 @@ export default function TamizMotor() {
 
                     <div className="field col-12 md:col-6">
                         <label className="font-bold">
-                            ¿Se va a efectuar el mantenimiento?*{" "}
+                            ¿Se va a efectuar el mantenimiento?{" "}
                             {submitted && !form.ejecutado && (
                                 <small className="p-error"> Requerido</small>
                             )}

@@ -614,15 +614,15 @@ export default function BandasLubricacion() {
                 <Column field="posicion_id" header="Posición" sortable />
                 <Column field="equipo" header="Equipo" sortable />
                 <Column field="registro" header="Registro" />
-                <Column field="cantidad" header="Consecutivo" />
+                <Column field="cantidad" header="Cantidad" />
                 <Column field="periodicidad" header="Periodicidad" />
                 <Column
-                    header="Último Mto."
+                    header="Último Mantenimiento"
                     body={(r) => fmtDMY(r.ultimo_mantenimiento)}
                     sortable
                 />
                 <Column
-                    header="Próximo Mto."
+                    header="Próximo Mantenimiento"
                     body={(r) => fmtDMY(r.proximo_mantenimiento)}
                     sortable
                 />
@@ -675,7 +675,7 @@ export default function BandasLubricacion() {
                 <div className="p-fluid grid">
                     <div className="field col-12 md:col-4">
                         <label className="font-bold">
-                            Periodicidad*{" "}
+                            Periodicidad{" "}
                             {submitted && !form.periodicidad && (
                                 <small className="p-error"> Requerido</small>
                             )}
@@ -723,7 +723,7 @@ export default function BandasLubricacion() {
 
                     <div className="field col-6 md:col-3">
                         <label className="font-bold">
-                            Técnico*{" "}
+                            Técnico{" "}
                             {submitted && !form.tecnico && (
                                 <small className="p-error"> Requerido</small>
                             )}
@@ -738,13 +738,13 @@ export default function BandasLubricacion() {
                     </div>
                     <div className="field col-6 md:col-3">
                         <label className="font-bold">
-                            Cantidad (consecutivo)
+                            Cantidad
                         </label>
                         <Dropdown
                             value={form.cantidad}
                             options={CANTIDAD_OPTIONS}
                             onChange={(e) => onChange("cantidad", e.value)}
-                            placeholder="Seleccione (01 o 02)"
+                            placeholder="Seleccione Cantidad"
                         />
                     </div>
 

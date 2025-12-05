@@ -655,7 +655,7 @@ export default function BombaSumergibleGeneral() {
 
             <div className="welcome-message">
                 <p>
-                    <b>Posición base (ID):</b> {POSICION_ID_BASE} &nbsp; | &nbsp{" "}
+                    <b>Posición (ID):</b> {POSICION_ID_BASE} &nbsp; | {" "}
                     <b>Equipo:</b> {EQUIPO} &nbsp; | &nbsp;
                     <b>Registro:</b> {REGISTRO}
                 </p>
@@ -719,12 +719,12 @@ export default function BombaSumergibleGeneral() {
                 <Column field="cantidad" header="Cantidad" />
                 <Column field="periodicidad" header="Periodicidad" />
                 <Column
-                    header="Último Mto."
+                    header="Último Mantenimiento"
                     body={(r) => fmtDMY(r.ultimo_mantenimiento)}
                     sortable
                 />
                 <Column
-                    header="Próximo Mto."
+                    header="Próximo Mantenimiento"
                     body={(r) => fmtDMY(r.proximo_mantenimiento)}
                     sortable
                 />

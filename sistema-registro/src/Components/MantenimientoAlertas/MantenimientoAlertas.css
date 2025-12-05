@@ -11,3 +11,35 @@
     margin: 18px auto 14px;
     border-radius: 8px;
 }
+
+/* Estilo especial solo para el botón "Panel de Alertas" */
+.boton-panel-alertas {
+    background-color: #2563eb;
+    /* azul */
+    color: #ffffff;
+    /* texto blanco */
+}
+
+/* Hover del botón "Panel de Alertas" */
+.boton-panel-alertas:hover {
+    background-color: #1d4ed8;
+    /* azul más oscuro al pasar el mouse */
+}
+
+/* Forzar estilo azul SOLO al botón "Panel de Alertas" */
+.grid-botones .boton-grid.boton-panel-alertas {
+    background-color: #133d96 !important;
+    /* azul */
+    border-color: #02060e !important;
+    color: #ffffff !important;
+    /* texto blanco */
+}
+
+/* Forzar estilo azul SOLO al botón "Panel de Alertas" */
+.grid-botones .boton-grid.boton-panel-alertas {
+    background-color: #4B7F52 !important;
+    /* azul */
+    border-color: #2563eb !important;
+    color: #ffffff !important;
+    /* texto blanco */
+}

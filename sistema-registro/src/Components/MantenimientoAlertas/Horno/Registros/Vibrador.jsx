@@ -623,7 +623,7 @@ export default function Vibrador() {
                 <Column field="equipo" header="Equipo" sortable />
                 <Column field="registro" header="Registro" />
                 <Column
-                    header="Consecutivo"
+                    header="Cantidad"
                     body={(r) =>
                         r.cantidad != null
                             ? String(r.cantidad).padStart(2, "0")
@@ -633,12 +633,12 @@ export default function Vibrador() {
                 />
                 <Column field="periodicidad" header="Periodicidad" />
                 <Column
-                    header="Último Mto."
+                    header="Último Mantenimiento"
                     body={(r) => fmtDMY(r.ultimo_mantenimiento)}
                     sortable
                 />
                 <Column
-                    header="Próximo Mto."
+                    header="Próximo Mantenimiento"
                     body={(r) => fmtDMY(r.proximo_mantenimiento)}
                     sortable
                 />
@@ -731,7 +731,7 @@ export default function Vibrador() {
                     </div>
 
                     <div className="field col-6 md:col-3">
-                        <label className="font-bold">Posición base</label>
+                        <label className="font-bold">Posición (ID)</label>
                         <InputText value={POSICION_ID_BASE} disabled />
                     </div>
                     <div className="field col-6 md:col-3">
@@ -756,7 +756,7 @@ export default function Vibrador() {
                     </div>
                     <div className="field col-6 md:col-3">
                         <label className="font-bold">
-                            Cantidad* (Consecutivo 01){" "}
+                            Cantidad{" "}
                             {submitted && !form.cantidad && (
                                 <small className="p-error"> Requerido</small>
                             )}
@@ -765,7 +765,7 @@ export default function Vibrador() {
                             value={form.cantidad}
                             options={CANTIDAD_OPTIONS}
                             onChange={(e) => onChange("cantidad", e.value)}
-                            placeholder="Seleccione"
+                            placeholder="Seleccione Cantidad"
                         />
                     </div>
 

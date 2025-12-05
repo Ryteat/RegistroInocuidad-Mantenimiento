@@ -576,11 +576,7 @@ export default function CadenasConveyorGeneral() {
                     <b>Equipo:</b> {EQUIPO} &nbsp; | &nbsp;
                     <b>Registro:</b> {REGISTRO}
                 </p>
-                <p>
-                    <b>ID final de ejemplo:</b>{" "}
-                    {buildPosicionId(form.cantidad) ||
-                        "Seleccione cantidad (01–18) para ver el ID"}
-                </p>
+
             </div>
 
             <div className="buttons-container">
@@ -634,7 +630,16 @@ export default function CadenasConveyorGeneral() {
                 <Column field="registro" header="Registro" />
                 <Column field="cantidad" header="Cantidad" sortable />
                 <Column field="periodicidad" header="Periodicidad" />
-
+                <Column
+                    header="Último Mantenimiento"
+                    body={(r) => fmtDMY(r.ultimo_mantenimiento)}
+                    sortable
+                />
+                <Column
+                    header="Próximo Mantenimiento"
+                    body={(r) => fmtDMY(r.proximo_mantenimiento)}
+                    sortable
+                />
                 <Column field="tecnico" header="Técnico" sortable />
                 <Column
                     header="Fecha de Registro"
@@ -728,7 +733,7 @@ export default function CadenasConveyorGeneral() {
 
                     <div className="field col-6 md:col-3">
                         <label className="font-bold">
-                            Técnico*{" "}
+                            Técnico{" "}
                             {submitted && !form.tecnico && (
                                 <small className="p-error"> Requerido</small>
                             )}
@@ -744,7 +749,7 @@ export default function CadenasConveyorGeneral() {
 
                     <div className="field col-6 md:col-3">
                         <label className="font-bold">
-                            Cantidad*{" "}
+                            Cantidad{" "}
                             {submitted && !form.cantidad && (
                                 <small className="p-error"> Requerido</small>
                             )}
@@ -753,7 +758,7 @@ export default function CadenasConveyorGeneral() {
                             value={form.cantidad}
                             options={CANTIDADES}
                             onChange={(e) => onCantidadChange(e.value)}
-                            placeholder="Seleccione cantidad (01–18)"
+                            placeholder="Seleccione cantidad"
                         />
                     </div>
 

@@ -38,8 +38,8 @@ export default function MantenimientoAlertas() {
             {isRootPath && (
                 <>
                     <header className="header-alertas">
-                        <img src={logo2} alt="mosca" className="logo2" />
-                        <h1>Alertas de Mantenimiento</h1>
+                        <h1><img src={logo2} alt="mosca" className="logo2" />
+                            Alertas de Mantenimiento</h1>
                     </header>
 
                     <div className="welcome-message">
@@ -69,15 +69,14 @@ export default function MantenimientoAlertas() {
                         <div className="bloque-sep" />
                         <div className="grid-botones">
                             <button
-                                className="boton-grid cols-2"
-                                onClick={() =>
-                                    navigate("/MantenimientoAlertas/Alertas")
-                                }
+                                className="boton-grid cols-2 boton-panel-alertas"
+                                onClick={() => navigate("/MantenimientoAlertas/Alertas")}
                             >
-                                Ver Sistema de Alertas
+                                Panel de Alertas
                             </button>
+
                             <button
-                                className="boton-grid cols-2"
+                                className="boton-grid cols-2 boton-volver-menu"
                                 onClick={goMenuPrincipal}
                             >
                                 Volver al Menú Principal

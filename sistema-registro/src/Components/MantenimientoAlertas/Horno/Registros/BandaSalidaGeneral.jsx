@@ -438,11 +438,11 @@ export default function BandaSalidaGeneral() {
             let error;
 
             if (editingId) {
-                // 🔵 EDICIÓN
+                // EDICIÓN
                 let updatePayload = { ...basePayload };
 
                 if (form.ejecutado === "SI" && todasSi) {
-                    // ✅ Todo SI → COMPLETADO (verde en campanita)
+                    // Todo SI → COMPLETADO
                     updatePayload = {
                         ...updatePayload,
                         ultimo_mantenimiento: baseDate,
@@ -452,7 +452,7 @@ export default function BandaSalidaGeneral() {
                         fecha_completado: new Date().toISOString(),
                     };
                 } else if (form.ejecutado === "NO") {
-                    // ❌ NO ejecutado → +7 días
+                    // NO ejecutado → +7 días
                     updatePayload = {
                         ...updatePayload,
                         ultimo_mantenimiento: null,
@@ -485,7 +485,7 @@ export default function BandaSalidaGeneral() {
                     .update(updatePayload)
                     .eq("id", editingId));
             } else {
-                // 🟢 NUEVO REGISTRO
+                // NUEVO REGISTRO
                 let ultimo = null;
                 let proximo = null;
 
@@ -672,9 +672,9 @@ export default function BandaSalidaGeneral() {
 
     const activeQuestions = getQuestionsFor(form.periodicidad);
 
-    const viewQuestions = !viewRow
-        ? []
-        : getQuestionsFor(viewRow.periodicidad || "");
+    // 🔵 Helper para VER, igual al patrón de Vibrador/BandaEntrada
+    const viewQuestionsForRow = (row) =>
+        getQuestionsFor(row.periodicidad || "");
 
     return (
         <div className="controlrendcosechayfrass-container">
@@ -686,7 +686,7 @@ export default function BandaSalidaGeneral() {
 
             <div className="welcome-message">
                 <p>
-                    <b>Posición base (ID):</b> {POSICION_ID_BASE} &nbsp; | &nbsp;{" "}
+                    <b>Posición (ID):</b> {POSICION_ID_BASE} &nbsp; | &nbsp;{" "}
                     <b>Equipo:</b> {EQUIPO} &nbsp; | &nbsp;
                     <b>Registro:</b> {REGISTRO}
                 </p>
@@ -745,7 +745,7 @@ export default function BandaSalidaGeneral() {
                 <Column field="equipo" header="Equipo" sortable />
                 <Column field="registro" header="Registro" />
                 <Column
-                    header="Consecutivo"
+                    header="Cantidad"
                     body={(r) =>
                         r.cantidad != null
                             ? String(r.cantidad).padStart(2, "0")
@@ -755,12 +755,12 @@ export default function BandaSalidaGeneral() {
                 />
                 <Column field="periodicidad" header="Periodicidad" />
                 <Column
-                    header="Último Mto."
+                    header="Último Mantenimiento"
                     body={(r) => fmtDMY(r.ultimo_mantenimiento)}
                     sortable
                 />
                 <Column
-                    header="Próximo Mto."
+                    header="Próximo Mantenimiento"
                     body={(r) => fmtDMY(r.proximo_mantenimiento)}
                     sortable
                 />
@@ -853,7 +853,7 @@ export default function BandaSalidaGeneral() {
                     </div>
 
                     <div className="field col-6 md:col-3">
-                        <label className="font-bold">Posición base</label>
+                        <label className="font-bold">Posición (ID)</label>
                         <InputText value={POSICION_ID_BASE} disabled />
                     </div>
                     <div className="field col-6 md:col-3">
@@ -878,7 +878,7 @@ export default function BandaSalidaGeneral() {
                     </div>
                     <div className="field col-6 md:col-3">
                         <label className="font-bold">
-                            Cantidad* (Consecutivo 01 / 02){" "}
+                            Cantidad{" "}
                             {submitted && !form.cantidad && (
                                 <small className="p-error"> Requerido</small>
                             )}
@@ -887,16 +887,13 @@ export default function BandaSalidaGeneral() {
                             value={form.cantidad}
                             options={CANTIDAD_OPTIONS}
                             onChange={(e) => onCantidadChange(e.value)}
-                            placeholder="Seleccione"
+                            placeholder="Seleccione Cantidad"
                         />
-                        <small className="block mt-1">
-                            La posición final será: {POSICION_ID_BASE}-01 / -02
-                        </small>
                     </div>
 
                     <div className="field col-12 md:col-6">
                         <label className="font-bold">
-                            ¿Se va a efectuar el mantenimiento?*{" "}
+                            ¿Se va a efectuar el mantenimiento?{" "}
                             {submitted && !form.ejecutado && (
                                 <small className="p-error"> Requerido</small>
                             )}
@@ -1028,129 +1025,79 @@ export default function BandaSalidaGeneral() {
                 </div>
             </Dialog>
 
-            {/* Dialog VER */}
+            {/* Dialog VER — mismo formato que Vibrador/BandaEntrada */}
             <Dialog
                 visible={viewDialogOpen}
-                style={{ width: "70vw", maxWidth: 1000 }}
-                header="Detalle — Banda de Salida (General)"
-                modal
                 onHide={hideViewDialog}
+                header="Detalle del registro"
+                style={{ width: "60vw", maxWidth: 900 }}
+                modal
             >
-                {viewRow && (
-                    <div className="p-fluid grid">
-                        <div className="field col-12 md:col-4">
-                            <label className="font-bold">Posición (ID)</label>
-                            <InputText value={viewRow.posicion_id} disabled />
-                        </div>
-                        <div className="field col-12 md:col-4">
-                            <label className="font-bold">Equipo</label>
-                            <InputText value={viewRow.equipo} disabled />
-                        </div>
-                        <div className="field col-12 md:col-4">
-                            <label className="font-bold">Registro</label>
-                            <InputText value={viewRow.registro} disabled />
-                        </div>
+                {!viewRow ? (
+                    <p>No hay datos para mostrar.</p>
+                ) : (
+                    <>
+                        <p>
+                            <b>ID:</b> {viewRow.posicion_id} &nbsp; | &nbsp;
+                            <b>Equipo:</b> {viewRow.equipo} &nbsp; | &nbsp;
+                            <b>Registro:</b> {viewRow.registro} &nbsp; | &nbsp;
+                            <b>Periodicidad:</b> {viewRow.periodicidad}
+                        </p>
+                        <p>
+                            <b>Consecutivo:</b>{" "}
+                            {viewRow.cantidad !== null &&
+                                viewRow.cantidad !== undefined
+                                ? String(viewRow.cantidad).padStart(2, "0")
+                                : "—"}
+                        </p>
+                        <p>
+                            <b>Fecha intervención:</b>{" "}
+                            {fmtDMY(viewRow.fecha_registro)} &nbsp; | &nbsp;
+                            <b>Hora:</b> {viewRow.hora_registro || "—"}
+                        </p>
+                        <p>
+                            <b>Técnico:</b> {viewRow.tecnico || "—"}
+                        </p>
 
-                        <div className="field col-12 md:col-4">
-                            <label className="font-bold">Periodicidad</label>
-                            <InputText
-                                value={viewRow.periodicidad}
-                                disabled
-                            />
-                        </div>
-                        <div className="field col-6 md:col-4">
-                            <label className="font-bold">
-                                Fecha intervención
-                            </label>
-                            <InputText
-                                value={fmtDMY(viewRow.fecha_registro)}
-                                disabled
-                            />
-                        </div>
-                        <div className="field col-6 md:col-4">
-                            <label className="font-bold">
-                                Hora intervención
-                            </label>
-                            <InputText
-                                value={viewRow.hora_registro || ""}
-                                disabled
-                            />
-                        </div>
+                        <hr />
 
-                        <div className="field col-6 md:col-4">
-                            <label className="font-bold">Técnico</label>
-                            <InputText
-                                value={viewRow.tecnico || ""}
-                                disabled
-                            />
-                        </div>
-                        <div className="field col-6 md:col-4">
-                            <label className="font-bold">Ejecutado</label>
-                            <InputText
-                                value={viewRow.ejecutado || ""}
-                                disabled
-                            />
-                        </div>
-                        <div className="field col-12 md:col-4">
-                            <label className="font-bold">
-                                Fecha de Registro
-                            </label>
-                            <InputText
-                                value={fmtDMYHM(viewRow.created_at)}
-                                disabled
-                            />
-                        </div>
-
-                        <div className="field col-12">
-                            <label className="font-bold">Observaciones</label>
-                            <InputText
-                                value={viewRow.observaciones || ""}
-                                disabled
-                            />
-                        </div>
-
-                        {!!viewQuestions.length && (
-                            <div className="field col-12">
-                                <div
-                                    style={{
-                                        border: "1px solid #d1d5db",
-                                        borderRadius: 8,
-                                        padding: 12,
-                                    }}
-                                >
+                        <div className="grid">
+                            {viewQuestionsForRow(viewRow).map((q, idx) => {
+                                const col = `respuesta_q${idx + 1}`;
+                                const val = viewRow[col] || "—";
+                                return (
                                     <div
-                                        style={{
-                                            fontWeight: 700,
-                                            marginBottom: 8,
-                                        }}
+                                        key={q.key}
+                                        className="col-12 md:col-6"
+                                        style={{ marginBottom: 8 }}
                                     >
-                                        Checklist — {viewRow.periodicidad}
+                                        <div
+                                            style={{
+                                                fontSize: "0.85rem",
+                                                fontWeight: 600,
+                                            }}
+                                        >
+                                            {q.label}
+                                        </div>
+                                        <div
+                                            style={{
+                                                marginTop: 2,
+                                                fontSize: "0.85rem",
+                                            }}
+                                        >
+                                            Respuesta: <b>{val}</b>
+                                        </div>
                                     </div>
-                                    <div className="grid">
-                                        {viewQuestions.map((q, idx) => (
-                                            <div
-                                                key={q.key}
-                                                className="col-12 md:col-6"
-                                            >
-                                                <label className="font-bold">
-                                                    {q.label}
-                                                </label>
-                                                <InputText
-                                                    value={
-                                                        viewRow[
-                                                        `respuesta_q${idx + 1
-                                                        }`
-                                                        ] || ""
-                                                    }
-                                                    disabled
-                                                />
-                                            </div>
-                                        ))}
-                                    </div>
-                                </div>
-                            </div>
-                        )}
-                    </div>
+                                );
+                            })}
+                        </div>
+
+                        <hr />
+                        <p>
+                            <b>Observaciones:</b>{" "}
+                            {viewRow.observaciones || "—"}
+                        </p>
+                    </>
                 )}
             </Dialog>
         </div>

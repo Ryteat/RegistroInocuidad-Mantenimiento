@@ -135,8 +135,10 @@ export default function PanelControlGeneral() {
     const [filtroRevisado, setFiltroRevisado] = useState("all");
     const { canReview, username } = useCanReview();
 
+    // 🔍 Dialog VER (igual patrón visual que TamizMotor)
     const [detailDialogOpen, setDetailDialogOpen] = useState(false);
     const [detailRow, setDetailRow] = useState(null);
+
     const [editingId, setEditingId] = useState(null);
 
     const showToast = (sev, sum, det, life = 3000) =>
@@ -494,26 +496,22 @@ export default function PanelControlGeneral() {
         );
     };
 
-    /* ===== Acciones (mismo patrón que Tamiz Malla) ===== */
+    /* ===== Acciones (mismo estilo visual que TamizMotor) ===== */
     const accionesTemplate = (row) => (
-        <div className="flex gap-2 justify-content-center">
+        <div className="flex gap-2">
             <Button
-                icon="pi pi-search"
-                rounded
+                label="Ver"
+                icon="pi pi-eye"
                 text
-                severity="info"
-                tooltip="Ver detalle"
                 onClick={() => {
                     setDetailRow(row);
                     setDetailDialogOpen(true);
                 }}
             />
             <Button
+                label="Editar"
                 icon="pi pi-pencil"
-                rounded
                 text
-                severity="warning"
-                tooltip="Editar"
                 onClick={() => openEdit(row)}
             />
         </div>
@@ -588,12 +586,12 @@ export default function PanelControlGeneral() {
                 <Column field="registro" header="Registro" />
                 <Column field="periodicidad" header="Periodicidad" />
                 <Column
-                    header="Último Mto."
+                    header="Último Mantenimiento"
                     body={(r) => fmtDMY(r.ultimo_mantenimiento)}
                     sortable
                 />
                 <Column
-                    header="Próximo Mto."
+                    header="Próximo Mantenimiento"
                     body={(r) => fmtDMY(r.proximo_mantenimiento)}
                     sortable
                 />
@@ -612,11 +610,11 @@ export default function PanelControlGeneral() {
                     header="Acciones"
                     body={accionesTemplate}
                     exportable={false}
-                    style={{ width: "10rem", textAlign: "center" }}
+                    style={{ width: "14rem" }}
                 />
             </DataTable>
 
-            {/* Dialogo de creación / edición */}
+            {/* Diálogo de creación / edición */}
             <Dialog
                 visible={dialogOpen}
                 style={{ width: "72vw", maxWidth: 1100 }}
@@ -682,7 +680,7 @@ export default function PanelControlGeneral() {
 
                     <div className="field col-6 md:col-3">
                         <label className="font-bold">
-                            Técnico*{" "}
+                            Técnico{" "}
                             {submitted && !form.tecnico && (
                                 <small className="p-error"> Requerido</small>
                             )}
@@ -696,7 +694,7 @@ export default function PanelControlGeneral() {
 
                     <div className="field col-6 md:col-3">
                         <label className="font-bold">
-                            Cantidad (referencia)
+                            Cantidad
                         </label>
                         <Dropdown
                             value={form.cantidad}
@@ -708,7 +706,7 @@ export default function PanelControlGeneral() {
 
                     <div className="field col-12 md:col-6">
                         <label className="font-bold">
-                            ¿Se va a efectuar el mantenimiento?*{" "}
+                            ¿Se va a efectuar el mantenimiento?{" "}
                             {submitted && !form.ejecutado && (
                                 <small className="p-error"> Requerido</small>
                             )}
@@ -813,58 +811,77 @@ export default function PanelControlGeneral() {
                 </div>
             </Dialog>
 
-            {/* Diálogo de detalle para ver preguntas / respuestas (igual estructura que Malla) */}
+            {/* Dialog VER – mismo layout que TamizMotor */}
             <Dialog
                 visible={detailDialogOpen}
-                header="Detalle del registro — Panel de Control"
+                onHide={() => setDetailDialogOpen(false)}
+                header="Detalle del registro"
                 style={{ width: "60vw", maxWidth: 900 }}
                 modal
-                onHide={() => setDetailDialogOpen(false)}
             >
-                {detailRow && (
-                    <div className="p-fluid">
+                {!detailRow ? (
+                    <p>No hay datos para mostrar.</p>
+                ) : (
+                    <>
                         <p>
-                            <b>Posición:</b> {detailRow.posicion_id} <br />
-                            <b>Equipo:</b> {detailRow.equipo} <br />
-                            <b>Registro:</b> {detailRow.registro} <br />
-                            <b>Técnico:</b> {detailRow.tecnico} <br />
-                            <b>Fecha intervención:</b>{" "}
-                            {fmtDMY(detailRow.fecha_registro)}{" "}
-                            {detailRow.hora_registro && ` ${detailRow.hora_registro}`}{" "}
-                            <br />
+                            <b>ID:</b> {detailRow.posicion_id} &nbsp; | &nbsp;
+                            <b>Equipo:</b> {detailRow.equipo} &nbsp; | &nbsp;
+                            <b>Registro:</b> {detailRow.registro} &nbsp; | &nbsp;
                             <b>Periodicidad:</b> {detailRow.periodicidad}
                         </p>
+                        <p>
+                            <b>Fecha intervención:</b>{" "}
+                            {fmtDMY(detailRow.fecha_registro)} &nbsp; | &nbsp;
+                            <b>Hora:</b> {detailRow.hora_registro || "—"}
+                        </p>
+                        <p>
+                            <b>Técnico:</b> {detailRow.tecnico || "—"}
+                        </p>
 
-                        <h3 className="mt-3 mb-2">Checklist</h3>
+                        <hr />
+
                         <div className="grid">
                             {Q_MENSUAL.map((q, idx) => {
-                                const resp =
-                                    detailRow[`respuesta_q${idx + 1}`] || "—";
+                                const col = `respuesta_q${idx + 1}`;
+                                const val = detailRow[col] || "—";
                                 return (
                                     <div
                                         key={q.key}
-                                        className="col-12 md:col-6 mb-2"
+                                        className="col-12 md:col-6"
+                                        style={{ marginBottom: 8 }}
                                     >
-                                        <p className="m-0">
-                                            <b>{q.label}</b>
-                                            <br />
+                                        <div
+                                            style={{
+                                                fontSize: "0.85rem",
+                                                fontWeight: 600,
+                                            }}
+                                        >
+                                            {q.label}
+                                        </div>
+                                        <div
+                                            style={{
+                                                marginTop: 2,
+                                                fontSize: "0.85rem",
+                                            }}
+                                        >
                                             Respuesta:{" "}
-                                            <span>
-                                                {resp === "SI"
-                                                    ? "Sí"
-                                                    : resp === "NO"
-                                                        ? "No"
-                                                        : "—"}
-                                            </span>
-                                        </p>
+                                            <b>
+                                                {val === "SI" || val === "NO"
+                                                    ? val
+                                                    : "—"}
+                                            </b>
+                                        </div>
                                     </div>
                                 );
                             })}
                         </div>
 
-                        <h3 className="mt-3 mb-2">Observaciones</h3>
-                        <p>{detailRow.observaciones || "Sin observaciones."}</p>
-                    </div>
+                        <hr />
+                        <p>
+                            <b>Observaciones:</b>{" "}
+                            {detailRow.observaciones || "—"}
+                        </p>
+                    </>
                 )}
             </Dialog>
         </div>

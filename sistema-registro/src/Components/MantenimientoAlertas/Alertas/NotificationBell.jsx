@@ -46,15 +46,14 @@ const ALLOWED_TABLES = [
     "mto_paneles_electrico",
     "mto_iluminacion",
     "mto_cuartos_electricos",
-    // Horno - Empacadora
+
+    // Horno
     "mto_horno_empacadora_sistema_neumatico",
     "mto_horno_empacadora_motor_reductor",
     "mto_horno_empacadora_vibrador",
-    // Horno - Enfriador
     "mto_horno_enfriador_motor_reductor",
     "mto_horno_enfriador_lubricacion_bandas",
     "mto_horno_enfriador_vibrador",
-    // Horno - Multilevel
     "mto_horno_multilevel_vibrador",
     "mto_horno_linea_gas_glp_horno_multilevel",
     "mto_horno_multilevel_sensor_pt100",
@@ -63,8 +62,6 @@ const ALLOWED_TABLES = [
     "mto_horno_banda_entrada_general",
     "mto_horno_banda_salida_general",
     "mto_horno_multilevel_motor_reductor",
-
-    // Horno - Selladora Banda
     "mto_horno_selladora_banda_continua_general",
 
     // Dieta
@@ -79,6 +76,7 @@ const ALLOWED_TABLES = [
     "mto_crecimiento_cadenas_conveyor_general",
     "mto_crecimiento_carro_rs",
     "mto_crecimiento_carro_as",
+
     // Cosecha
     "mto_cosecha_panel_control_general",
     "mto_cosecha_tamiz_motor",
@@ -90,6 +88,12 @@ const ALLOWED_TABLES = [
  * POSICION_ID base → ruta del formulario
  */
 const FORM_MAP = {
+
+    // Infraestructura
+    "IN-PN-G": "/MantenimientoAlertas/InfraestructuraDePlanta/PanelElectrico",
+    "IN-I-G": "/MantenimientoAlertas/InfraestructuraDePlanta/Iluminacion",
+    "IN-CE-G": "/MantenimientoAlertas/InfraestructuraDePlanta/CuartosElectricos",
+
     // Crecimiento
     "CRE-EY-G": "/MantenimientoAlertas/Crecimiento/ExtractoresInyectoresGeneral",
     "CRE-P-G": "/MantenimientoAlertas/Crecimiento/PanelesGeneral",
@@ -101,24 +105,21 @@ const FORM_MAP = {
     "D-M-G": "/MantenimientoAlertas/Dieta/MezcladoraGeneral",
     "D-B-L": "/MantenimientoAlertas/Dieta/BandasLubricacion",
     "D-CC-G": "/MantenimientoAlertas/Dieta/ContenedoresCascaraGeneral",
+
     // Cosecha
     "COS-PC-G": "/MantenimientoAlertas/Cosecha/PanelControlGeneral",
     "COS-T-M": "/MantenimientoAlertas/Cosecha/TamizMotor",
     "COS-T-REM": "/MantenimientoAlertas/Cosecha/TamizRevisionEstructuraMalla",
 
-    // Horno TODOS
-
-    // Empacadora
+    // Horno 
     "H-EL-V": "/MantenimientoAlertas/Horno/Vibrador",
     "H-EL-MR": "/MantenimientoAlertas/Horno/MotorReductor",
     "H-EL-SN": "/MantenimientoAlertas/Horno/SistemaNeumatico",
-    // Multilevel
     "H-HM-V": "/MantenimientoAlertas/Horno/VibradorHornoMultilevel",
     "H-HM-LG": "/MantenimientoAlertas/Horno/LineaGasGLPHornoMultilevel",
     "H-HM-LB": "/MantenimientoAlertas/Horno/LubricacionBandasHornoMultilevel",
     "H-HM-SPT": "/MantenimientoAlertas/Horno/SensorPT100",
     "H-HM-MR": "/MantenimientoAlertas/Horno/MotorReductorHornoMultilevel",
-
     "H-ML-V": "/MantenimientoAlertas/Horno/Vibrador",
     "H-HM-TT": "/MantenimientoAlertas/Horno/TransmisionTurbinaHornoMultilevel",
     "H-E-SN": "/MantenimientoAlertas/HornoEmpacadora/SistemaNeumatico",
@@ -133,11 +134,6 @@ const FORM_MAP = {
     "H-ENF-V": "/MantenimientoAlertas/Horno/VibradorEnfriador",
     "H-ENF-LB": "/MantenimientoAlertas/Horno/LubricacionBandasEnfriador",
     "H-ENF-MR": "/MantenimientoAlertas/Horno/MotorReductorEnfriador",
-
-    // Infraestructura
-    "IN-PN-G": "/MantenimientoAlertas/InfraestructuraDePlanta/PanelElectrico",
-    "IN-I-G": "/MantenimientoAlertas/InfraestructuraDePlanta/Iluminacion",
-    "IN-CE-G": "/MantenimientoAlertas/InfraestructuraDePlanta/CuartosElectricos",
 };
 
 /** Tablas que usan "I" (Incompleto) como bloqueo de completado */
