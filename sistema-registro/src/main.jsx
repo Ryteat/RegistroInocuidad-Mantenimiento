@@ -313,6 +313,7 @@ const router = createBrowserRouter(
             { path: `ControlCalidadHornoMicroondas`, element: <ControlCalidadHornoMicroondas /> },
             { path: `ControlCalidadHornoMultilevel`, element: <ControlCalidadHornoMultilevel /> },
             { path: `ControlCalidadDietaSiembra`, element: <ControlCalidadDietaSiembra /> },
+            //{ path: `ControlMortalidad`, element: <ControlMortalidad /> },
           ],
         },
 
